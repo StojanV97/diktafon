@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Diktafon",
+    "slug": "diktafon",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.local.diktafon",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Microphone access for recording audio."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#111111"
+      },
+      "package": "com.local.diktafon",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
