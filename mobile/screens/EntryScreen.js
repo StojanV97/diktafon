@@ -36,7 +36,7 @@ function formatPlaybackTime(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function JournalEntryScreen({ route, navigation }) {
+export default function EntryScreen({ route, navigation }) {
   const theme = useTheme();
   const { id } = route.params;
   const [record, setRecord] = useState(null);
@@ -144,8 +144,8 @@ export default function JournalEntryScreen({ route, navigation }) {
           <View style={styles.controls}>
             <IconButton
               icon="rewind-10"
-              iconColor="#AAA"
-              containerColor="#2A2A2A"
+              iconColor="#555"
+              containerColor="#E0E0E0"
               size={20}
               onPress={() => player.seekTo(Math.max(0, status.currentTime - 10))}
               disabled={!status.isLoaded}
@@ -159,8 +159,8 @@ export default function JournalEntryScreen({ route, navigation }) {
             />
             <IconButton
               icon="fast-forward-10"
-              iconColor="#AAA"
-              containerColor="#2A2A2A"
+              iconColor="#555"
+              containerColor="#E0E0E0"
               size={20}
               onPress={() => player.seekTo(Math.min(status.duration ?? 0, status.currentTime + 10))}
               disabled={!status.isLoaded}
@@ -178,14 +178,14 @@ export default function JournalEntryScreen({ route, navigation }) {
       <View style={styles.actions}>
         <IconButton
           icon="content-copy"
-          iconColor="#AAA"
+          iconColor="#555"
           size={24}
           onPress={copyText}
         />
         <Text variant="labelSmall" style={styles.actionDivider}>|</Text>
         <IconButton
           icon="share-variant"
-          iconColor="#AAA"
+          iconColor="#555"
           size={24}
           onPress={shareText}
         />
@@ -207,38 +207,38 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { color: "#AAA" },
   meta: {
-    backgroundColor: "#1A1A1A",
+    backgroundColor: "#FFFFFF",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#2A2A2A",
+    borderBottomColor: "#E0E0E0",
   },
-  filename: { color: "#FFF", fontWeight: "600", marginBottom: 4 },
-  metaLine: { color: "#888" },
+  filename: { color: "#111", fontWeight: "600", marginBottom: 4 },
+  metaLine: { color: "#666" },
   textScroll: { flex: 1 },
   textContent: { padding: 16 },
-  bodyText: { color: "#DDD", lineHeight: 24 },
+  bodyText: { color: "#222", lineHeight: 24 },
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#2A2A2A",
-    backgroundColor: "#1A1A1A",
+    borderTopColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
     paddingVertical: 4,
   },
-  actionDivider: { color: "#2A2A2A" },
+  actionDivider: { color: "#E0E0E0" },
   playerCard: {
-    backgroundColor: "#1A1A1A",
+    backgroundColor: "#F8F8F8",
     marginHorizontal: 12,
     marginTop: 10,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#2A2A2A",
+    borderColor: "#E0E0E0",
   },
   progressBarTrack: {
     height: 4,
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "#E0E0E0",
     borderRadius: 2,
     overflow: "hidden",
   },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   timeText: {
-    color: "#666",
+    color: "#888",
     fontVariant: ["tabular-nums"],
   },
   controls: {

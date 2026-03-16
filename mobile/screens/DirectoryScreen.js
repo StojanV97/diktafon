@@ -3,6 +3,7 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -15,23 +16,29 @@ import {
   IconButton,
   Menu,
   Portal,
+  RadioButton,
   Snackbar,
   Text,
   useTheme,
 } from "react-native-paper";
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
+import * as DocumentPicker from "expo-document-picker";
 import {
   createEntry,
   fetchEntries,
   fetchEntry,
   deleteEntry,
-  getFolder,
   updateEntryToProcessing,
   completeEntry,
   failEntry,
   entryAudioUri,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
+
+const AUDIO_TYPES = [
+  "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
+  "audio/flac", "audio/aac", "audio/x-m4a", "audio/webm", "audio/*",
+];
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
@@ -51,13 +58,14 @@ function formatTimer(ms) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function JournalFolderScreen({ route, navigation }) {
+export default function DirectoryScreen({ route, navigation }) {
   const theme = useTheme();
   const { id: folderId } = route.params;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(null);
@@ -65,6 +73,14 @@ export default function JournalFolderScreen({ route, navigation }) {
   // Delete dialog
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Engine choice dialog
+  const [engineDialogVisible, setEngineDialogVisible] = useState(false);
+  const [engineChoice, setEngineChoice] = useState("local");
+  const [engineTargetId, setEngineTargetId] = useState(null);
+
+  // AI dialog
+  const [aiDialogVisible, setAiDialogVisible] = useState(false);
 
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
@@ -78,6 +94,17 @@ export default function JournalFolderScreen({ route, navigation }) {
   const prevIsRecording = useRef(false);
 
   const pollIntervalRef = useRef(null);
+
+  // AI Insights button in header
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={() => setAiDialogVisible(true)} style={styles.aiBtn}>
+          <Text style={styles.aiBtnText}>AI</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const load = useCallback(async () => {
     try {
@@ -196,6 +223,7 @@ export default function JournalFolderScreen({ route, navigation }) {
 
   const stopRecording = async () => {
     try {
+      const elapsed = recorderState.durationMillis ?? 0;
       await audioRecorder.stop();
       setIsPaused(false);
       setMeteringHistory([]);
@@ -207,9 +235,10 @@ export default function JournalFolderScreen({ route, navigation }) {
 
       const now = new Date();
       const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
+      const durationSeconds = Math.floor(elapsed / 1000);
 
       try {
-        const entry = await createEntry(folderId, filename, uri);
+        const entry = await createEntry(folderId, filename, uri, durationSeconds);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
         setSnackbar("Čuvanje snimka nije uspelo: " + e.message);
@@ -219,13 +248,39 @@ export default function JournalFolderScreen({ route, navigation }) {
     }
   };
 
-  const onTranscribe = async (entryId) => {
+  const importFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: AUDIO_TYPES,
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const entry = await createEntry(folderId, asset.name, asset.uri, 0);
+      setEntries((prev) => [entry, ...prev]);
+    } catch (e) {
+      setSnackbar("Uvoz nije uspeo: " + e.message);
+    }
+  };
+
+  const openEngineDialog = (entryId) => {
+    setMenuVisible(null);
+    setEngineTargetId(entryId);
+    setEngineChoice("local");
+    setEngineDialogVisible(true);
+  };
+
+  const onTranscribeConfirm = async () => {
+    setEngineDialogVisible(false);
+    const entryId = engineTargetId;
+    if (!entryId) return;
+
     const entry = await fetchEntry(entryId);
-    const folder = await getFolder(entry?.folder_id);
     const audioUri = entryAudioUri(entryId);
 
     try {
-      if (folder?.engine === "assemblyai") {
+      if (engineChoice === "assemblyai") {
         const { assemblyai_id } = await submitAssemblyAI(audioUri, entry.filename);
         const updated = await updateEntryToProcessing(entryId, assemblyai_id);
         setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
@@ -236,6 +291,8 @@ export default function JournalFolderScreen({ route, navigation }) {
         setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
       }
     } catch (e) {
+      const updated = await failEntry(entryId, e.message);
+      if (updated) setEntries((prev) => prev.map((en) => (en.id === entryId ? updated : en)));
       setSnackbar(e.message);
     }
   };
@@ -282,7 +339,7 @@ export default function JournalFolderScreen({ route, navigation }) {
     return (
       <Card
         style={styles.card}
-        onPress={() => isDone && navigation.navigate("JournalEntry", { id: item.id })}
+        onPress={() => isDone && navigation.navigate("Entry", { id: item.id })}
       >
         <Card.Content>
           <View style={styles.cardHeader}>
@@ -309,11 +366,11 @@ export default function JournalFolderScreen({ route, navigation }) {
                 {isRecorded && (
                   <Menu.Item
                     leadingIcon="text-recognition"
-                    onPress={() => { setMenuVisible(null); onTranscribe(item.id); }}
+                    onPress={() => openEngineDialog(item.id)}
                     title="Transkribiši"
                   />
                 )}
-                {isDone && (
+                {(isDone || isRecorded) && (
                   <Menu.Item
                     leadingIcon="delete-outline"
                     onPress={() => onDeletePress(item.id, item.filename)}
@@ -342,7 +399,7 @@ export default function JournalFolderScreen({ route, navigation }) {
             <Button
               mode="contained"
               compact
-              onPress={() => onTranscribe(item.id)}
+              onPress={() => openEngineDialog(item.id)}
               style={styles.transcribeBtn}
               labelStyle={styles.transcribeBtnLabel}
             >
@@ -402,59 +459,71 @@ export default function JournalFolderScreen({ route, navigation }) {
         }
       />
 
-      <View style={styles.recordArea}>
-        {isActiveSession ? (
-          <>
-            <View style={styles.waveform}>
-              {meteringHistory.map((m, i) => {
-                const normalized = Math.max(0, Math.min(1, (m + 60) / 60));
-                return (
-                  <View
-                    key={i}
-                    style={[
-                      styles.waveformBar,
-                      { height: 4 + normalized * 36, opacity: isPaused ? 0.4 : 1 },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-            <Text variant="titleMedium" style={[styles.timer, isPaused && styles.timerPaused]}>
-              {formatTimer(elapsed)}
-            </Text>
-            <View style={styles.recordControls}>
-              <IconButton
-                icon={isPaused ? "play" : "pause"}
-                iconColor="#FFF"
-                containerColor="#FF4444"
-                size={28}
-                onPress={isPaused ? resumeRecording : pauseRecording}
-              />
-              <IconButton
-                icon="stop"
-                iconColor="#FFF"
-                containerColor="#333"
-                size={24}
-                onPress={stopRecording}
-              />
-            </View>
-            <Text variant="bodySmall" style={styles.recordHint}>
-              {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
-            </Text>
-          </>
-        ) : (
-          <>
-            <FAB
-              icon="microphone"
-              onPress={startRecording}
-              style={styles.recordFab}
+      {isActiveSession && (
+        <View style={styles.recordArea}>
+          <View style={styles.waveform}>
+            {meteringHistory.map((m, i) => {
+              const normalized = Math.max(0, Math.min(1, (m + 60) / 60));
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.waveformBar,
+                    { height: 4 + normalized * 36, opacity: isPaused ? 0.4 : 1 },
+                  ]}
+                />
+              );
+            })}
+          </View>
+          <Text variant="titleMedium" style={[styles.timer, isPaused && styles.timerPaused]}>
+            {formatTimer(elapsed)}
+          </Text>
+          <View style={styles.recordControls}>
+            <IconButton
+              icon={isPaused ? "play" : "pause"}
+              iconColor="#FFF"
+              containerColor="#FF4444"
+              size={28}
+              onPress={isPaused ? resumeRecording : pauseRecording}
             />
-            <Text variant="bodySmall" style={styles.recordHint}>Tapni da snimaš</Text>
-          </>
-        )}
-      </View>
+            <IconButton
+              icon="stop"
+              iconColor="#FFF"
+              containerColor="#333"
+              size={24}
+              onPress={stopRecording}
+            />
+          </View>
+          <Text variant="bodySmall" style={styles.recordHint}>
+            {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
+          </Text>
+        </View>
+      )}
+
+      <FAB.Group
+        open={fabOpen}
+        visible={!isActiveSession}
+        icon={fabOpen ? "close" : "microphone"}
+        actions={[
+          {
+            icon: "microphone",
+            label: "Snimi",
+            onPress: startRecording,
+            style: { backgroundColor: "#4A9EFF" },
+          },
+          {
+            icon: "file-upload-outline",
+            label: "Uvezi fajl",
+            onPress: importFile,
+            style: { backgroundColor: "#4A9EFF" },
+          },
+        ]}
+        onStateChange={({ open }) => setFabOpen(open)}
+        fabStyle={styles.recordFab}
+      />
 
       <Portal>
+        {/* Delete dialog */}
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
           <Dialog.Title>Obriši zapis</Dialog.Title>
           <Dialog.Content>
@@ -465,6 +534,56 @@ export default function JournalFolderScreen({ route, navigation }) {
           <Dialog.Actions>
             <Button onPress={() => setDeleteDialogVisible(false)}>Otkaži</Button>
             <Button onPress={onDeleteConfirm} textColor={theme.colors.error}>Obriši</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Engine choice dialog */}
+        <Dialog visible={engineDialogVisible} onDismiss={() => setEngineDialogVisible(false)}>
+          <Dialog.Title>Izaberi tip transkripcije</Dialog.Title>
+          <Dialog.Content>
+            <RadioButton.Group onValueChange={setEngineChoice} value={engineChoice}>
+              <TouchableOpacity
+                style={styles.engineRow}
+                onPress={() => setEngineChoice("local")}
+              >
+                <RadioButton value="local" />
+                <View style={styles.engineInfo}>
+                  <Text variant="bodyMedium" style={styles.engineTitle}>Lokalni model — Besplatno</Text>
+                  <Text variant="bodySmall" style={styles.engineDesc}>
+                    Osnovna transkripcija. Radi lokalno, bez slanja podataka van uređaja. Podržava srpski i engleski jezik.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.engineRow}
+                onPress={() => setEngineChoice("assemblyai")}
+              >
+                <RadioButton value="assemblyai" />
+                <View style={styles.engineInfo}>
+                  <Text variant="bodyMedium" style={styles.engineTitle}>AssemblyAI — Premium</Text>
+                  <Text variant="bodySmall" style={styles.engineDesc}>
+                    Prepoznavanje govornika (ko je govorio šta), viša tačnost, podrška za akcentovane govore, automatske interpunkcije i detekcija tema.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </RadioButton.Group>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEngineDialogVisible(false)}>Otkaži</Button>
+            <Button onPress={onTranscribeConfirm}>Transkribiši</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* AI Insights dialog */}
+        <Dialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)}>
+          <Dialog.Title>AI uvidi</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              {"AI analiza će omogućiti:\n• Automatsko sažimanje transkripata\n• Prepoznavanje govornika i tema\n• Pametan pregled ključnih tačaka\n• Pretraga po sadržaju unutar direktorijuma\n\nOva funkcija je u razvoju i biće dostupna uskoro."}
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setAiDialogVisible(false)}>Zatvori</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -485,29 +604,29 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   list: { padding: 12, paddingBottom: 140 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#666", textAlign: "center", lineHeight: 26 },
+  emptyText: { color: "#888", textAlign: "center", lineHeight: 26 },
   card: {
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#FFFFFF",
     marginBottom: 10,
   },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-  filename: { color: "#FFF", fontWeight: "600", flex: 1, marginRight: 8 },
+  filename: { color: "#111", fontWeight: "600", flex: 1, marginRight: 8 },
   cardMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
   duration: { color: "#4A9EFF" },
-  date: { color: "#888", marginBottom: 6 },
+  date: { color: "#777", marginBottom: 6 },
   statusChip: {
     alignSelf: "flex-start",
     marginBottom: 6,
     height: 28,
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "#F0F0F0",
   },
   statusChipText: { fontSize: 11, lineHeight: 14 },
-  statusChipRecorded: { backgroundColor: "#1A2A3A" },
-  statusChipProcessing: { backgroundColor: "#2A2A1A" },
-  statusChipDone: { backgroundColor: "#1A2A1A" },
-  statusChipError: { backgroundColor: "#3A1A1A" },
-  preview: { color: "#AAA", lineHeight: 18 },
-  previewError: { color: "#FF6B6B" },
+  statusChipRecorded: { backgroundColor: "#E3F0FF" },
+  statusChipProcessing: { backgroundColor: "#FFFDE7" },
+  statusChipDone: { backgroundColor: "#E8F5E9" },
+  statusChipError: { backgroundColor: "#FFEBEE" },
+  preview: { color: "#555", lineHeight: 18 },
+  previewError: { color: "#D32F2F" },
   processingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   processingText: { color: "#4A9EFF" },
   transcribeBtn: {
@@ -516,6 +635,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#4A9EFF",
   },
   transcribeBtnLabel: { fontSize: 13 },
+  engineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 8,
+  },
+  engineInfo: { flex: 1, paddingLeft: 4 },
+  engineTitle: { fontWeight: "700", marginBottom: 2 },
+  engineDesc: { color: "#555", lineHeight: 18 },
+  aiBtn: {
+    backgroundColor: "#4A9EFF",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 8,
+  },
+  aiBtnText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
   recordArea: {
     position: "absolute",
     bottom: 0,
@@ -524,9 +659,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingBottom: 28,
     paddingTop: 12,
-    backgroundColor: "#111",
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: "#2A2A2A",
+    borderTopColor: "#E0E0E0",
   },
   timer: {
     color: "#FF4444",
@@ -534,7 +669,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     marginBottom: 8,
   },
-  timerPaused: { color: "#888" },
+  timerPaused: { color: "#AAA" },
   recordControls: {
     flexDirection: "row",
     alignItems: "center",

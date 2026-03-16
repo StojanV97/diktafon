@@ -40,14 +40,37 @@ function truncateText(text, max = 200) {
   return text.slice(0, max) + "...";
 }
 
+// ── Migration ──────────────────────────────────────────
+
+export async function migrateData() {
+  const folders = await readJSON(foldersFile);
+  let changed = false;
+  for (const folder of folders) {
+    if (!folder.color) {
+      folder.color = "#4A9EFF";
+      changed = true;
+    }
+    if (!folder.tags) {
+      folder.tags = [];
+      changed = true;
+    }
+    if (folder.engine !== undefined) {
+      delete folder.engine;
+      changed = true;
+    }
+  }
+  if (changed) writeJSON(foldersFile, folders);
+}
+
 // ── Folders ─────────────────────────────────────────────
 
-export async function createFolder(name, engine = "local") {
+export async function createFolder(name, color = "#4A9EFF", tags = []) {
   const folders = await readJSON(foldersFile);
   const folder = {
     id: generateUUID(),
     name,
-    engine,
+    color,
+    tags,
     created_at: new Date().toISOString(),
   };
   folders.unshift(folder);
@@ -64,13 +87,24 @@ export async function getFolder(id) {
   return folders.find((f) => f.id === id) || null;
 }
 
-export async function renameFolder(id, name) {
+export async function updateFolder(id, updates) {
   const folders = await readJSON(foldersFile);
   const folder = folders.find((f) => f.id === id);
   if (!folder) return null;
-  folder.name = name;
+  if (updates.name !== undefined) folder.name = updates.name;
+  if (updates.color !== undefined) folder.color = updates.color;
+  if (updates.tags !== undefined) folder.tags = updates.tags;
   writeJSON(foldersFile, folders);
   return folder;
+}
+
+export async function getAllTags() {
+  const folders = await readJSON(foldersFile);
+  const tagSet = new Set();
+  for (const folder of folders) {
+    if (folder.tags) folder.tags.forEach((t) => tagSet.add(t));
+  }
+  return [...tagSet].sort();
 }
 
 export async function deleteFolder(id) {
@@ -95,7 +129,7 @@ export async function deleteFolder(id) {
 
 // ── Entries ─────────────────────────────────────────────
 
-export async function createEntry(folderId, filename, audioSourceUri) {
+export async function createEntry(folderId, filename, audioSourceUri, durationSeconds = 0) {
   ensureDirs();
   const id = generateUUID();
 
@@ -110,7 +144,7 @@ export async function createEntry(folderId, filename, audioSourceUri) {
     filename,
     text: "",
     created_at: new Date().toISOString(),
-    duration_seconds: 0,
+    duration_seconds: durationSeconds,
     status: "recorded",
     audio_file: `${id}.m4a`,
   };
