@@ -115,7 +115,7 @@ export default function SettingsScreen() {
               </Text>
             </Text>
             <Text style={[typography.caption, { marginTop: spacing.xs }]}>
-              Model za transkripciju na uredjaju (~141 MB). Preuzima se jednom.
+              Besplatno · Radi offline · ~466 MB · Sporije, slabiji kvalitet za srpski
             </Text>
             {downloading && (
               <View style={{ marginTop: spacing.md }}>
@@ -180,7 +180,7 @@ export default function SettingsScreen() {
               activeOutlineColor={colors.primary}
             />
             <Text style={[typography.caption, { marginTop: spacing.xs }]}>
-              assemblyai.com za API kljuc
+              Brze · Bolji kvalitet · Zahteva API kljuc
             </Text>
             <View style={styles.btnRow}>
               <Button

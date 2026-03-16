@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -200,7 +200,7 @@ export default function DirectoryHomeScreen({ navigation }) {
 
   const regularFolders = folders.filter((f) => !f.is_daily_log);
 
-  const ListHeader = () => (
+  const listHeader = useMemo(() => (
     <View style={[styles.headerArea, { paddingTop: insets.top + spacing.lg }]}>
       <View style={styles.headerTitleRow}>
         <View>
@@ -237,7 +237,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
       </TouchableOpacity>
     </View>
-  );
+  ), [insets.top, dailyStats]);
 
   const renderItem = ({ item }) => {
     const color = item.color || FOLDER_COLORS[0];
@@ -319,7 +319,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         data={regularFolders}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ListHeaderComponent={ListHeader}
+        ListHeaderComponent={listHeader}
         contentContainerStyle={[styles.list, { flexGrow: 1 }]}
         refreshControl={
           <RefreshControl

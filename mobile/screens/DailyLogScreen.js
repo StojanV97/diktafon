@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Clipboard,
   SectionList,
@@ -128,7 +128,8 @@ export default function DailyLogScreen({ navigation }) {
 
   const [snackbar, setSnackbar] = useState("");
 
-  const pollIntervalRef = useRef(null);
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds) => {
@@ -159,52 +160,42 @@ export default function DailyLogScreen({ navigation }) {
   }, [navigation, load]);
 
   // Poll processing entries every 5 seconds
+  const hasProcessing = useMemo(() => entries.some((e) => e.status === "processing"), [entries]);
+
   useEffect(() => {
-    const hasProcessing = entries.some((e) => e.status === "processing");
+    if (!hasProcessing) return;
 
-    if (hasProcessing && !pollIntervalRef.current) {
-      pollIntervalRef.current = setInterval(async () => {
-        const processing = entries.filter((e) => e.status === "processing" && e.assemblyai_id);
-        if (processing.length === 0) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          return;
-        }
-        await Promise.all(
-          processing.map(async (e) => {
-            try {
-              const result = await checkAssemblyAI(e.assemblyai_id);
-              if (result.status === "done") {
-                const updated = await completeEntry(e.id, result.text, result.duration_seconds);
-                if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-              } else if (result.status === "error") {
-                const updated = await failEntry(e.id, result.error);
-                if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-              }
-            } catch {
-              // Retry next interval
+    const intervalId = setInterval(async () => {
+      const processing = entriesRef.current.filter(
+        (e) => e.status === "processing" && e.assemblyai_id
+      );
+      if (processing.length === 0) return;
+
+      await Promise.all(
+        processing.map(async (e) => {
+          try {
+            const result = await checkAssemblyAI(e.assemblyai_id);
+            if (result.status === "done") {
+              const updated = await completeEntry(e.id, result.text, result.duration_seconds);
+              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
+            } else if (result.status === "error") {
+              const updated = await failEntry(e.id, result.error);
+              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
             }
-          })
-        );
-      }, 5000);
-    }
+          } catch {
+            // Retry next interval
+          }
+        })
+      );
+    }, 5000);
 
-    if (!hasProcessing && pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
+    return () => clearInterval(intervalId);
+  }, [hasProcessing]);
 
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [entries]);
+  const grouped = useMemo(() => groupByDate(entries), [entries]);
 
   // Load combined transcripts for dates where all entries are done
   useEffect(() => {
-    const grouped = groupByDate(entries);
     for (const { date, data } of grouped) {
       const allDone = data.length > 0 && data.every((e) => e.status === "done");
       if (allDone && !combinedTexts[date]) {
@@ -220,7 +211,7 @@ export default function DailyLogScreen({ navigation }) {
         });
       }
     }
-  }, [entries]);
+  }, [grouped]);
 
   const toggleSection = (date) => {
     setCollapsedDates((prev) => {
@@ -400,7 +391,6 @@ export default function DailyLogScreen({ navigation }) {
     }
   };
 
-  const grouped = groupByDate(entries);
   const sections = grouped.map(({ date, data }) => ({
     date,
     allData: data,

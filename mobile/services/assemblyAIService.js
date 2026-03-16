@@ -1,10 +1,9 @@
 import * as SecureStore from "expo-secure-store";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 const API_BASE = "https://api.assemblyai.com/v2";
 const STORE_KEY = "assemblyai_api_key";
 
-const UPLOAD_TIMEOUT_MS = 120_000;
 const STATUS_TIMEOUT_MS = 30_000;
 
 // ── API Key Management ──────────────────────────────────
@@ -23,17 +22,19 @@ export async function removeApiKey() {
 
 export async function hasApiKey() {
   const key = await getApiKey();
-  return !!key && key.trim().length > 0;
+  if (key && key.trim().length > 0) return true;
+  const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY;
+  return !!envKey && envKey.trim().length > 0;
 }
 
 // ── Transcription ───────────────────────────────────────
 
 async function getKeyOrThrow() {
   const key = await getApiKey();
-  if (!key || !key.trim()) {
-    throw new Error("ASSEMBLYAI_KEY_MISSING");
-  }
-  return key.trim();
+  if (key && key.trim()) return key.trim();
+  const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY;
+  if (envKey && envKey.trim()) return envKey.trim();
+  throw new Error("ASSEMBLYAI_KEY_MISSING");
 }
 
 export async function submitAndGetId(fileUri) {
@@ -71,6 +72,7 @@ export async function submitAndGetId(fileUri) {
       },
       body: JSON.stringify({
         audio_url: upload_url,
+        speech_models: ["universal-2", "universal-3-pro"],
         language_code: "sr",
         speaker_labels: true,
       }),

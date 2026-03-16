@@ -224,9 +224,12 @@ export default function EntryScreen({ route, navigation }) {
       {/* Transcript section */}
       <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
         <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>
-        <Text style={styles.bodyText} selectable>
-          {record.text}
-        </Text>
+        {record.text
+          ? <Text style={styles.bodyText} selectable>{record.text}</Text>
+          : <Text style={[typography.body, { color: colors.muted, fontStyle: 'italic' }]}>
+              Transkript nije dostupan. Vrati se i tapni „Transkribisi".
+            </Text>
+        }
       </ScrollView>
 
       {/* Bottom actions */}

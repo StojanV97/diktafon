@@ -1,9 +1,9 @@
 import { initWhisper } from "whisper.rn";
 import { File, Directory, Paths } from "expo-file-system";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 const MODEL_URL =
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
 
 const SERBIAN_PROMPT =
   "Ovo je transkript na srpskom jeziku. " +
@@ -11,7 +11,7 @@ const SERBIAN_PROMPT =
   "Rečenice završavaj tačkom. Imena piši velikim slovom.";
 
 const modelsDir = new Directory(Paths.document, "whisper-models");
-const modelFile = new File(modelsDir, "ggml-base.bin");
+const modelFile = new File(modelsDir, "ggml-small.bin");
 
 let whisperContext = null;
 
