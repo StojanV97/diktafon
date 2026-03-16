@@ -1,14 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  FAB,
+  IconButton,
+  Menu,
+  Portal,
+  Snackbar,
+  Text,
+  useTheme,
+} from "react-native-paper";
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
 import {
   createEntry,
@@ -42,11 +52,22 @@ function formatTimer(ms) {
 }
 
 export default function JournalFolderScreen({ route, navigation }) {
+  const theme = useTheme();
   const { id: folderId } = route.params;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+
+  // Menu state
+  const [menuVisible, setMenuVisible] = useState(null);
+
+  // Delete dialog
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Snackbar
+  const [snackbar, setSnackbar] = useState("");
 
   const audioRecorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
@@ -56,7 +77,6 @@ export default function JournalFolderScreen({ route, navigation }) {
   const [meteringHistory, setMeteringHistory] = useState([]);
   const prevIsRecording = useRef(false);
 
-  // Polling interval for processing entries
   const pollIntervalRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -64,7 +84,7 @@ export default function JournalFolderScreen({ route, navigation }) {
       const data = await fetchEntries(folderId);
       setEntries(data);
     } catch (e) {
-      Alert.alert("Greška", e.message);
+      setSnackbar(e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -134,7 +154,7 @@ export default function JournalFolderScreen({ route, navigation }) {
     try {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        Alert.alert("Dozvola", "Potrebna je dozvola za mikrofon.");
+        setSnackbar("Potrebna je dozvola za mikrofon.");
         return;
       }
 
@@ -146,13 +166,13 @@ export default function JournalFolderScreen({ route, navigation }) {
       await audioRecorder.prepareToRecordAsync();
       const recStatus = audioRecorder.getStatus();
       if (!recStatus.canRecord) {
-        Alert.alert("Greška", "Snimač nije spreman.");
+        setSnackbar("Snimač nije spreman.");
         return;
       }
       audioRecorder.record();
       setIsPaused(false);
     } catch (e) {
-      Alert.alert("Greška", "Snimanje nije uspelo: " + e.message);
+      setSnackbar("Snimanje nije uspelo: " + e.message);
     }
   };
 
@@ -161,7 +181,7 @@ export default function JournalFolderScreen({ route, navigation }) {
       await audioRecorder.pause();
       setIsPaused(true);
     } catch (e) {
-      Alert.alert("Greška", "Pauza nije uspela: " + e.message);
+      setSnackbar("Pauza nije uspela: " + e.message);
     }
   };
 
@@ -170,7 +190,7 @@ export default function JournalFolderScreen({ route, navigation }) {
       audioRecorder.record();
       setIsPaused(false);
     } catch (e) {
-      Alert.alert("Greška", "Nastavak nije uspeo: " + e.message);
+      setSnackbar("Nastavak nije uspeo: " + e.message);
     }
   };
 
@@ -192,10 +212,10 @@ export default function JournalFolderScreen({ route, navigation }) {
         const entry = await createEntry(folderId, filename, uri);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
-        Alert.alert("Greška", "Čuvanje snimka nije uspelo: " + e.message);
+        setSnackbar("Čuvanje snimka nije uspelo: " + e.message);
       }
     } catch (e) {
-      Alert.alert("Greška", "Zaustavljanje nije uspelo: " + e.message);
+      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
     }
   };
 
@@ -216,22 +236,40 @@ export default function JournalFolderScreen({ route, navigation }) {
         setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
       }
     } catch (e) {
-      Alert.alert("Greška", e.message);
+      setSnackbar(e.message);
     }
   };
 
-  const onDeleteEntry = (entryId, filename) => {
-    Alert.alert("Obriši zapis", `Obrisati "${filename}"?`, [
-      { text: "Otkaži", style: "cancel" },
-      {
-        text: "Obriši",
-        style: "destructive",
-        onPress: async () => {
-          await deleteEntry(entryId);
-          setEntries((prev) => prev.filter((e) => e.id !== entryId));
-        },
-      },
-    ]);
+  const onDeletePress = (entryId, filename) => {
+    setMenuVisible(null);
+    setDeleteTarget({ id: entryId, filename });
+    setDeleteDialogVisible(true);
+  };
+
+  const onDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    await deleteEntry(deleteTarget.id);
+    setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+    setDeleteDialogVisible(false);
+    setDeleteTarget(null);
+  };
+
+  const statusLabel = (status) => {
+    switch (status) {
+      case "recorded": return "Snimljeno";
+      case "processing": return "Transkribuje...";
+      case "error": return "Greška";
+      default: return "Gotovo";
+    }
+  };
+
+  const statusIcon = (status) => {
+    switch (status) {
+      case "recorded": return "record-circle-outline";
+      case "processing": return "progress-clock";
+      case "error": return "alert-circle-outline";
+      default: return "check-circle-outline";
+    }
   };
 
   const renderItem = ({ item }) => {
@@ -242,57 +280,99 @@ export default function JournalFolderScreen({ route, navigation }) {
     const isDone = !isRecorded && !isProcessing;
 
     return (
-      <Pressable
-        style={({ pressed }) => [styles.card, isDone && pressed && styles.cardPressed]}
+      <Card
+        style={styles.card}
         onPress={() => isDone && navigation.navigate("JournalEntry", { id: item.id })}
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.filename} numberOfLines={1}>
-            {item.filename}
-          </Text>
-          <View style={styles.cardMeta}>
-            {item.duration_seconds > 0 && (
-              <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
-            )}
-            {isDone && (
-              <Pressable
-                style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-                onPress={() => onDeleteEntry(item.id, item.filename)}
-                hitSlop={8}
+        <Card.Content>
+          <View style={styles.cardHeader}>
+            <Text variant="titleSmall" style={styles.filename} numberOfLines={1}>
+              {item.filename}
+            </Text>
+            <View style={styles.cardMeta}>
+              {item.duration_seconds > 0 && (
+                <Text variant="bodySmall" style={styles.duration}>
+                  {formatDuration(item.duration_seconds)}
+                </Text>
+              )}
+              <Menu
+                visible={menuVisible === item.id}
+                onDismiss={() => setMenuVisible(null)}
+                anchor={
+                  <IconButton
+                    icon="dots-vertical"
+                    size={18}
+                    onPress={() => setMenuVisible(item.id)}
+                  />
+                }
               >
-                <Text style={styles.deleteBtnText}>×</Text>
-              </Pressable>
-            )}
+                {isRecorded && (
+                  <Menu.Item
+                    leadingIcon="text-recognition"
+                    onPress={() => { setMenuVisible(null); onTranscribe(item.id); }}
+                    title="Transkribiši"
+                  />
+                )}
+                {isDone && (
+                  <Menu.Item
+                    leadingIcon="delete-outline"
+                    onPress={() => onDeletePress(item.id, item.filename)}
+                    title="Obriši"
+                  />
+                )}
+              </Menu>
+            </View>
           </View>
-        </View>
-        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
-        {isRecorded && (
-          <Pressable
-            style={({ pressed }) => [styles.transcribeBtn, pressed && { opacity: 0.7 }]}
-            onPress={() => onTranscribe(item.id)}
+          <Text variant="bodySmall" style={styles.date}>{formatDate(item.created_at)}</Text>
+          <Chip
+            compact
+            icon={statusIcon(status)}
+            textStyle={styles.statusChipText}
+            style={[
+              styles.statusChip,
+              isError && styles.statusChipError,
+              isDone && !isError && styles.statusChipDone,
+              isRecorded && styles.statusChipRecorded,
+              isProcessing && styles.statusChipProcessing,
+            ]}
           >
-            <Text style={styles.transcribeBtnText}>Transkribiši</Text>
-          </Pressable>
-        )}
-        {isProcessing && (
-          <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color="#4A9EFF" />
-            <Text style={styles.processingText}>Transkribovanje...</Text>
-          </View>
-        )}
-        {isDone && (
-          <Text style={[styles.preview, isError && styles.previewError]} numberOfLines={2}>
-            {item.text}
-          </Text>
-        )}
-      </Pressable>
+            {statusLabel(status)}
+          </Chip>
+          {isRecorded && (
+            <Button
+              mode="contained"
+              compact
+              onPress={() => onTranscribe(item.id)}
+              style={styles.transcribeBtn}
+              labelStyle={styles.transcribeBtnLabel}
+            >
+              Transkribiši
+            </Button>
+          )}
+          {isProcessing && (
+            <View style={styles.processingRow}>
+              <ActivityIndicator size="small" />
+              <Text variant="bodySmall" style={styles.processingText}>Transkribovanje...</Text>
+            </View>
+          )}
+          {isDone && (
+            <Text
+              variant="bodySmall"
+              style={[styles.preview, isError && styles.previewError]}
+              numberOfLines={2}
+            >
+              {item.text}
+            </Text>
+          )}
+        </Card.Content>
+      </Card>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4A9EFF" />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -312,11 +392,11 @@ export default function JournalFolderScreen({ route, navigation }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); load(); }}
-            tintColor="#4A9EFF"
+            tintColor={theme.colors.primary}
           />
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text variant="bodyLarge" style={styles.emptyText}>
             Nema zapisa.{"\n"}Tapni mikrofon da snimiš.
           </Text>
         }
@@ -339,82 +419,103 @@ export default function JournalFolderScreen({ route, navigation }) {
                 );
               })}
             </View>
-            <Text style={[styles.timer, isPaused && styles.timerPaused]}>{formatTimer(elapsed)}</Text>
+            <Text variant="titleMedium" style={[styles.timer, isPaused && styles.timerPaused]}>
+              {formatTimer(elapsed)}
+            </Text>
             <View style={styles.recordControls}>
-              <Pressable
-                style={({ pressed }) => [styles.recordBtn, styles.recordBtnActive, pressed && styles.recordBtnPressed]}
+              <IconButton
+                icon={isPaused ? "play" : "pause"}
+                iconColor="#FFF"
+                containerColor="#FF4444"
+                size={28}
                 onPress={isPaused ? resumeRecording : pauseRecording}
-              >
-                <Text style={styles.controlIcon}>{isPaused ? "▶" : "⏸"}</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.stopBtn, pressed && styles.recordBtnPressed]}
+              />
+              <IconButton
+                icon="stop"
+                iconColor="#FFF"
+                containerColor="#333"
+                size={24}
                 onPress={stopRecording}
-              >
-                <View style={styles.stopIcon} />
-              </Pressable>
+              />
             </View>
-            <Text style={styles.recordHint}>
+            <Text variant="bodySmall" style={styles.recordHint}>
               {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
             </Text>
           </>
         ) : (
           <>
-            <Pressable
-              style={({ pressed }) => [styles.recordBtn, pressed && styles.recordBtnPressed]}
+            <FAB
+              icon="microphone"
               onPress={startRecording}
-            >
-              <Text style={styles.micEmoji}>🎙️</Text>
-            </Pressable>
-            <Text style={styles.recordHint}>Tapni da snimaš</Text>
+              style={styles.recordFab}
+            />
+            <Text variant="bodySmall" style={styles.recordHint}>Tapni da snimaš</Text>
           </>
         )}
       </View>
+
+      <Portal>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
+          <Dialog.Title>Obriši zapis</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              Obrisati "{deleteTarget?.filename}"?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteDialogVisible(false)}>Otkaži</Button>
+            <Button onPress={onDeleteConfirm} textColor={theme.colors.error}>Obriši</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar("")}
+        duration={3000}
+      >
+        {snackbar}
+      </Snackbar>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111" },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   list: { padding: 12, paddingBottom: 140 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#666", fontSize: 16, textAlign: "center", lineHeight: 26 },
+  emptyText: { color: "#666", textAlign: "center", lineHeight: 26 },
   card: {
     backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    padding: 14,
     marginBottom: 10,
   },
-  cardPressed: { opacity: 0.7 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-  filename: { color: "#FFF", fontWeight: "600", fontSize: 15, flex: 1, marginRight: 8 },
-  cardMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  duration: { color: "#4A9EFF", fontSize: 13 },
-  deleteBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  filename: { color: "#FFF", fontWeight: "600", flex: 1, marginRight: 8 },
+  cardMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  duration: { color: "#4A9EFF" },
+  date: { color: "#888", marginBottom: 6 },
+  statusChip: {
+    alignSelf: "flex-start",
+    marginBottom: 6,
+    height: 28,
     backgroundColor: "#2A2A2A",
-    justifyContent: "center",
-    alignItems: "center",
   },
-  deleteBtnPressed: { backgroundColor: "#FF4444" },
-  deleteBtnText: { color: "#888", fontSize: 18, lineHeight: 22, fontWeight: "300" },
-  date: { color: "#888", fontSize: 12, marginBottom: 6 },
-  preview: { color: "#AAA", fontSize: 13, lineHeight: 18 },
+  statusChipText: { fontSize: 11, lineHeight: 14 },
+  statusChipRecorded: { backgroundColor: "#1A2A3A" },
+  statusChipProcessing: { backgroundColor: "#2A2A1A" },
+  statusChipDone: { backgroundColor: "#1A2A1A" },
+  statusChipError: { backgroundColor: "#3A1A1A" },
+  preview: { color: "#AAA", lineHeight: 18 },
   previewError: { color: "#FF6B6B" },
   processingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  processingText: { color: "#4A9EFF", fontSize: 13 },
+  processingText: { color: "#4A9EFF" },
   transcribeBtn: {
     alignSelf: "flex-start",
-    backgroundColor: "#4A9EFF",
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     marginTop: 4,
+    backgroundColor: "#4A9EFF",
   },
-  transcribeBtnText: { color: "#FFF", fontSize: 13, fontWeight: "600" },
+  transcribeBtnLabel: { fontSize: 13 },
   recordArea: {
     position: "absolute",
     bottom: 0,
@@ -429,56 +530,20 @@ const styles = StyleSheet.create({
   },
   timer: {
     color: "#FF4444",
-    fontSize: 20,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
     marginBottom: 8,
-  },
-  recordBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "#4A9EFF",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 6,
-    shadowColor: "#4A9EFF",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-  },
-  recordBtnActive: {
-    backgroundColor: "#FF4444",
-    shadowColor: "#FF4444",
-  },
-  recordBtnPressed: { opacity: 0.8 },
-  stopIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    backgroundColor: "#FFF",
   },
   timerPaused: { color: "#888" },
   recordControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 20,
+    gap: 12,
   },
-  stopBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#333",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+  recordFab: {
+    backgroundColor: "#4A9EFF",
   },
-  controlIcon: { color: "#FFF", fontSize: 20 },
-  micEmoji: { fontSize: 28 },
+  recordHint: { color: "#666", marginTop: 6 },
   waveform: {
     flexDirection: "row",
     alignItems: "center",
@@ -492,5 +557,4 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: "#FF4444",
   },
-  recordHint: { color: "#666", fontSize: 12, marginTop: 6 },
 });

@@ -1,14 +1,23 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Dialog,
+  FAB,
+  IconButton,
+  Menu,
+  Portal,
+  Snackbar,
+  Text,
+  useTheme,
+} from "react-native-paper";
 import { fetchTranscriptions, deleteTranscription } from "../services/api";
 
 function formatDate(iso) {
@@ -24,16 +33,27 @@ function formatDuration(seconds) {
 }
 
 export default function HomeScreen({ navigation }) {
+  const theme = useTheme();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Menu state
+  const [menuVisible, setMenuVisible] = useState(null);
+
+  // Delete dialog
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Snackbar
+  const [snackbar, setSnackbar] = useState("");
 
   const load = useCallback(async () => {
     try {
       const data = await fetchTranscriptions();
       setRecords(data);
     } catch (e) {
-      Alert.alert("Greška", e.message);
+      setSnackbar(e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,49 +65,71 @@ export default function HomeScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, load]);
 
-  const onDelete = (id, filename) => {
-    Alert.alert("Obriši", `Obrisati transkript za "${filename}"?`, [
-      { text: "Otkaži", style: "cancel" },
-      {
-        text: "Obriši",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteTranscription(id);
-            setRecords((prev) => prev.filter((r) => r.id !== id));
-          } catch (e) {
-            Alert.alert("Greška", e.message);
-          }
-        },
-      },
-    ]);
+  const onDeletePress = (id, filename) => {
+    setMenuVisible(null);
+    setDeleteTarget({ id, filename });
+    setDeleteDialogVisible(true);
+  };
+
+  const onDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteTranscription(deleteTarget.id);
+      setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    } catch (e) {
+      setSnackbar(e.message);
+    }
+    setDeleteDialogVisible(false);
+    setDeleteTarget(null);
   };
 
   const renderItem = ({ item }) => (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    <Card
+      style={styles.card}
       onPress={() => navigation.navigate("Detail", { id: item.id })}
-      onLongPress={() => onDelete(item.id, item.filename)}
     >
-      <View style={styles.cardHeader}>
-        <Text style={styles.filename} numberOfLines={1}>
-          {item.filename}
+      <Card.Content>
+        <View style={styles.cardHeader}>
+          <Text variant="titleSmall" style={styles.filename} numberOfLines={1}>
+            {item.filename}
+          </Text>
+          <View style={styles.cardMeta}>
+            {item.duration_seconds > 0 && (
+              <Text variant="bodySmall" style={styles.duration}>
+                {formatDuration(item.duration_seconds)}
+              </Text>
+            )}
+            <Menu
+              visible={menuVisible === item.id}
+              onDismiss={() => setMenuVisible(null)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  size={18}
+                  onPress={() => setMenuVisible(item.id)}
+                />
+              }
+            >
+              <Menu.Item
+                leadingIcon="delete-outline"
+                onPress={() => onDeletePress(item.id, item.filename)}
+                title="Obriši"
+              />
+            </Menu>
+          </View>
+        </View>
+        <Text variant="bodySmall" style={styles.date}>{formatDate(item.created_at)}</Text>
+        <Text variant="bodySmall" style={styles.preview} numberOfLines={2}>
+          {item.text}
         </Text>
-        {item.duration_seconds > 0 && (
-          <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
-        )}
-      </View>
-      <Text style={styles.date}>{formatDate(item.created_at)}</Text>
-      <Text style={styles.preview} numberOfLines={2}>
-        {item.text}
-      </Text>
-    </Pressable>
+      </Card.Content>
+    </Card>
   );
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4A9EFF" />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -106,59 +148,68 @@ export default function HomeScreen({ navigation }) {
               setRefreshing(true);
               load();
             }}
-            tintColor="#4A9EFF"
+            tintColor={theme.colors.primary}
           />
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text variant="bodyLarge" style={styles.emptyText}>
             Nema transkripata.{"\n"}Tapni + da dodaš snimak.
           </Text>
         }
       />
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+
+      <FAB
+        icon="plus"
+        style={styles.fab}
         onPress={() => navigation.navigate("Transcribe")}
+      />
+
+      <Portal>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
+          <Dialog.Title>Obriši</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              Obrisati transkript za "{deleteTarget?.filename}"?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteDialogVisible(false)}>Otkaži</Button>
+            <Button onPress={onDeleteConfirm} textColor={theme.colors.error}>Obriši</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar("")}
+        duration={3000}
       >
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
+        {snackbar}
+      </Snackbar>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111" },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   list: { padding: 12 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#666", fontSize: 16, textAlign: "center", lineHeight: 26 },
+  emptyText: { color: "#666", textAlign: "center", lineHeight: 26 },
   card: {
     backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    padding: 14,
     marginBottom: 10,
   },
-  cardPressed: { opacity: 0.7 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-  filename: { color: "#FFF", fontWeight: "600", fontSize: 15, flex: 1, marginRight: 8 },
-  duration: { color: "#4A9EFF", fontSize: 13 },
-  date: { color: "#888", fontSize: 12, marginBottom: 6 },
-  preview: { color: "#AAA", fontSize: 13, lineHeight: 18 },
+  filename: { color: "#FFF", fontWeight: "600", flex: 1, marginRight: 8 },
+  cardMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  duration: { color: "#4A9EFF" },
+  date: { color: "#888", marginBottom: 6 },
+  preview: { color: "#AAA", lineHeight: 18 },
   fab: {
     position: "absolute",
     bottom: 28,
     right: 24,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
     backgroundColor: "#4A9EFF",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 6,
-    shadowColor: "#4A9EFF",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
   },
-  fabPressed: { opacity: 0.8 },
-  fabText: { color: "#FFF", fontSize: 32, lineHeight: 36 },
 });

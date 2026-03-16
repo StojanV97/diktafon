@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Clipboard,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  IconButton,
+  Snackbar,
+  Text,
+  useTheme,
+} from "react-native-paper";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { fetchTranscription, downloadUrl } from "../services/api";
@@ -26,33 +30,37 @@ function formatDuration(seconds) {
 }
 
 export default function TranscriptionDetailScreen({ route }) {
+  const theme = useTheme();
   const { id } = route.params;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [snackbar, setSnackbar] = useState("");
 
   useEffect(() => {
     fetchTranscription(id)
       .then(setRecord)
-      .catch((e) => Alert.alert("Greška", e.message))
+      .catch((e) => setSnackbar(e.message))
       .finally(() => setLoading(false));
   }, [id]);
 
   const copyText = () => {
     if (!record?.text) return;
     Clipboard.setString(record.text);
-    Alert.alert("Kopirano", "Tekst je kopiran u clipboard.");
+    setSnackbar("Tekst je kopiran u clipboard.");
   };
 
   const shareText = async () => {
     if (!record?.text) return;
     try {
       await Share.share({ message: record.text, title: record.filename });
-    } catch (e) {
+    } catch {
       // user dismissed
     }
   };
 
   const downloadTxt = async () => {
+    setDownloading(true);
     try {
       const url = downloadUrl(id);
       const safeName = record.filename.replace(/\.[^.]+$/, "") + "_transkript.txt";
@@ -64,17 +72,19 @@ export default function TranscriptionDetailScreen({ route }) {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: "text/plain", UTI: "public.plain-text" });
       } else {
-        Alert.alert("Sačuvano", `Fajl sačuvan: ${uri}`);
+        setSnackbar(`Fajl sačuvan: ${uri}`);
       }
     } catch (e) {
-      Alert.alert("Greška", e.message);
+      setSnackbar(e.message);
+    } finally {
+      setDownloading(false);
     }
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4A9EFF" />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -82,7 +92,7 @@ export default function TranscriptionDetailScreen({ route }) {
   if (!record) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>Transkript nije pronađen.</Text>
+        <Text variant="bodyLarge" style={styles.errorText}>Transkript nije pronađen.</Text>
       </View>
     );
   }
@@ -90,76 +100,81 @@ export default function TranscriptionDetailScreen({ route }) {
   return (
     <View style={styles.container}>
       <View style={styles.meta}>
-        <Text style={styles.filename}>{record.filename}</Text>
-        <Text style={styles.metaLine}>
+        <Text variant="titleMedium" style={styles.filename}>{record.filename}</Text>
+        <Text variant="bodySmall" style={styles.metaLine}>
           {formatDate(record.created_at)}
           {record.duration_seconds > 0 && `  •  ${formatDuration(record.duration_seconds)}`}
         </Text>
       </View>
 
       <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
-        <Text style={styles.bodyText} selectable>
+        <Text variant="bodyMedium" style={styles.bodyText} selectable>
           {record.text}
         </Text>
       </ScrollView>
 
       <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+        <IconButton
+          icon="content-copy"
+          iconColor="#AAA"
+          size={24}
           onPress={copyText}
-        >
-          <Text style={styles.actionIcon}>📋</Text>
-          <Text style={styles.actionLabel}>Kopiraj</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+        />
+        <Text variant="labelSmall" style={styles.actionDivider}>|</Text>
+        <IconButton
+          icon="share-variant"
+          iconColor="#AAA"
+          size={24}
           onPress={shareText}
-        >
-          <Text style={styles.actionIcon}>↗️</Text>
-          <Text style={styles.actionLabel}>Podeli</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-          onPress={downloadTxt}
-        >
-          <Text style={styles.actionIcon}>💾</Text>
-          <Text style={styles.actionLabel}>Sačuvaj .txt</Text>
-        </Pressable>
+        />
+        <Text variant="labelSmall" style={styles.actionDivider}>|</Text>
+        {downloading ? (
+          <ActivityIndicator size="small" style={styles.downloadSpinner} />
+        ) : (
+          <IconButton
+            icon="download"
+            iconColor="#AAA"
+            size={24}
+            onPress={downloadTxt}
+          />
+        )}
       </View>
+
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar("")}
+        duration={2000}
+      >
+        {snackbar}
+      </Snackbar>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111" },
-  errorText: { color: "#AAA", fontSize: 16 },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  errorText: { color: "#AAA" },
   meta: {
     backgroundColor: "#1A1A1A",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#2A2A2A",
   },
-  filename: { color: "#FFF", fontWeight: "600", fontSize: 16, marginBottom: 4 },
-  metaLine: { color: "#888", fontSize: 13 },
+  filename: { color: "#FFF", fontWeight: "600", marginBottom: 4 },
+  metaLine: { color: "#888" },
   textScroll: { flex: 1 },
   textContent: { padding: 16 },
-  bodyText: { color: "#DDD", fontSize: 15, lineHeight: 24 },
+  bodyText: { color: "#DDD", lineHeight: 24 },
   actions: {
     flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: "#2A2A2A",
     backgroundColor: "#1A1A1A",
+    paddingVertical: 4,
   },
-  actionBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 14,
-    gap: 4,
-  },
-  pressed: { opacity: 0.6 },
-  actionIcon: { fontSize: 22 },
-  actionLabel: { color: "#AAA", fontSize: 12 },
+  actionDivider: { color: "#2A2A2A" },
+  downloadSpinner: { margin: 12 },
 });

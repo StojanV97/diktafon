@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Clipboard,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import {
+  ActivityIndicator,
+  FAB,
+  IconButton,
+  Snackbar,
+  Text,
+  useTheme,
+} from "react-native-paper";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { fetchEntry, entryAudioUri } from "../services/journalStorage";
 
@@ -32,9 +37,11 @@ function formatPlaybackTime(seconds) {
 }
 
 export default function JournalEntryScreen({ route, navigation }) {
+  const theme = useTheme();
   const { id } = route.params;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -42,7 +49,7 @@ export default function JournalEntryScreen({ route, navigation }) {
         const data = await fetchEntry(id);
         setRecord(data);
       } catch (e) {
-        Alert.alert("Greška", e.message);
+        setSnackbar(e.message);
       } finally {
         setLoading(false);
       }
@@ -74,7 +81,7 @@ export default function JournalEntryScreen({ route, navigation }) {
   const copyText = () => {
     if (!record?.text) return;
     Clipboard.setString(record.text);
-    Alert.alert("Kopirano", "Tekst je kopiran u clipboard.");
+    setSnackbar("Tekst je kopiran u clipboard.");
   };
 
   const shareText = async () => {
@@ -89,7 +96,7 @@ export default function JournalEntryScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4A9EFF" />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -97,7 +104,7 @@ export default function JournalEntryScreen({ route, navigation }) {
   if (!record) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>Zapis nije pronađen.</Text>
+        <Text variant="bodyLarge" style={styles.errorText}>Zapis nije pronađen.</Text>
       </View>
     );
   }
@@ -105,8 +112,8 @@ export default function JournalEntryScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.meta}>
-        <Text style={styles.filename}>{record.filename}</Text>
-        <Text style={styles.metaLine}>
+        <Text variant="titleMedium" style={styles.filename}>{record.filename}</Text>
+        <Text variant="bodySmall" style={styles.metaLine}>
           {formatDate(record.created_at)}
           {record.duration_seconds > 0 && `  •  ${formatDuration(record.duration_seconds)}`}
         </Text>
@@ -127,92 +134,99 @@ export default function JournalEntryScreen({ route, navigation }) {
             ]} />
           </Pressable>
           <View style={styles.timeRow}>
-            <Text style={styles.timeText}>{formatPlaybackTime(status.currentTime)}</Text>
-            <Text style={styles.timeText}>{formatPlaybackTime(status.duration)}</Text>
+            <Text variant="labelSmall" style={styles.timeText}>
+              {formatPlaybackTime(status.currentTime)}
+            </Text>
+            <Text variant="labelSmall" style={styles.timeText}>
+              {formatPlaybackTime(status.duration)}
+            </Text>
           </View>
           <View style={styles.controls}>
-            <Pressable
-              style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+            <IconButton
+              icon="rewind-10"
+              iconColor="#AAA"
+              containerColor="#2A2A2A"
+              size={20}
               onPress={() => player.seekTo(Math.max(0, status.currentTime - 10))}
               disabled={!status.isLoaded}
-            >
-              <Text style={styles.skipBtnText}>−10</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.playBtn, pressed && { opacity: 0.8 }]}
+            />
+            <FAB
+              icon={status.playing ? "pause" : "play"}
+              size="small"
               onPress={() => status.playing ? player.pause() : player.play()}
               disabled={!status.isLoaded}
-            >
-              <Text style={styles.playBtnIcon}>{status.playing ? "⏸" : "▶"}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+              style={styles.playFab}
+            />
+            <IconButton
+              icon="fast-forward-10"
+              iconColor="#AAA"
+              containerColor="#2A2A2A"
+              size={20}
               onPress={() => player.seekTo(Math.min(status.duration ?? 0, status.currentTime + 10))}
               disabled={!status.isLoaded}
-            >
-              <Text style={styles.skipBtnText}>+10</Text>
-            </Pressable>
+            />
           </View>
         </View>
       )}
 
       <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
-        <Text style={styles.bodyText} selectable>
+        <Text variant="bodyMedium" style={styles.bodyText} selectable>
           {record.text}
         </Text>
       </ScrollView>
 
       <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+        <IconButton
+          icon="content-copy"
+          iconColor="#AAA"
+          size={24}
           onPress={copyText}
-        >
-          <Text style={styles.actionIcon}>📋</Text>
-          <Text style={styles.actionLabel}>Kopiraj</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+        />
+        <Text variant="labelSmall" style={styles.actionDivider}>|</Text>
+        <IconButton
+          icon="share-variant"
+          iconColor="#AAA"
+          size={24}
           onPress={shareText}
-        >
-          <Text style={styles.actionIcon}>↗️</Text>
-          <Text style={styles.actionLabel}>Podeli</Text>
-        </Pressable>
+        />
       </View>
+
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar("")}
+        duration={2000}
+      >
+        {snackbar}
+      </Snackbar>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111" },
-  errorText: { color: "#AAA", fontSize: 16 },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  errorText: { color: "#AAA" },
   meta: {
     backgroundColor: "#1A1A1A",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#2A2A2A",
   },
-  filename: { color: "#FFF", fontWeight: "600", fontSize: 16, marginBottom: 4 },
-  metaLine: { color: "#888", fontSize: 13 },
+  filename: { color: "#FFF", fontWeight: "600", marginBottom: 4 },
+  metaLine: { color: "#888" },
   textScroll: { flex: 1 },
   textContent: { padding: 16 },
-  bodyText: { color: "#DDD", fontSize: 15, lineHeight: 24 },
+  bodyText: { color: "#DDD", lineHeight: 24 },
   actions: {
     flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: "#2A2A2A",
     backgroundColor: "#1A1A1A",
+    paddingVertical: 4,
   },
-  actionBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 14,
-    gap: 4,
-  },
-  pressed: { opacity: 0.6 },
-  actionIcon: { fontSize: 22 },
-  actionLabel: { color: "#AAA", fontSize: 12 },
+  actionDivider: { color: "#2A2A2A" },
   playerCard: {
     backgroundColor: "#1A1A1A",
     marginHorizontal: 12,
@@ -241,43 +255,15 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: "#666",
-    fontSize: 11,
     fontVariant: ["tabular-nums"],
   },
   controls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 24,
+    gap: 16,
   },
-  skipBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#2A2A2A",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  skipBtnText: {
-    color: "#AAA",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  playBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  playFab: {
     backgroundColor: "#4A9EFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#4A9EFF",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  playBtnIcon: {
-    color: "#FFF",
-    fontSize: 22,
   },
 });
