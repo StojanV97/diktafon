@@ -65,20 +65,27 @@ export async function transcribe(audioFileUri, onProgress) {
     });
   }
 
-  const { promise } = whisperContext.transcribe(audioFileUri, {
-    language: "sr",
-    prompt: SERBIAN_PROMPT,
-    onProgress: (progress) => {
-      onProgress?.(progress / 100);
-    },
-  });
+  try {
+    const { promise } = whisperContext.transcribe(audioFileUri, {
+      language: "sr",
+      prompt: SERBIAN_PROMPT,
+      onProgress: (progress) => {
+        onProgress?.(progress / 100);
+      },
+    });
 
-  const result = await promise;
+    const result = await promise;
 
-  return {
-    text: (result.result || "").trim(),
-    duration_seconds: Math.round((result.segments?.slice(-1)[0]?.t1 || 0) / 100),
-  };
+    return {
+      text: (result.result || "").trim(),
+      duration_seconds: Math.round((result.segments?.slice(-1)[0]?.t1 || 0) / 100),
+    };
+  } catch (e) {
+    // Release corrupted context so it's re-initialized on next attempt
+    try { whisperContext.release(); } catch {}
+    whisperContext = null;
+    throw e;
+  }
 }
 
 export function releaseContext() {

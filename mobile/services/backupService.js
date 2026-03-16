@@ -53,14 +53,13 @@ export async function restoreFromBackup(fileUri) {
   audioDir.create({ idempotent: true });
   textsDir.create({ idempotent: true });
 
-  // Restore JSON metadata
+  // Restore JSON metadata — validate before writing to avoid destroying existing data
   const foldersJSON = await zip.file("folders.json").async("string");
   const entriesJSON = await zip.file("entries.json").async("string");
-  foldersFile.write(foldersJSON);
-  entriesFile.write(entriesJSON);
-
   const folders = JSON.parse(foldersJSON);
   const entries = JSON.parse(entriesJSON);
+  foldersFile.write(foldersJSON);
+  entriesFile.write(entriesJSON);
 
   // Restore audio files
   let audioCount = 0;

@@ -25,14 +25,42 @@ async function readJSON(file) {
     if (!file.exists) return [];
     const raw = await file.text();
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
+    // Main file is corrupted — try the backup
+    const bakFile = new File(file.parentDirectory, file.name + ".bak");
+    if (bakFile.exists) {
+      try {
+        const bakRaw = await bakFile.text();
+        const data = JSON.parse(bakRaw);
+        console.warn(`readJSON: ${file.name} corrupted, recovered from .bak`);
+        // Restore main file from backup
+        file.write(bakRaw);
+        return data;
+      } catch {
+        console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
+      }
+    } else {
+      console.warn(`readJSON: ${file.name} corrupted, no .bak available`);
+    }
     return [];
   }
 }
 
 function writeJSON(file, data) {
   ensureDirs();
-  file.write(JSON.stringify(data));
+  const json = JSON.stringify(data);
+  // Write to temp file first, then back up old file, then move temp into place
+  const tmpFile = new File(file.parentDirectory, file.name + ".tmp");
+  tmpFile.write(json);
+  // Back up the current file before replacing
+  if (file.exists) {
+    const bakFile = new File(file.parentDirectory, file.name + ".bak");
+    if (bakFile.exists) bakFile.delete();
+    file.copy(bakFile);
+  }
+  // Move temp file to real path (atomic on most filesystems)
+  if (file.exists) file.delete();
+  tmpFile.move(file);
 }
 
 function truncateText(text, max = 200) {
@@ -77,15 +105,15 @@ export async function migrateData() {
   // Backfill recorded_date for existing daily log entries
   const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
   if (dailyLogFolder) {
-    const entries = await readJSON(entriesFile);
+    const dailyEntries = await readJSON(entriesFile);
     let entriesChanged = false;
-    for (const entry of entries) {
+    for (const entry of dailyEntries) {
       if (entry.folder_id === dailyLogFolder.id && !entry.recorded_date) {
         entry.recorded_date = entry.created_at.slice(0, 10);
         entriesChanged = true;
       }
     }
-    if (entriesChanged) writeJSON(entriesFile, entries);
+    if (entriesChanged) writeJSON(entriesFile, dailyEntries);
   }
 }
 

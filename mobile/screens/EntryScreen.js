@@ -107,9 +107,9 @@ export default function EntryScreen({ route, navigation }) {
         return;
       }
       await Sharing.shareAsync(entryAudioUri(record.id), {
-        mimeType: "audio/m4a",
+        mimeType: "audio/wav",
         dialogTitle: "Sacuvaj snimak",
-        UTI: "public.audio",
+        UTI: "com.microsoft.waveform-audio",
       });
     } catch (e) {
       setSnackbar("Nije moguce sacuvati snimak: " + e.message);
