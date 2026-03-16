@@ -5,18 +5,21 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
   ActivityIndicator,
-  FAB,
-  IconButton,
+  Menu,
   Snackbar,
   Text,
-  useTheme,
 } from "react-native-paper";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { fetchEntry, entryAudioUri } from "../services/journalStorage";
+import { colors, spacing, radii, elevation, typography } from "../theme";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
@@ -37,11 +40,11 @@ function formatPlaybackTime(seconds) {
 }
 
 export default function EntryScreen({ route, navigation }) {
-  const theme = useTheme();
   const { id } = route.params;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState("");
+  const [shareMenuVisible, setShareMenuVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -85,6 +88,7 @@ export default function EntryScreen({ route, navigation }) {
   };
 
   const shareText = async () => {
+    setShareMenuVisible(false);
     if (!record?.text) return;
     try {
       await Share.share({ message: record.text, title: record.filename });
@@ -93,10 +97,53 @@ export default function EntryScreen({ route, navigation }) {
     }
   };
 
+  const saveRecordingToFiles = async () => {
+    setShareMenuVisible(false);
+    if (!record?.audio_file) return;
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        setSnackbar("Deljenje fajlova nije dostupno na ovom uredjaju.");
+        return;
+      }
+      await Sharing.shareAsync(entryAudioUri(record.id), {
+        mimeType: "audio/m4a",
+        dialogTitle: "Sacuvaj snimak",
+        UTI: "public.audio",
+      });
+    } catch (e) {
+      setSnackbar("Nije moguce sacuvati snimak: " + e.message);
+    }
+  };
+
+  const saveTranscriptToFiles = async () => {
+    setShareMenuVisible(false);
+    if (!record?.text) return;
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        setSnackbar("Deljenje fajlova nije dostupno na ovom uredjaju.");
+        return;
+      }
+      const baseName = record.filename.replace(/\.[^.]+$/, "");
+      const txtPath = FileSystem.cacheDirectory + baseName + ".txt";
+      await FileSystem.writeAsStringAsync(txtPath, record.text, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      await Sharing.shareAsync(txtPath, {
+        mimeType: "text/plain",
+        dialogTitle: "Sacuvaj transkript",
+        UTI: "public.plain-text",
+      });
+    } catch (e) {
+      setSnackbar("Nije moguce sacuvati transkript: " + e.message);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -104,23 +151,25 @@ export default function EntryScreen({ route, navigation }) {
   if (!record) {
     return (
       <View style={styles.center}>
-        <Text variant="bodyLarge" style={styles.errorText}>Zapis nije pronađen.</Text>
+        <Text style={[typography.body, { color: colors.muted }]}>Zapis nije pronadjen.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Meta section */}
       <View style={styles.meta}>
-        <Text variant="titleMedium" style={styles.filename}>{record.filename}</Text>
-        <Text variant="bodySmall" style={styles.metaLine}>
+        <Text style={typography.heading}>{record.filename}</Text>
+        <Text style={[typography.caption, { marginTop: spacing.xs }]}>
           {formatDate(record.created_at)}
-          {record.duration_seconds > 0 && `  •  ${formatDuration(record.duration_seconds)}`}
+          {record.duration_seconds > 0 && `  \u2022  ${formatDuration(record.duration_seconds)}`}
         </Text>
       </View>
 
+      {/* Player card */}
       {record?.audio_file && (
-        <View style={styles.playerCard}>
+        <View style={[styles.playerCard, elevation.md]}>
           <Pressable
             style={styles.progressBarTrack}
             onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
@@ -134,61 +183,91 @@ export default function EntryScreen({ route, navigation }) {
             ]} />
           </Pressable>
           <View style={styles.timeRow}>
-            <Text variant="labelSmall" style={styles.timeText}>
+            <Text style={styles.timeText}>
               {formatPlaybackTime(status.currentTime)}
             </Text>
-            <Text variant="labelSmall" style={styles.timeText}>
+            <Text style={styles.timeText}>
               {formatPlaybackTime(status.duration)}
             </Text>
           </View>
           <View style={styles.controls}>
-            <IconButton
-              icon="rewind-10"
-              iconColor="#555"
-              containerColor="#E0E0E0"
-              size={20}
+            <TouchableOpacity
               onPress={() => player.seekTo(Math.max(0, status.currentTime - 10))}
               disabled={!status.isLoaded}
-            />
-            <FAB
-              icon={status.playing ? "pause" : "play"}
-              size="small"
+              style={styles.skipBtn}
+            >
+              <MaterialCommunityIcons name="rewind-10" size={22} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => status.playing ? player.pause() : player.play()}
               disabled={!status.isLoaded}
-              style={styles.playFab}
-            />
-            <IconButton
-              icon="fast-forward-10"
-              iconColor="#555"
-              containerColor="#E0E0E0"
-              size={20}
+              style={[styles.playFab, elevation.md]}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name={status.playing ? "pause" : "play"}
+                size={28}
+                color="#FFF"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => player.seekTo(Math.min(status.duration ?? 0, status.currentTime + 10))}
               disabled={!status.isLoaded}
-            />
+              style={styles.skipBtn}
+            >
+              <MaterialCommunityIcons name="fast-forward-10" size={22} color={colors.muted} />
+            </TouchableOpacity>
           </View>
         </View>
       )}
 
+      {/* Transcript section */}
       <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
-        <Text variant="bodyMedium" style={styles.bodyText} selectable>
+        <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>
+        <Text style={styles.bodyText} selectable>
           {record.text}
         </Text>
       </ScrollView>
 
-      <View style={styles.actions}>
-        <IconButton
-          icon="content-copy"
-          iconColor="#555"
-          size={24}
-          onPress={copyText}
-        />
-        <Text variant="labelSmall" style={styles.actionDivider}>|</Text>
-        <IconButton
-          icon="share-variant"
-          iconColor="#555"
-          size={24}
-          onPress={shareText}
-        />
+      {/* Bottom actions */}
+      <View style={[styles.actions, elevation.sm]}>
+        <TouchableOpacity onPress={copyText} style={styles.actionBtn}>
+          <MaterialCommunityIcons name="content-copy" size={20} color={colors.muted} />
+          <Text style={styles.actionLabel}>Kopiraj</Text>
+        </TouchableOpacity>
+
+        <View style={styles.actionDivider} />
+
+        <Menu
+          visible={shareMenuVisible}
+          onDismiss={() => setShareMenuVisible(false)}
+          anchor={
+            <TouchableOpacity onPress={() => setShareMenuVisible(true)} style={styles.actionBtn}>
+              <MaterialCommunityIcons name="share-variant" size={20} color={colors.muted} />
+              <Text style={styles.actionLabel}>Podeli</Text>
+            </TouchableOpacity>
+          }
+        >
+          <Menu.Item
+            leadingIcon="text-box-outline"
+            onPress={shareText}
+            title="Podeli transkript"
+          />
+          {record.audio_file && (
+            <Menu.Item
+              leadingIcon="music-note"
+              onPress={saveRecordingToFiles}
+              title="Sacuvaj snimak u Fajlove"
+            />
+          )}
+          {record.text && (
+            <Menu.Item
+              leadingIcon="file-document-outline"
+              onPress={saveTranscriptToFiles}
+              title="Sacuvaj transkript u Fajlove"
+            />
+          )}
+        </Menu>
       </View>
 
       <Snackbar
@@ -203,67 +282,99 @@ export default function EntryScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorText: { color: "#AAA" },
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+
+  // Meta
   meta: {
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
-  filename: { color: "#111", fontWeight: "600", marginBottom: 4 },
-  metaLine: { color: "#666" },
-  textScroll: { flex: 1 },
-  textContent: { padding: 16 },
-  bodyText: { color: "#222", lineHeight: 24 },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 4,
-  },
-  actionDivider: { color: "#E0E0E0" },
+
+  // Player card
   playerCard: {
-    backgroundColor: "#F8F8F8",
-    marginHorizontal: 12,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
   },
   progressBarTrack: {
     height: 4,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#E2E8F0",
     borderRadius: 2,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#4A9EFF",
+    backgroundColor: colors.primary,
     borderRadius: 2,
   },
   timeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 6,
-    marginBottom: 12,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   timeText: {
-    color: "#888",
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: colors.muted,
     fontVariant: ["tabular-nums"],
   },
   controls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    gap: spacing.xxl,
+  },
+  skipBtn: {
+    padding: spacing.sm,
   },
   playFab: {
-    backgroundColor: "#4A9EFF",
+    backgroundColor: colors.primary,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Transcript
+  textScroll: { flex: 1 },
+  textContent: { padding: spacing.lg },
+  bodyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: colors.foreground,
+    lineHeight: 24,
+  },
+
+  // Bottom actions
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    borderTopWidth: 0,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  actionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: colors.muted,
+  },
+  actionDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: "#E2E8F0",
   },
 });

@@ -10,8 +10,6 @@ import {
 import {
   ActivityIndicator,
   Button,
-  Card,
-  Chip,
   Dialog,
   FAB,
   IconButton,
@@ -20,22 +18,18 @@ import {
   Snackbar,
   Text,
   TextInput,
-  useTheme,
 } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { fetchFolders, createFolder, deleteFolder, updateFolder, getAllTags } from "../services/journalStorage";
-
-const COLOR_PALETTE = [
-  "#4A9EFF", "#FF6B6B", "#4AFF8C", "#FFB74A",
-  "#B44AFF", "#FF4A9E", "#4AFFFF", "#FFE14A",
-];
+import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
 }
 
 export default function DirectoryHomeScreen({ navigation }) {
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,7 +38,7 @@ export default function DirectoryHomeScreen({ navigation }) {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMode, setDialogMode] = useState("create");
   const [dialogName, setDialogName] = useState("");
-  const [dialogColor, setDialogColor] = useState(COLOR_PALETTE[0]);
+  const [dialogColor, setDialogColor] = useState(FOLDER_COLORS[0]);
   const [dialogTags, setDialogTags] = useState([]);
   const [dialogTagInput, setDialogTagInput] = useState("");
   const [dialogTargetId, setDialogTargetId] = useState(null);
@@ -81,12 +75,12 @@ export default function DirectoryHomeScreen({ navigation }) {
     setDialogMode(mode);
     if (mode === "edit" && folder) {
       setDialogName(folder.name);
-      setDialogColor(folder.color || COLOR_PALETTE[0]);
+      setDialogColor(folder.color || FOLDER_COLORS[0]);
       setDialogTags(folder.tags || []);
       setDialogTargetId(folder.id);
     } else {
       setDialogName("");
-      setDialogColor(COLOR_PALETTE[0]);
+      setDialogColor(FOLDER_COLORS[0]);
       setDialogTags([]);
       setDialogTargetId(null);
     }
@@ -119,7 +113,7 @@ export default function DirectoryHomeScreen({ navigation }) {
     const name = dialogName.trim();
     if (!name) return;
     if (name.length > 100) {
-      setSnackbar("Naziv ne može biti duži od 100 karaktera.");
+      setSnackbar("Naziv ne moze biti duzi od 100 karaktera.");
       return;
     }
 
@@ -159,71 +153,83 @@ export default function DirectoryHomeScreen({ navigation }) {
     setDeleteTarget(null);
   };
 
+  const ListHeader = () => (
+    <View style={[styles.headerArea, { paddingTop: insets.top + spacing.lg }]}>
+      <Text style={typography.monoLabel}>APP</Text>
+      <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktafon</Text>
+    </View>
+  );
+
   const renderItem = ({ item }) => {
-    const color = item.color || COLOR_PALETTE[0];
+    const color = item.color || FOLDER_COLORS[0];
     const tags = item.tags || [];
     const visibleTags = tags.slice(0, 3);
     const extraCount = tags.length - visibleTags.length;
 
     return (
-      <Card
-        style={[styles.card, { borderLeftColor: color, borderLeftWidth: 4 }]}
+      <TouchableOpacity
+        activeOpacity={0.7}
         onPress={() => navigation.navigate("Directory", { id: item.id, name: item.name })}
+        style={[styles.card, elevation.sm]}
       >
-        <Card.Content style={styles.cardContent}>
-          <MaterialCommunityIcons
-            name="folder-outline"
-            size={28}
-            color={color}
-            style={styles.folderIcon}
+        {/* Left accent bar */}
+        <View style={[styles.accentBar, { backgroundColor: color }]} />
+
+        {/* Folder icon */}
+        <View style={[styles.folderIconWrap, { backgroundColor: color + "26" }]}>
+          <MaterialCommunityIcons name="folder-outline" size={22} color={color} />
+        </View>
+
+        {/* Body */}
+        <View style={styles.cardBody}>
+          <Text style={typography.heading} numberOfLines={1}>{item.name}</Text>
+          <Text style={[typography.caption, { marginTop: 2 }]}>{formatDate(item.created_at)}</Text>
+          {tags.length > 0 && (
+            <View style={styles.tagRow}>
+              {visibleTags.map((t) => (
+                <View key={t} style={styles.tagChip}>
+                  <Text style={styles.tagChipText}>{t.toLowerCase()}</Text>
+                </View>
+              ))}
+              {extraCount > 0 && (
+                <Text style={[typography.caption, { marginLeft: spacing.xs }]}>+{extraCount}</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Three-dot menu */}
+        <Menu
+          visible={menuVisible === item.id}
+          onDismiss={() => setMenuVisible(null)}
+          anchor={
+            <IconButton
+              icon="dots-vertical"
+              iconColor={colors.muted}
+              size={20}
+              onPress={() => setMenuVisible(item.id)}
+            />
+          }
+        >
+          <Menu.Item
+            leadingIcon="pencil-outline"
+            onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
+            title="Izmeni"
           />
-          <View style={styles.cardBody}>
-            <Text variant="titleMedium" style={styles.folderName}>{item.name}</Text>
-            <Text variant="bodySmall" style={styles.date}>{formatDate(item.created_at)}</Text>
-            {tags.length > 0 && (
-              <View style={styles.tagRow}>
-                {visibleTags.map((t) => (
-                  <Chip key={t} compact textStyle={styles.tagChipText} style={styles.tagChip}>
-                    {t.toLowerCase()}
-                  </Chip>
-                ))}
-                {extraCount > 0 && (
-                  <Text variant="bodySmall" style={styles.extraTags}>+{extraCount}</Text>
-                )}
-              </View>
-            )}
-          </View>
-          <Menu
-            visible={menuVisible === item.id}
-            onDismiss={() => setMenuVisible(null)}
-            anchor={
-              <IconButton
-                icon="dots-vertical"
-                size={20}
-                onPress={() => setMenuVisible(item.id)}
-              />
-            }
-          >
-            <Menu.Item
-              leadingIcon="pencil-outline"
-              onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
-              title="Izmeni"
-            />
-            <Menu.Item
-              leadingIcon="delete-outline"
-              onPress={() => onDeletePress(item.id, item.name)}
-              title="Obriši"
-            />
-          </Menu>
-        </Card.Content>
-      </Card>
+          <Menu.Item
+            leadingIcon="delete-outline"
+            onPress={() => onDeletePress(item.id, item.name)}
+            title="Obrisi"
+          />
+        </Menu>
+      </TouchableOpacity>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -234,17 +240,18 @@ export default function DirectoryHomeScreen({ navigation }) {
         data={folders}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        ListHeaderComponent={ListHeader}
         contentContainerStyle={folders.length === 0 ? styles.empty : styles.list}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); load(); }}
-            tintColor={theme.colors.primary}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
-          <Text variant="bodyLarge" style={styles.emptyText}>
-            Nema direktorijuma.{"\n"}Tapni + da kreiraš direktorijum.
+          <Text style={[typography.body, styles.emptyText]}>
+            Nema direktorijuma.{"\n"}Tapni + da kreiras direktorijum.
           </Text>
         }
       />
@@ -252,13 +259,14 @@ export default function DirectoryHomeScreen({ navigation }) {
       <FAB
         icon="plus"
         style={styles.fab}
+        color="#FFF"
         onPress={() => openDialog("create")}
       />
 
       <Portal>
         {/* Create / Edit Dialog */}
-        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>
+        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>
             {dialogMode === "create" ? "Novi direktorijum" : "Izmeni direktorijum"}
           </Dialog.Title>
           <Dialog.ScrollArea style={styles.dialogScrollArea}>
@@ -271,12 +279,14 @@ export default function DirectoryHomeScreen({ navigation }) {
                 autoFocus
                 maxLength={100}
                 style={styles.dialogInput}
+                outlineColor={colors.borderGhost}
+                activeOutlineColor={colors.primary}
               />
 
               {/* Color picker */}
-              <Text variant="bodyMedium" style={styles.sectionLabel}>Boja</Text>
+              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>BOJA</Text>
               <View style={styles.colorRow}>
-                {COLOR_PALETTE.map((c) => (
+                {FOLDER_COLORS.map((c) => (
                   <TouchableOpacity
                     key={c}
                     onPress={() => setDialogColor(c)}
@@ -290,7 +300,7 @@ export default function DirectoryHomeScreen({ navigation }) {
               </View>
 
               {/* Tag input */}
-              <Text variant="bodyMedium" style={styles.sectionLabel}>Tagovi</Text>
+              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>TAGOVI</Text>
               <View style={styles.tagInputRow}>
                 <TextInput
                   label="Novi tag"
@@ -300,12 +310,15 @@ export default function DirectoryHomeScreen({ navigation }) {
                   mode="outlined"
                   dense
                   style={styles.tagTextInput}
+                  outlineColor={colors.borderGhost}
+                  activeOutlineColor={colors.primary}
                 />
                 <Button
-                  mode="contained-tonal"
+                  mode="contained"
                   compact
                   onPress={addTag}
                   style={styles.addTagBtn}
+                  buttonColor={colors.primary}
                 >
                   Dodaj
                 </Button>
@@ -315,18 +328,16 @@ export default function DirectoryHomeScreen({ navigation }) {
               {tagSuggestions.length > 0 && (
                 <View style={styles.suggestions}>
                   {tagSuggestions.map((t) => (
-                    <Chip
+                    <TouchableOpacity
                       key={t}
-                      compact
                       onPress={() => {
                         setDialogTags((prev) => [...prev, t]);
                         setDialogTagInput("");
                       }}
-                      textStyle={styles.suggestionText}
                       style={styles.suggestionChip}
                     >
-                      {t}
-                    </Chip>
+                      <Text style={styles.suggestionText}>{t}</Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
@@ -335,39 +346,38 @@ export default function DirectoryHomeScreen({ navigation }) {
               {dialogTags.length > 0 && (
                 <View style={styles.currentTags}>
                   {dialogTags.map((t) => (
-                    <Chip
+                    <TouchableOpacity
                       key={t}
-                      compact
-                      onClose={() => removeTag(t)}
-                      textStyle={styles.tagChipText}
+                      onPress={() => removeTag(t)}
                       style={styles.dialogTagChip}
                     >
-                      {t.toLowerCase()}
-                    </Chip>
+                      <Text style={styles.dialogTagChipText}>{t.toLowerCase()}</Text>
+                      <MaterialCommunityIcons name="close" size={14} color={colors.muted} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)}>Otkaži</Button>
-            <Button onPress={onDialogConfirm}>
-              {dialogMode === "create" ? "Kreiraj" : "Sačuvaj"}
+            <Button onPress={() => setDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={onDialogConfirm} textColor={colors.primary}>
+              {dialogMode === "create" ? "Kreiraj" : "Sacuvaj"}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
-          <Dialog.Title>Obriši direktorijum</Dialog.Title>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>Obrisi direktorijum</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
+            <Text style={typography.body}>
               Obrisati "{deleteTarget?.name}" i sve zapise u njemu?
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>Otkaži</Button>
-            <Button onPress={onDeleteConfirm} textColor={theme.colors.error}>Obriši</Button>
+            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={onDeleteConfirm} textColor={colors.danger}>Obrisi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -384,50 +394,85 @@ export default function DirectoryHomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  list: { padding: 12 },
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#888", textAlign: "center", lineHeight: 26 },
-  card: {
-    marginBottom: 10,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    overflow: "hidden",
+  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
+
+  headerArea: {
+    paddingHorizontal: spacing.xs,
+    paddingBottom: spacing.xl,
   },
-  cardContent: {
+
+  // Card
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
     flexDirection: "row",
     alignItems: "center",
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    overflow: "hidden",
   },
-  folderIcon: { marginRight: 12 },
+  accentBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    borderTopLeftRadius: radii.lg,
+    borderBottomLeftRadius: radii.lg,
+  },
+  folderIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: spacing.lg,
+    marginRight: spacing.md,
+  },
   cardBody: { flex: 1 },
-  folderName: { color: "#111", fontWeight: "600" },
-  date: { color: "#777", marginTop: 2 },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
   tagChip: {
-    backgroundColor: "#F0F0F0",
-    paddingVertical: 2,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
   },
   tagChipText: {
+    fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    lineHeight: 13,
-    includeFontPadding: false,
-    textAlignVertical: "center",
+    color: colors.primary,
   },
-  extraTags: { color: "#777", alignSelf: "center", marginLeft: 4 },
+
+  // FAB
   fab: {
     position: "absolute",
     bottom: 28,
     right: 24,
-    backgroundColor: "#4A9EFF",
+    backgroundColor: colors.primary,
+    borderRadius: radii.xl,
+  },
+
+  // Dialog
+  dialog: {
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
   },
   dialogScrollArea: { paddingHorizontal: 24, maxHeight: 400 },
-  dialogInput: { marginBottom: 12 },
-  sectionLabel: { color: "#555", marginBottom: 8, marginTop: 4 },
+  dialogInput: { marginBottom: spacing.md, backgroundColor: colors.surface },
   colorRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
     flexWrap: "wrap",
   },
   colorCircle: {
@@ -437,31 +482,50 @@ const styles = StyleSheet.create({
   },
   colorCircleSelected: {
     borderWidth: 3,
-    borderColor: "#333",
+    borderColor: colors.foreground,
   },
   tagInputRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  tagTextInput: { flex: 1 },
-  addTagBtn: { marginTop: 6 },
+  tagTextInput: { flex: 1, backgroundColor: colors.surface },
+  addTagBtn: { marginTop: 6, borderRadius: radii.sm },
   suggestions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
-    marginBottom: 8,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  suggestionChip: { backgroundColor: "#E3F0FF" },
-  suggestionText: { fontSize: 11 },
+  suggestionChip: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  suggestionText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: colors.primary,
+  },
   currentTags: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 8,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   dialogTagChip: {
-    backgroundColor: "#F0F0F0",
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dialogTagChipText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: colors.foreground,
   },
 });

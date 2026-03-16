@@ -9,8 +9,6 @@ import {
 import {
   ActivityIndicator,
   Button,
-  Card,
-  Chip,
   Dialog,
   FAB,
   IconButton,
@@ -19,8 +17,8 @@ import {
   RadioButton,
   Snackbar,
   Text,
-  useTheme,
 } from "react-native-paper";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -34,6 +32,7 @@ import {
   entryAudioUri,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
+import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const AUDIO_TYPES = [
   "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
@@ -59,7 +58,6 @@ function formatTimer(ms) {
 }
 
 export default function DirectoryScreen({ route, navigation }) {
-  const theme = useTheme();
   const { id: folderId } = route.params;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +98,7 @@ export default function DirectoryScreen({ route, navigation }) {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity onPress={() => setAiDialogVisible(true)} style={styles.aiBtn}>
-          <Text style={styles.aiBtnText}>AI</Text>
+          <MaterialCommunityIcons name="creation" size={18} color={colors.primary} />
         </TouchableOpacity>
       ),
     });
@@ -193,7 +191,7 @@ export default function DirectoryScreen({ route, navigation }) {
       await audioRecorder.prepareToRecordAsync();
       const recStatus = audioRecorder.getStatus();
       if (!recStatus.canRecord) {
-        setSnackbar("Snimač nije spreman.");
+        setSnackbar("Snimac nije spreman.");
         return;
       }
       audioRecorder.record();
@@ -241,7 +239,7 @@ export default function DirectoryScreen({ route, navigation }) {
         const entry = await createEntry(folderId, filename, uri, durationSeconds);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
-        setSnackbar("Čuvanje snimka nije uspelo: " + e.message);
+        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
       }
     } catch (e) {
       setSnackbar("Zaustavljanje nije uspelo: " + e.message);
@@ -311,21 +309,16 @@ export default function DirectoryScreen({ route, navigation }) {
     setDeleteTarget(null);
   };
 
-  const statusLabel = (status) => {
+  const statusConfig = (status) => {
     switch (status) {
-      case "recorded": return "Snimljeno";
-      case "processing": return "Transkribuje...";
-      case "error": return "Greška";
-      default: return "Gotovo";
-    }
-  };
-
-  const statusIcon = (status) => {
-    switch (status) {
-      case "recorded": return "record-circle-outline";
-      case "processing": return "progress-clock";
-      case "error": return "alert-circle-outline";
-      default: return "check-circle-outline";
+      case "recorded":
+        return { label: "Snimljeno", icon: "check", bg: colors.primaryLight, fg: colors.primary };
+      case "processing":
+        return { label: "Transkribuje...", icon: "progress-clock", bg: colors.warningLight, fg: colors.warning };
+      case "error":
+        return { label: "Greska", icon: "alert-circle-outline", bg: colors.dangerLight, fg: colors.danger };
+      default:
+        return { label: "Gotovo", icon: "check-circle-outline", bg: colors.successLight, fg: colors.success };
     }
   };
 
@@ -335,101 +328,92 @@ export default function DirectoryScreen({ route, navigation }) {
     const isProcessing = status === "processing";
     const isError = status === "error";
     const isDone = !isRecorded && !isProcessing;
+    const sc = statusConfig(status);
 
     return (
-      <Card
-        style={styles.card}
+      <TouchableOpacity
+        activeOpacity={0.7}
         onPress={() => isDone && navigation.navigate("Entry", { id: item.id })}
+        style={[styles.card, elevation.sm]}
       >
-        <Card.Content>
-          <View style={styles.cardHeader}>
-            <Text variant="titleSmall" style={styles.filename} numberOfLines={1}>
-              {item.filename}
-            </Text>
-            <View style={styles.cardMeta}>
-              {item.duration_seconds > 0 && (
-                <Text variant="bodySmall" style={styles.duration}>
-                  {formatDuration(item.duration_seconds)}
-                </Text>
+        <View style={styles.cardHeader}>
+          <Text style={[typography.heading, { flex: 1, marginRight: spacing.sm }]} numberOfLines={1}>
+            {item.filename}
+          </Text>
+          <View style={styles.cardMeta}>
+            {item.duration_seconds > 0 && (
+              <Text style={[typography.caption, { color: colors.primary }]}>
+                {formatDuration(item.duration_seconds)}
+              </Text>
+            )}
+            <Menu
+              visible={menuVisible === item.id}
+              onDismiss={() => setMenuVisible(null)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  iconColor={colors.muted}
+                  size={18}
+                  onPress={() => setMenuVisible(item.id)}
+                />
+              }
+            >
+              {isRecorded && (
+                <Menu.Item
+                  leadingIcon="text-recognition"
+                  onPress={() => openEngineDialog(item.id)}
+                  title="Transkribisi"
+                />
               )}
-              <Menu
-                visible={menuVisible === item.id}
-                onDismiss={() => setMenuVisible(null)}
-                anchor={
-                  <IconButton
-                    icon="dots-vertical"
-                    size={18}
-                    onPress={() => setMenuVisible(item.id)}
-                  />
-                }
-              >
-                {isRecorded && (
-                  <Menu.Item
-                    leadingIcon="text-recognition"
-                    onPress={() => openEngineDialog(item.id)}
-                    title="Transkribiši"
-                  />
-                )}
-                {(isDone || isRecorded) && (
-                  <Menu.Item
-                    leadingIcon="delete-outline"
-                    onPress={() => onDeletePress(item.id, item.filename)}
-                    title="Obriši"
-                  />
-                )}
-              </Menu>
-            </View>
+              {(isDone || isRecorded) && (
+                <Menu.Item
+                  leadingIcon="delete-outline"
+                  onPress={() => onDeletePress(item.id, item.filename)}
+                  title="Obrisi"
+                />
+              )}
+            </Menu>
           </View>
-          <Text variant="bodySmall" style={styles.date}>{formatDate(item.created_at)}</Text>
-          <Chip
+        </View>
+
+        <Text style={[typography.caption, { marginBottom: spacing.sm }]}>{formatDate(item.created_at)}</Text>
+
+        {/* Status badge */}
+        <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+          {isProcessing ? (
+            <ActivityIndicator size={12} color={sc.fg} style={{ marginRight: 6 }} />
+          ) : (
+            <MaterialCommunityIcons name={sc.icon} size={14} color={sc.fg} style={{ marginRight: 6 }} />
+          )}
+          <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
+        </View>
+
+        {isRecorded && (
+          <Button
+            mode="contained"
             compact
-            icon={statusIcon(status)}
-            textStyle={styles.statusChipText}
-            style={[
-              styles.statusChip,
-              isError && styles.statusChipError,
-              isDone && !isError && styles.statusChipDone,
-              isRecorded && styles.statusChipRecorded,
-              isProcessing && styles.statusChipProcessing,
-            ]}
+            onPress={() => openEngineDialog(item.id)}
+            style={styles.transcribeBtn}
+            labelStyle={styles.transcribeBtnLabel}
+            buttonColor={colors.primary}
           >
-            {statusLabel(status)}
-          </Chip>
-          {isRecorded && (
-            <Button
-              mode="contained"
-              compact
-              onPress={() => openEngineDialog(item.id)}
-              style={styles.transcribeBtn}
-              labelStyle={styles.transcribeBtnLabel}
-            >
-              Transkribiši
-            </Button>
-          )}
-          {isProcessing && (
-            <View style={styles.processingRow}>
-              <ActivityIndicator size="small" />
-              <Text variant="bodySmall" style={styles.processingText}>Transkribovanje...</Text>
-            </View>
-          )}
-          {isDone && (
-            <Text
-              variant="bodySmall"
-              style={[styles.preview, isError && styles.previewError]}
-              numberOfLines={2}
-            >
-              {item.text}
-            </Text>
-          )}
-        </Card.Content>
-      </Card>
+            Transkribisi
+          </Button>
+        )}
+
+        {isDone && item.text && (
+          <Text style={[typography.body, styles.preview, isError && { color: colors.danger }]} numberOfLines={2}>
+            {item.text}
+          </Text>
+        )}
+      </TouchableOpacity>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -449,16 +433,17 @@ export default function DirectoryScreen({ route, navigation }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); load(); }}
-            tintColor={theme.colors.primary}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
-          <Text variant="bodyLarge" style={styles.emptyText}>
-            Nema zapisa.{"\n"}Tapni mikrofon da snimiš.
+          <Text style={[typography.body, styles.emptyText]}>
+            Nema zapisa.{"\n"}Tapni mikrofon da snimis.
           </Text>
         }
       />
 
+      {/* Recording overlay */}
       {isActiveSession && (
         <View style={styles.recordArea}>
           <View style={styles.waveform}>
@@ -475,26 +460,30 @@ export default function DirectoryScreen({ route, navigation }) {
               );
             })}
           </View>
-          <Text variant="titleMedium" style={[styles.timer, isPaused && styles.timerPaused]}>
+          <Text style={[styles.timer, isPaused && styles.timerPaused]}>
             {formatTimer(elapsed)}
           </Text>
           <View style={styles.recordControls}>
-            <IconButton
-              icon={isPaused ? "play" : "pause"}
-              iconColor="#FFF"
-              containerColor="#FF4444"
-              size={28}
+            <TouchableOpacity
+              style={styles.pauseBtn}
               onPress={isPaused ? resumeRecording : pauseRecording}
-            />
-            <IconButton
-              icon="stop"
-              iconColor="#FFF"
-              containerColor="#333"
-              size={24}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name={isPaused ? "play" : "pause"}
+                size={28}
+                color="#FFF"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.stopBtn}
               onPress={stopRecording}
-            />
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="stop" size={24} color={colors.foreground} />
+            </TouchableOpacity>
           </View>
-          <Text variant="bodySmall" style={styles.recordHint}>
+          <Text style={[typography.caption, { marginTop: spacing.sm }]}>
             {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
           </Text>
         </View>
@@ -509,48 +498,49 @@ export default function DirectoryScreen({ route, navigation }) {
             icon: "microphone",
             label: "Snimi",
             onPress: startRecording,
-            style: { backgroundColor: "#4A9EFF" },
+            style: { backgroundColor: colors.primary },
           },
           {
             icon: "file-upload-outline",
             label: "Uvezi fajl",
             onPress: importFile,
-            style: { backgroundColor: "#4A9EFF" },
+            style: { backgroundColor: colors.primary },
           },
         ]}
         onStateChange={({ open }) => setFabOpen(open)}
         fabStyle={styles.recordFab}
+        color="#FFF"
       />
 
       <Portal>
         {/* Delete dialog */}
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
-          <Dialog.Title>Obriši zapis</Dialog.Title>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>Obrisi zapis</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
+            <Text style={typography.body}>
               Obrisati "{deleteTarget?.filename}"?
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>Otkaži</Button>
-            <Button onPress={onDeleteConfirm} textColor={theme.colors.error}>Obriši</Button>
+            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={onDeleteConfirm} textColor={colors.danger}>Obrisi</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Engine choice dialog */}
-        <Dialog visible={engineDialogVisible} onDismiss={() => setEngineDialogVisible(false)}>
-          <Dialog.Title>Izaberi tip transkripcije</Dialog.Title>
+        <Dialog visible={engineDialogVisible} onDismiss={() => setEngineDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>Izaberi tip transkripcije</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={setEngineChoice} value={engineChoice}>
               <TouchableOpacity
                 style={styles.engineRow}
                 onPress={() => setEngineChoice("local")}
               >
-                <RadioButton value="local" />
+                <RadioButton value="local" color={colors.primary} />
                 <View style={styles.engineInfo}>
-                  <Text variant="bodyMedium" style={styles.engineTitle}>Lokalni model — Besplatno</Text>
-                  <Text variant="bodySmall" style={styles.engineDesc}>
-                    Osnovna transkripcija. Radi lokalno, bez slanja podataka van uređaja. Podržava srpski i engleski jezik.
+                  <Text style={[typography.heading, { fontSize: 15 }]}>Lokalni model — Besplatno</Text>
+                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
+                    Osnovna transkripcija. Radi lokalno, bez slanja podataka van uredjaja. Podrzava srpski i engleski jezik.
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -558,32 +548,32 @@ export default function DirectoryScreen({ route, navigation }) {
                 style={styles.engineRow}
                 onPress={() => setEngineChoice("assemblyai")}
               >
-                <RadioButton value="assemblyai" />
+                <RadioButton value="assemblyai" color={colors.primary} />
                 <View style={styles.engineInfo}>
-                  <Text variant="bodyMedium" style={styles.engineTitle}>AssemblyAI — Premium</Text>
-                  <Text variant="bodySmall" style={styles.engineDesc}>
-                    Prepoznavanje govornika (ko je govorio šta), viša tačnost, podrška za akcentovane govore, automatske interpunkcije i detekcija tema.
+                  <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
+                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
+                    Prepoznavanje govornika (ko je govorio sta), visa tacnost, podrska za akcentovane govore, automatske interpunkcije i detekcija tema.
                   </Text>
                 </View>
               </TouchableOpacity>
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setEngineDialogVisible(false)}>Otkaži</Button>
-            <Button onPress={onTranscribeConfirm}>Transkribiši</Button>
+            <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Transkribisi</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* AI Insights dialog */}
-        <Dialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)}>
-          <Dialog.Title>AI uvidi</Dialog.Title>
+        <Dialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>AI uvidi</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              {"AI analiza će omogućiti:\n• Automatsko sažimanje transkripata\n• Prepoznavanje govornika i tema\n• Pametan pregled ključnih tačaka\n• Pretraga po sadržaju unutar direktorijuma\n\nOva funkcija je u razvoju i biće dostupna uskoro."}
+            <Text style={[typography.body, { lineHeight: 22 }]}>
+              {"AI analiza ce omoguciti:\n\u2022 Automatsko sazimanje transkripata\n\u2022 Prepoznavanje govornika i tema\n\u2022 Pametan pregled kljucnih tacaka\n\u2022 Pretraga po sadrzaju unutar direktorijuma\n\nOva funkcija je u razvoju i bice dostupna uskoro."}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setAiDialogVisible(false)}>Zatvori</Button>
+            <Button onPress={() => setAiDialogVisible(false)} textColor={colors.primary}>Zatvori</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -600,96 +590,133 @@ export default function DirectoryScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  list: { padding: 12, paddingBottom: 140 },
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  list: { padding: spacing.lg, paddingBottom: 140 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#888", textAlign: "center", lineHeight: 26 },
+  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
+
+  // Card
   card: {
-    backgroundColor: "#FFFFFF",
-    marginBottom: 10,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-  filename: { color: "#111", fontWeight: "600", flex: 1, marginRight: 8 },
-  cardMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
-  duration: { color: "#4A9EFF" },
-  date: { color: "#777", marginBottom: 6 },
-  statusChip: {
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  cardMeta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+
+  // Status badge
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     alignSelf: "flex-start",
-    marginBottom: 6,
-    height: 28,
-    backgroundColor: "#F0F0F0",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 100,
+    marginBottom: spacing.sm,
   },
-  statusChipText: { fontSize: 11, lineHeight: 14 },
-  statusChipRecorded: { backgroundColor: "#E3F0FF" },
-  statusChipProcessing: { backgroundColor: "#FFFDE7" },
-  statusChipDone: { backgroundColor: "#E8F5E9" },
-  statusChipError: { backgroundColor: "#FFEBEE" },
-  preview: { color: "#555", lineHeight: 18 },
-  previewError: { color: "#D32F2F" },
-  processingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  processingText: { color: "#4A9EFF" },
+  statusText: {
+    fontFamily: "JetBrainsMono_500Medium",
+    fontSize: 11,
+  },
+
+  preview: {
+    color: colors.muted,
+    lineHeight: 20,
+  },
+
   transcribeBtn: {
     alignSelf: "flex-start",
-    marginTop: 4,
-    backgroundColor: "#4A9EFF",
+    marginTop: spacing.xs,
+    borderRadius: radii.sm,
   },
-  transcribeBtnLabel: { fontSize: 13 },
-  engineRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 8,
-  },
-  engineInfo: { flex: 1, paddingLeft: 4 },
-  engineTitle: { fontWeight: "700", marginBottom: 2 },
-  engineDesc: { color: "#555", lineHeight: 18 },
+  transcribeBtnLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  // AI button
   aiBtn: {
-    backgroundColor: "#4A9EFF",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm,
   },
-  aiBtnText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
+
+  // Recording overlay
   recordArea: {
     position: "absolute",
+    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
     alignItems: "center",
-    paddingBottom: 28,
-    paddingTop: 12,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
   },
   timer: {
-    color: "#FF4444",
-    fontWeight: "700",
+    fontFamily: "JetBrainsMono_500Medium",
+    fontSize: 32,
+    color: colors.danger,
     fontVariant: ["tabular-nums"],
-    marginBottom: 8,
+    marginBottom: spacing.lg,
   },
-  timerPaused: { color: "#AAA" },
+  timerPaused: { color: colors.muted },
   recordControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.lg,
+  },
+  pauseBtn: {
+    backgroundColor: colors.danger,
+    borderRadius: radii.xl,
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stopBtn: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: radii.xl,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   recordFab: {
-    backgroundColor: "#4A9EFF",
+    backgroundColor: colors.primary,
+    borderRadius: radii.xl,
   },
-  recordHint: { color: "#666", marginTop: 6 },
   waveform: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 40,
-    gap: 2,
-    marginBottom: 8,
+    height: 48,
+    gap: 3,
+    marginBottom: spacing.lg,
   },
   waveformBar: {
-    width: 3,
-    borderRadius: 1.5,
-    backgroundColor: "#FF4444",
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: colors.danger,
   },
+
+  // Dialog
+  dialog: {
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+  },
+  engineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: spacing.sm,
+  },
+  engineInfo: { flex: 1, paddingLeft: spacing.xs },
 });
