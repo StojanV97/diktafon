@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
-import { fetchEntries, uploadEntry, deleteEntry } from "../services/journalApi";
+import { fetchEntries, fetchEntry, uploadEntry, deleteEntry, transcribeEntry } from "../services/journalApi";
 import {
   saveRecording,
   getPendingRecordings,
@@ -30,9 +30,10 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function formatTimer(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+function formatTimer(ms) {
+  const total = Math.floor((ms ?? 0) / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
@@ -44,6 +45,7 @@ export default function JournalFolderScreen({ route, navigation }) {
   const [uploading, setUploading] = useState(false);
   const [pending, setPending] = useState([]);
   const [retrying, setRetrying] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
 
   const audioRecorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
@@ -51,8 +53,10 @@ export default function JournalFolderScreen({ route, navigation }) {
   });
   const recorderState = useAudioRecorderState(audioRecorder, 100);
   const [meteringHistory, setMeteringHistory] = useState([]);
-  const [isPaused, setIsPaused] = useState(false);
   const prevIsRecording = useRef(false);
+
+  // Polling interval for processing entries
+  const pollIntervalRef = useRef(null);
 
   const loadPending = useCallback(async () => {
     const all = await getPendingRecordings();
@@ -76,6 +80,47 @@ export default function JournalFolderScreen({ route, navigation }) {
     const unsubscribe = navigation.addListener("focus", load);
     return unsubscribe;
   }, [navigation, load]);
+
+  // Poll processing entries every 5 seconds
+  useEffect(() => {
+    const hasProcessing = entries.some((e) => e.status === "processing");
+
+    if (hasProcessing && !pollIntervalRef.current) {
+      pollIntervalRef.current = setInterval(async () => {
+        const processing = entries.filter((e) => e.status === "processing");
+        if (processing.length === 0) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          return;
+        }
+        const updates = await Promise.all(
+          processing.map((e) =>
+            fetchEntry(e.id).catch(() => null)
+          )
+        );
+        updates.forEach((updated) => {
+          if (!updated) return;
+          if (updated.status !== "processing") {
+            setEntries((prev) =>
+              prev.map((e) => (e.id === updated.id ? updated : e))
+            );
+          }
+        });
+      }, 5000);
+    }
+
+    if (!hasProcessing && pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [entries]);
 
   useEffect(() => {
     if (recorderState.isRecording) {
@@ -147,7 +192,7 @@ export default function JournalFolderScreen({ route, navigation }) {
 
       let localUri;
       try {
-        localUri = await saveRecording(uri, filename);
+        localUri = saveRecording(uri, filename);
       } catch (e) {
         Alert.alert("Greška", "Čuvanje snimka nije uspelo: " + e.message);
         return;
@@ -169,6 +214,15 @@ export default function JournalFolderScreen({ route, navigation }) {
       }
     } catch (e) {
       Alert.alert("Greška", "Zaustavljanje nije uspelo: " + e.message);
+    }
+  };
+
+  const onTranscribe = async (entryId) => {
+    try {
+      const updated = await transcribeEntry(entryId);
+      setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
+    } catch (e) {
+      Alert.alert("Greška", e.message);
     }
   };
 
@@ -218,34 +272,60 @@ export default function JournalFolderScreen({ route, navigation }) {
     ]);
   };
 
-  const renderItem = ({ item }) => (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={() => navigation.navigate("JournalEntry", { id: item.id })}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.filename} numberOfLines={1}>
-          {item.filename}
-        </Text>
-        <View style={styles.cardMeta}>
-          {item.duration_seconds > 0 && (
-            <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
-          )}
-          <Pressable
-            style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-            onPress={() => onDeleteEntry(item.id, item.filename)}
-            hitSlop={8}
-          >
-            <Text style={styles.deleteBtnText}>×</Text>
-          </Pressable>
+  const renderItem = ({ item }) => {
+    const status = item.status ?? "done";
+    const isRecorded = status === "recorded";
+    const isProcessing = status === "processing";
+    const isError = status === "error";
+    const isDone = !isRecorded && !isProcessing;
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.card, isDone && pressed && styles.cardPressed]}
+        onPress={() => isDone && navigation.navigate("JournalEntry", { id: item.id })}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.filename} numberOfLines={1}>
+            {item.filename}
+          </Text>
+          <View style={styles.cardMeta}>
+            {item.duration_seconds > 0 && (
+              <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
+            )}
+            {isDone && (
+              <Pressable
+                style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
+                onPress={() => onDeleteEntry(item.id, item.filename)}
+                hitSlop={8}
+              >
+                <Text style={styles.deleteBtnText}>×</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
-      </View>
-      <Text style={styles.date}>{formatDate(item.created_at)}</Text>
-      <Text style={styles.preview} numberOfLines={2}>
-        {item.text}
-      </Text>
-    </Pressable>
-  );
+        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        {isRecorded && (
+          <Pressable
+            style={({ pressed }) => [styles.transcribeBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => onTranscribe(item.id)}
+          >
+            <Text style={styles.transcribeBtnText}>Transkribiši</Text>
+          </Pressable>
+        )}
+        {isProcessing && (
+          <View style={styles.processingRow}>
+            <ActivityIndicator size="small" color="#4A9EFF" />
+            <Text style={styles.processingText}>Transkribovanje...</Text>
+          </View>
+        )}
+        {isDone && (
+          <Text style={[styles.preview, isError && styles.previewError]} numberOfLines={2}>
+            {item.text}
+          </Text>
+        )}
+      </Pressable>
+    );
+  };
 
   if (loading) {
     return (
@@ -257,7 +337,7 @@ export default function JournalFolderScreen({ route, navigation }) {
 
   const isRecording = recorderState.isRecording;
   const isActiveSession = isRecording || isPaused;
-  const elapsed = (recorderState.durationMillis ?? 0) / 1000;
+  const elapsed = recorderState.durationMillis ?? 0;
 
   return (
     <View style={styles.container}>
@@ -278,7 +358,7 @@ export default function JournalFolderScreen({ route, navigation }) {
             {uploading && (
               <View style={styles.uploadingBar}>
                 <ActivityIndicator size="small" color="#4A9EFF" />
-                <Text style={styles.uploadingText}>Transkribovanje...</Text>
+                <Text style={styles.uploadingText}>Učitavanje...</Text>
               </View>
             )}
             {pending.length > 0 && (
@@ -405,6 +485,18 @@ const styles = StyleSheet.create({
   deleteBtnText: { color: "#888", fontSize: 18, lineHeight: 22, fontWeight: "300" },
   date: { color: "#888", fontSize: 12, marginBottom: 6 },
   preview: { color: "#AAA", fontSize: 13, lineHeight: 18 },
+  previewError: { color: "#FF6B6B" },
+  processingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  processingText: { color: "#4A9EFF", fontSize: 13 },
+  transcribeBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#4A9EFF",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  transcribeBtnText: { color: "#FFF", fontSize: 13, fontWeight: "600" },
   uploadingBar: {
     flexDirection: "row",
     alignItems: "center",

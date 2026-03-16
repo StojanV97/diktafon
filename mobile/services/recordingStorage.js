@@ -1,35 +1,33 @@
-import * as FileSystem from "expo-file-system";
+import { File, Directory, Paths } from "expo-file-system";
 
-const RECORDINGS_DIR = FileSystem.documentDirectory + "recordings/";
-const PENDING_FILE = RECORDINGS_DIR + "pending.json";
+const recordingsDir = new Directory(Paths.document, "recordings");
+const pendingFile = new File(recordingsDir, "pending.json");
 
-async function ensureRecordingsDir() {
-  try {
-    await FileSystem.makeDirectoryAsync(RECORDINGS_DIR, { intermediates: true });
-  } catch (e) {
-    // Directory already exists or other non-critical error
-  }
+function ensureRecordingsDir() {
+  recordingsDir.create({ idempotent: true });
 }
 
-export async function saveRecording(uri, filename) {
-  await ensureRecordingsDir();
-  const dest = RECORDINGS_DIR + filename;
-  await FileSystem.copyAsync({ from: uri, to: dest });
-  return dest;
+export function saveRecording(uri, filename) {
+  ensureRecordingsDir();
+  const source = new File(uri);
+  const dest = new File(recordingsDir, filename);
+  source.copy(dest);
+  return dest.uri;
 }
 
 async function readPending() {
   try {
-    const raw = await FileSystem.readAsStringAsync(PENDING_FILE);
+    if (!pendingFile.exists) return [];
+    const raw = await pendingFile.text();
     return JSON.parse(raw);
   } catch {
     return [];
   }
 }
 
-async function writePending(entries) {
-  await ensureRecordingsDir();
-  await FileSystem.writeAsStringAsync(PENDING_FILE, JSON.stringify(entries));
+function writePending(entries) {
+  ensureRecordingsDir();
+  pendingFile.write(JSON.stringify(entries));
 }
 
 export async function getPendingRecordings() {
@@ -39,26 +37,26 @@ export async function getPendingRecordings() {
 export async function addPending(entry) {
   const pending = await readPending();
   pending.push(entry);
-  await writePending(pending);
+  writePending(pending);
 }
 
 export async function removePending(filename) {
   const pending = await readPending();
-  await writePending(pending.filter((e) => e.filename !== filename));
+  writePending(pending.filter((e) => e.filename !== filename));
 }
 
-export async function listSavedRecordings() {
-  await ensureRecordingsDir();
-  const files = await FileSystem.readDirectoryAsync(RECORDINGS_DIR);
-  return files.filter((f) => f.endsWith(".m4a"));
+export function listSavedRecordings() {
+  ensureRecordingsDir();
+  return recordingsDir
+    .list()
+    .filter((f) => f instanceof File && f.name.endsWith(".m4a"))
+    .map((f) => f.name);
 }
 
-export async function deleteRecording(filename) {
-  const path = RECORDINGS_DIR + filename;
-  try {
-    await FileSystem.deleteAsync(path);
-  } catch (e) {
-    // File doesn't exist or other non-critical error
+export function deleteRecording(filename) {
+  const file = new File(recordingsDir, filename);
+  if (file.exists) {
+    file.delete();
   }
-  await removePending(filename);
+  removePending(filename);
 }

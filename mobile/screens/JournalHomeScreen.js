@@ -37,7 +37,7 @@ export default function JournalHomeScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, load]);
 
-  const onAdd = () => {
+  const promptFolderName = (engine) => {
     Alert.prompt("Novi folder", "Unesite naziv foldera:", [
       { text: "Otkaži", style: "cancel" },
       {
@@ -45,13 +45,21 @@ export default function JournalHomeScreen({ navigation }) {
         onPress: async (name) => {
           if (!name?.trim()) return;
           try {
-            const folder = await createFolder(name.trim());
+            const folder = await createFolder(name.trim(), engine);
             setFolders((prev) => [folder, ...prev]);
           } catch (e) {
             Alert.alert("Greška", e.message);
           }
         },
       },
+    ]);
+  };
+
+  const onAdd = () => {
+    Alert.alert("Tip transkripcije", "Izaberi tip za novi folder:", [
+      { text: "Otkaži", style: "cancel" },
+      { text: "Lokalni (privatno)", onPress: () => promptFolderName("local") },
+      { text: "AssemblyAI (glasovi)", onPress: () => promptFolderName("assemblyai") },
     ]);
   };
 
@@ -106,7 +114,12 @@ export default function JournalHomeScreen({ navigation }) {
       <Text style={styles.folderIcon}>📁</Text>
       <View style={styles.cardBody}>
         <Text style={styles.folderName}>{item.name}</Text>
-        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        <View style={styles.cardMeta}>
+          <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+          <Text style={[styles.engineBadge, item.engine === "assemblyai" && styles.engineBadgeAssembly]}>
+            {item.engine === "assemblyai" ? "AssemblyAI" : "lokalni"}
+          </Text>
+        </View>
       </View>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
@@ -168,7 +181,17 @@ const styles = StyleSheet.create({
   folderIcon: { fontSize: 28, marginRight: 12 },
   cardBody: { flex: 1 },
   folderName: { color: "#FFF", fontWeight: "600", fontSize: 16 },
-  date: { color: "#888", fontSize: 12, marginTop: 2 },
+  cardMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  date: { color: "#888", fontSize: 12 },
+  engineBadge: {
+    color: "#888",
+    fontSize: 11,
+    backgroundColor: "#2A2A2A",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  engineBadgeAssembly: { color: "#4A9EFF", backgroundColor: "#1A2A3A" },
   chevron: { color: "#555", fontSize: 24, marginLeft: 8 },
   fab: {
     position: "absolute",

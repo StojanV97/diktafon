@@ -2,11 +2,11 @@ import { BASE_URL, request } from "./api";
 
 // ── Folders ─────────────────────────────────────────────
 
-export async function createFolder(name) {
+export async function createFolder(name, engine = "local") {
   return request("/journal/folders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, engine }),
   });
 }
 
@@ -58,4 +58,8 @@ export async function fetchEntry(entryId) {
 
 export async function deleteEntry(entryId) {
   return request(`/journal/entries/${entryId}`, { method: "DELETE" });
+}
+
+export async function transcribeEntry(entryId) {
+  return request(`/journal/entries/${entryId}/transcribe`, { method: "POST" });
 }
