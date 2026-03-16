@@ -258,3 +258,71 @@ def journal_delete_entry(entry_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Entry not found")
     return {"deleted": True}
+
+
+@app.get("/journal/entries/{entry_id}/audio")
+def journal_get_entry_audio(entry_id: str):
+    entry = get_entry(entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    audio_file = entry.get("audio_file")
+    if not audio_file:
+        raise HTTPException(status_code=404, detail="No audio file for this entry")
+    audio_path = AUDIO_DIR / audio_file
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+    return FileResponse(
+        path=str(audio_path),
+        media_type="audio/mp4",  # correct MIME for .m4a; "audio/m4a" is non-standard
+        filename=audio_file,
+    )
+
+
+# ── Stateless AssemblyAI endpoints (for local-first mobile) ──
+
+@app.post("/transcribe/assemblyai/submit")
+async def transcribe_assemblyai_submit(file: UploadFile = File(...)):
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in SUPPORTED_FORMATS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format '{suffix}'. Supported: {', '.join(SUPPORTED_FORMATS)}"
+        )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        safe_filename = Path(file.filename).name or "upload"
+        tmp_path = os.path.join(tmpdir, safe_filename)
+
+        with open(tmp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        size = os.path.getsize(tmp_path)
+        if size > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large (max 500MB)")
+        if size == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        try:
+            transcript_id = submit_transcription(tmp_path)
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"AssemblyAI submission failed: {str(e)}")
+
+    return {"assemblyai_id": transcript_id}
+
+
+@app.get("/transcribe/assemblyai/status/{transcript_id}")
+def transcribe_assemblyai_status(transcript_id: str):
+    try:
+        result = check_transcription(transcript_id)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"AssemblyAI check failed: {str(e)}")
+
+    if result is None:
+        return {"status": "processing"}
+
+    if "error" in result:
+        return {"status": "error", "error": result["error"]}
+
+    return {"status": "done", "text": result["text"], "duration_seconds": result["duration_seconds"]}

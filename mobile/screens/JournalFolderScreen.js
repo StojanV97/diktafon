@@ -10,14 +10,18 @@ import {
   View,
 } from "react-native";
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
-import { fetchEntries, fetchEntry, uploadEntry, deleteEntry, transcribeEntry } from "../services/journalApi";
 import {
-  saveRecording,
-  getPendingRecordings,
-  addPending,
-  removePending,
-  deleteRecording,
-} from "../services/recordingStorage";
+  createEntry,
+  fetchEntries,
+  fetchEntry,
+  deleteEntry,
+  getFolder,
+  updateEntryToProcessing,
+  completeEntry,
+  failEntry,
+  entryAudioUri,
+} from "../services/journalStorage";
+import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
@@ -42,9 +46,6 @@ export default function JournalFolderScreen({ route, navigation }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [pending, setPending] = useState([]);
-  const [retrying, setRetrying] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
 
   const audioRecorder = useAudioRecorder({
@@ -58,11 +59,6 @@ export default function JournalFolderScreen({ route, navigation }) {
   // Polling interval for processing entries
   const pollIntervalRef = useRef(null);
 
-  const loadPending = useCallback(async () => {
-    const all = await getPendingRecordings();
-    setPending(all.filter((p) => p.folderId === folderId));
-  }, [folderId]);
-
   const load = useCallback(async () => {
     try {
       const data = await fetchEntries(folderId);
@@ -73,8 +69,7 @@ export default function JournalFolderScreen({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-    loadPending();
-  }, [folderId, loadPending]);
+  }, [folderId]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", load);
@@ -87,25 +82,28 @@ export default function JournalFolderScreen({ route, navigation }) {
 
     if (hasProcessing && !pollIntervalRef.current) {
       pollIntervalRef.current = setInterval(async () => {
-        const processing = entries.filter((e) => e.status === "processing");
+        const processing = entries.filter((e) => e.status === "processing" && e.assemblyai_id);
         if (processing.length === 0) {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
           return;
         }
-        const updates = await Promise.all(
-          processing.map((e) =>
-            fetchEntry(e.id).catch(() => null)
-          )
+        await Promise.all(
+          processing.map(async (e) => {
+            try {
+              const result = await checkAssemblyAI(e.assemblyai_id);
+              if (result.status === "done") {
+                const updated = await completeEntry(e.id, result.text, result.duration_seconds);
+                if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
+              } else if (result.status === "error") {
+                const updated = await failEntry(e.id, result.error);
+                if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
+              }
+            } catch {
+              // Retry next interval
+            }
+          })
         );
-        updates.forEach((updated) => {
-          if (!updated) return;
-          if (updated.status !== "processing") {
-            setEntries((prev) =>
-              prev.map((e) => (e.id === updated.id ? updated : e))
-            );
-          }
-        });
       }, 5000);
     }
 
@@ -190,27 +188,11 @@ export default function JournalFolderScreen({ route, navigation }) {
       const now = new Date();
       const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
 
-      let localUri;
       try {
-        localUri = saveRecording(uri, filename);
-      } catch (e) {
-        Alert.alert("Greška", "Čuvanje snimka nije uspelo: " + e.message);
-        return;
-      }
-
-      setUploading(true);
-      try {
-        const entry = await uploadEntry(folderId, localUri, filename, "audio/m4a");
+        const entry = await createEntry(folderId, filename, uri);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
-        await addPending({ filename, uri: localUri, folderId, createdAt: now.toISOString() });
-        await loadPending();
-        Alert.alert(
-          "Snimak sačuvan",
-          "Upload nije uspeo, ali snimak je sačuvan lokalno. Možeš pokušati ponovo kasnije."
-        );
-      } finally {
-        setUploading(false);
+        Alert.alert("Greška", "Čuvanje snimka nije uspelo: " + e.message);
       }
     } catch (e) {
       Alert.alert("Greška", "Zaustavljanje nije uspelo: " + e.message);
@@ -218,9 +200,21 @@ export default function JournalFolderScreen({ route, navigation }) {
   };
 
   const onTranscribe = async (entryId) => {
+    const entry = await fetchEntry(entryId);
+    const folder = await getFolder(entry?.folder_id);
+    const audioUri = entryAudioUri(entryId);
+
     try {
-      const updated = await transcribeEntry(entryId);
-      setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
+      if (folder?.engine === "assemblyai") {
+        const { assemblyai_id } = await submitAssemblyAI(audioUri, entry.filename);
+        const updated = await updateEntryToProcessing(entryId, assemblyai_id);
+        setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
+      } else {
+        setEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, status: "processing" } : e)));
+        const { text, duration_seconds } = await transcribeLocal(audioUri, entry.filename);
+        const updated = await completeEntry(entryId, text, duration_seconds);
+        setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
+      }
     } catch (e) {
       Alert.alert("Greška", e.message);
     }
@@ -233,40 +227,8 @@ export default function JournalFolderScreen({ route, navigation }) {
         text: "Obriši",
         style: "destructive",
         onPress: async () => {
-          try {
-            await deleteEntry(entryId);
-            setEntries((prev) => prev.filter((e) => e.id !== entryId));
-          } catch (e) {
-            Alert.alert("Greška", e.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const retryUpload = async (item) => {
-    setRetrying(item.filename);
-    try {
-      const entry = await uploadEntry(item.folderId, item.uri, item.filename, "audio/m4a");
-      await removePending(item.filename);
-      setPending((prev) => prev.filter((p) => p.filename !== item.filename));
-      setEntries((prev) => [entry, ...prev]);
-    } catch (e) {
-      Alert.alert("Greška", "Ponovni upload nije uspeo:\n" + e.message);
-    } finally {
-      setRetrying(null);
-    }
-  };
-
-  const deletePendingItem = (item) => {
-    Alert.alert("Obriši snimak", `Obrisati "${item.filename}"?`, [
-      { text: "Otkaži", style: "cancel" },
-      {
-        text: "Obriši",
-        style: "destructive",
-        onPress: async () => {
-          await deleteRecording(item.filename);
-          setPending((prev) => prev.filter((p) => p.filename !== item.filename));
+          await deleteEntry(entryId);
+          setEntries((prev) => prev.filter((e) => e.id !== entryId));
         },
       },
     ]);
@@ -345,7 +307,7 @@ export default function JournalFolderScreen({ route, navigation }) {
         data={entries}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={entries.length === 0 && !uploading ? styles.empty : styles.list}
+        contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -353,53 +315,10 @@ export default function JournalFolderScreen({ route, navigation }) {
             tintColor="#4A9EFF"
           />
         }
-        ListHeaderComponent={
-          <>
-            {uploading && (
-              <View style={styles.uploadingBar}>
-                <ActivityIndicator size="small" color="#4A9EFF" />
-                <Text style={styles.uploadingText}>Učitavanje...</Text>
-              </View>
-            )}
-            {pending.length > 0 && (
-              <View style={styles.pendingSection}>
-                <Text style={styles.pendingSectionTitle}>Neobjavljeni snimci</Text>
-                {pending.map((p) => (
-                  <View key={p.filename} style={styles.pendingCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingFilename} numberOfLines={1}>{p.filename}</Text>
-                      <Text style={styles.pendingDate}>{formatDate(p.createdAt)}</Text>
-                    </View>
-                    <Pressable
-                      style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
-                      onPress={() => retryUpload(p)}
-                      disabled={retrying === p.filename}
-                    >
-                      {retrying === p.filename ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <Text style={styles.retryBtnText}>Ponovi</Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-                      onPress={() => deletePendingItem(p)}
-                      hitSlop={8}
-                    >
-                      <Text style={styles.deleteBtnText}>×</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-          </>
-        }
         ListEmptyComponent={
-          !uploading ? (
-            <Text style={styles.emptyText}>
-              Nema zapisa.{"\n"}Tapni mikrofon da snimiš.
-            </Text>
-          ) : null
+          <Text style={styles.emptyText}>
+            Nema zapisa.{"\n"}Tapni mikrofon da snimiš.
+          </Text>
         }
       />
 
@@ -444,7 +363,6 @@ export default function JournalFolderScreen({ route, navigation }) {
             <Pressable
               style={({ pressed }) => [styles.recordBtn, pressed && styles.recordBtnPressed]}
               onPress={startRecording}
-              disabled={uploading}
             >
               <Text style={styles.micEmoji}>🎙️</Text>
             </Pressable>
@@ -497,17 +415,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   transcribeBtnText: { color: "#FFF", fontSize: 13, fontWeight: "600" },
-  uploadingBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#1A1A1A",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    gap: 10,
-  },
-  uploadingText: { color: "#4A9EFF", fontSize: 14 },
   recordArea: {
     position: "absolute",
     bottom: 0,
@@ -586,26 +493,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF4444",
   },
   recordHint: { color: "#666", fontSize: 12, marginTop: 6 },
-  pendingSection: { marginBottom: 14 },
-  pendingSectionTitle: { color: "#FF9500", fontSize: 13, fontWeight: "600", marginBottom: 8 },
-  pendingCard: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    borderLeftWidth: 3,
-    borderLeftColor: "#FF9500",
-    gap: 10,
-  },
-  pendingFilename: { color: "#FFF", fontSize: 14, fontWeight: "500" },
-  pendingDate: { color: "#888", fontSize: 12, marginTop: 2 },
-  retryBtn: {
-    backgroundColor: "#4A9EFF",
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  retryBtnText: { color: "#FFF", fontSize: 13, fontWeight: "600" },
 });

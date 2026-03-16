@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { fetchFolders, createFolder, deleteFolder, renameFolder } from "../services/journalApi";
+import { fetchFolders, createFolder, deleteFolder, renameFolder } from "../services/journalStorage";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
