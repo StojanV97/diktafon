@@ -131,7 +131,7 @@ export default function DailyLogScreen({ navigation }) {
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
 
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds) => {
       try {
         const entry = await createDailyLogEntry(uri, durationSeconds);
@@ -395,6 +395,14 @@ export default function DailyLogScreen({ navigation }) {
     }
   };
 
+  const handleCancel = async () => {
+    try {
+      await cancelRecording();
+    } catch (e) {
+      setSnackbar("Otkazivanje nije uspelo: " + e.message);
+    }
+  };
+
   const sections = grouped.map(({ date, data }) => ({
     date,
     allData: data,
@@ -518,29 +526,30 @@ export default function DailyLogScreen({ navigation }) {
           </View>
 
           <View style={styles.cardBody}>
-            <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-              {isProcessing ? (
-                <ActivityIndicator size={10} color={sc.fg} style={{ marginRight: 4 }} />
-              ) : (
-                <MaterialCommunityIcons name={sc.icon} size={12} color={sc.fg} style={{ marginRight: 4 }} />
+            <View style={styles.statusRow}>
+              <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                {isProcessing ? (
+                  <ActivityIndicator size={10} color={sc.fg} style={{ marginRight: 4 }} />
+                ) : (
+                  <MaterialCommunityIcons name={sc.icon} size={12} color={sc.fg} style={{ marginRight: 4 }} />
+                )}
+                <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
+              </View>
+              {isRecorded && (
+                <TouchableOpacity
+                  style={styles.transcribeLink}
+                  onPress={() => openSingleEngineDialog(item.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.transcribeLinkText}>U tekst</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={14} color={colors.primary} />
+                </TouchableOpacity>
               )}
-              <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
             </View>
             {isDone && item.text ? (
               <Text style={[typography.body, styles.preview]} numberOfLines={2}>
                 {item.text}
               </Text>
-            ) : isRecorded ? (
-              <Button
-                mode="contained"
-                compact
-                onPress={() => openSingleEngineDialog(item.id)}
-                style={styles.transcribeBtn}
-                labelStyle={styles.transcribeBtnLabel}
-                buttonColor={colors.primary}
-              >
-                Transkribisi
-              </Button>
             ) : null}
           </View>
 
@@ -560,7 +569,7 @@ export default function DailyLogScreen({ navigation }) {
               <Menu.Item
                 leadingIcon="text-recognition"
                 onPress={() => openSingleEngineDialog(item.id)}
-                title="Transkribisi"
+                title="U tekst"
               />
             )}
             <Menu.Item
@@ -621,6 +630,7 @@ export default function DailyLogScreen({ navigation }) {
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}
+          onCancel={handleCancel}
         />
       )}
 
@@ -630,7 +640,7 @@ export default function DailyLogScreen({ navigation }) {
           leftLabel="Home"
           onLeftPress={() => navigation.navigate("Home")}
           centerIcon="text-recognition"
-          centerLabel="Transkribisi sve"
+          centerLabel="Sve u tekst"
           onCenterPress={() => openBatchEngineDialog(null)}
           centerDisabled={!entries.some((e) => e.status === "recorded")}
           onRightPress={handleStartRecording}
@@ -687,7 +697,7 @@ export default function DailyLogScreen({ navigation }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Transkribisi</Button>
+            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Pokreni</Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -806,15 +816,19 @@ const styles = StyleSheet.create({
   },
   cardBody: { flex: 1 },
 
-  // Status badge
+  // Status row
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: 100,
-    marginBottom: spacing.xs,
   },
   statusText: {
     fontFamily: "JetBrainsMono_500Medium",
@@ -827,12 +841,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  transcribeBtn: {
-    alignSelf: "flex-start",
-    marginTop: spacing.xs,
-    borderRadius: radii.sm,
+  transcribeLink: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  transcribeBtnLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  transcribeLinkText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: colors.primary,
+  },
 
   // Dialogs
   dialog: {

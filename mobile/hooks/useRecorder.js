@@ -89,6 +89,13 @@ export function useRecorder({ onRecordingComplete }) {
     await onRecordingComplete(uri, durationSeconds, filename);
   };
 
+  const cancelRecording = async () => {
+    await audioRecorder.stop();
+    setIsPaused(false);
+    setMeteringHistory([]);
+    await setAudioModeAsync({ allowsRecording: false });
+  };
+
   return {
     isRecording: recorderState.isRecording,
     isPaused,
@@ -98,5 +105,6 @@ export function useRecorder({ onRecordingComplete }) {
     pauseRecording,
     resumeRecording,
     stopRecording,
+    cancelRecording,
   };
 }

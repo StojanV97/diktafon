@@ -86,7 +86,7 @@ export default function DirectoryScreen({ route, navigation }) {
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
 
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds, filename) => {
       try {
         const entry = await createEntry(folderId, filename, uri, durationSeconds);
@@ -187,6 +187,14 @@ export default function DirectoryScreen({ route, navigation }) {
       await stopRecording();
     } catch (e) {
       setSnackbar("Zaustavljanje nije uspelo: " + e.message);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await cancelRecording();
+    } catch (e) {
+      setSnackbar("Otkazivanje nije uspelo: " + e.message);
     }
   };
 
@@ -330,7 +338,7 @@ export default function DirectoryScreen({ route, navigation }) {
                 <Menu.Item
                   leadingIcon="text-recognition"
                   onPress={() => openEngineDialog(item.id)}
-                  title="Transkribisi"
+                  title="U tekst"
                 />
               )}
               {(isDone || isRecorded) && (
@@ -346,28 +354,28 @@ export default function DirectoryScreen({ route, navigation }) {
 
         <Text style={[typography.caption, { marginBottom: spacing.sm }]}>{formatDate(item.created_at)}</Text>
 
-        {/* Status badge */}
-        <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-          {isProcessing ? (
-            <ActivityIndicator size={12} color={sc.fg} style={{ marginRight: 6 }} />
-          ) : (
-            <MaterialCommunityIcons name={sc.icon} size={14} color={sc.fg} style={{ marginRight: 6 }} />
-          )}
-          <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
-        </View>
+        {/* Status badge row */}
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+            {isProcessing ? (
+              <ActivityIndicator size={12} color={sc.fg} style={{ marginRight: 6 }} />
+            ) : (
+              <MaterialCommunityIcons name={sc.icon} size={14} color={sc.fg} style={{ marginRight: 6 }} />
+            )}
+            <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
+          </View>
 
-        {isRecorded && (
-          <Button
-            mode="contained"
-            compact
-            onPress={() => openEngineDialog(item.id)}
-            style={styles.transcribeBtn}
-            labelStyle={styles.transcribeBtnLabel}
-            buttonColor={colors.primary}
-          >
-            Transkribisi
-          </Button>
-        )}
+          {isRecorded && (
+            <TouchableOpacity
+              style={styles.transcribeLink}
+              onPress={() => openEngineDialog(item.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.transcribeLinkText}>U tekst</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         {isDone && item.text && (
           <Text style={[typography.body, styles.preview, isError && { color: colors.danger }]} numberOfLines={2}>
@@ -417,6 +425,7 @@ export default function DirectoryScreen({ route, navigation }) {
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}
+          onCancel={handleCancel}
         />
       )}
 
@@ -482,7 +491,7 @@ export default function DirectoryScreen({ route, navigation }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Transkribisi</Button>
+            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Pokreni</Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -547,15 +556,19 @@ const styles = StyleSheet.create({
   },
   cardMeta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
 
-  // Status badge
+  // Status row
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 100,
-    marginBottom: spacing.sm,
   },
   statusText: {
     fontFamily: "JetBrainsMono_500Medium",
@@ -567,12 +580,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  transcribeBtn: {
-    alignSelf: "flex-start",
-    marginTop: spacing.xs,
-    borderRadius: radii.sm,
+  transcribeLink: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  transcribeBtnLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  transcribeLinkText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: colors.primary,
+  },
 
   // AI button
   aiBtn: {

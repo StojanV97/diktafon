@@ -11,7 +11,7 @@ function formatTimer(ms) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop }) {
+export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop, onCancel }) {
   return (
     <View style={styles.recordArea}>
       <View style={styles.waveform}>
@@ -33,6 +33,13 @@ export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, o
       </Text>
       <View style={styles.recordControls}>
         <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={onCancel}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="close" size={22} color={colors.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.pauseBtn}
           onPress={isPaused ? onResume : onPause}
           activeOpacity={0.8}
@@ -44,15 +51,15 @@ export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, o
           />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.stopBtn}
+          style={styles.saveBtn}
           onPress={onStop}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="stop" size={24} color={colors.foreground} />
+          <MaterialCommunityIcons name="check" size={22} color="#FFF" />
         </TouchableOpacity>
       </View>
       <Text style={[typography.caption, { marginTop: spacing.sm }]}>
-        {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
+        {isPaused ? "Odbaci \u00B7 Nastavi \u00B7 Sacuvaj" : "Odbaci \u00B7 Pauziraj \u00B7 Sacuvaj"}
       </Text>
     </View>
   );
@@ -80,7 +87,15 @@ const styles = StyleSheet.create({
   recordControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.lg,
+    gap: spacing.xl,
+  },
+  cancelBtn: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: radii.xl,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   pauseBtn: {
     backgroundColor: colors.danger,
@@ -90,8 +105,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  stopBtn: {
-    backgroundColor: "#E2E8F0",
+  saveBtn: {
+    backgroundColor: colors.success,
     borderRadius: radii.xl,
     width: 48,
     height: 48,
