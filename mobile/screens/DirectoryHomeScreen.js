@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Button,
   Dialog,
-  FAB,
   IconButton,
   Menu,
   Portal,
@@ -74,6 +73,7 @@ export default function DirectoryHomeScreen({ navigation }) {
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
 
+  // Recording
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds) => {
       try {
@@ -85,6 +85,18 @@ export default function DirectoryHomeScreen({ navigation }) {
       }
     },
   });
+
+  const handleRecordPress = async () => {
+    try {
+      if (isRecording) {
+        await stopRecording();
+      } else {
+        await startRecording();
+      }
+    } catch (e) {
+      setSnackbar(e.message);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -103,38 +115,6 @@ export default function DirectoryHomeScreen({ navigation }) {
     const unsubscribe = navigation.addListener("focus", load);
     return unsubscribe;
   }, [navigation, load]);
-
-  const handleStartRecording = async () => {
-    try {
-      await startRecording();
-    } catch (e) {
-      setSnackbar(e.message);
-    }
-  };
-
-  const handlePause = async () => {
-    try {
-      await pauseRecording();
-    } catch (e) {
-      setSnackbar("Pauza nije uspela: " + e.message);
-    }
-  };
-
-  const handleResume = async () => {
-    try {
-      await resumeRecording();
-    } catch (e) {
-      setSnackbar("Nastavak nije uspeo: " + e.message);
-    }
-  };
-
-  const handleStop = async () => {
-    try {
-      await stopRecording();
-    } catch (e) {
-      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
-    }
-  };
 
   const openDialog = async (mode, folder) => {
     setDialogMode(mode);
@@ -218,7 +198,6 @@ export default function DirectoryHomeScreen({ navigation }) {
     setDeleteTarget(null);
   };
 
-  // Filter out daily log folder from regular list
   const regularFolders = folders.filter((f) => !f.is_daily_log);
 
   const ListHeader = () => (
@@ -334,8 +313,6 @@ export default function DirectoryHomeScreen({ navigation }) {
     );
   }
 
-  const isActiveSession = isRecording || isPaused;
-
   return (
     <View style={styles.container}>
       <FlatList
@@ -343,7 +320,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
-        contentContainerStyle={regularFolders.length === 0 ? styles.empty : styles.list}
+        contentContainerStyle={[styles.list, { flexGrow: 1 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -352,39 +329,38 @@ export default function DirectoryHomeScreen({ navigation }) {
           />
         }
         ListEmptyComponent={
-          <Text style={[typography.body, styles.emptyText]}>
-            Nema direktorijuma.{"\n"}Tapni + da kreiras direktorijum.
-          </Text>
+          <View style={styles.emptyWrap}>
+            <Text style={[typography.body, styles.emptyText]}>
+              Nema direktorijuma.{"\n"}Tapni + da kreiras direktorijum.
+            </Text>
+          </View>
         }
       />
 
-      {isActiveSession && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
-          elapsed={elapsed}
-          isPaused={isPaused}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStop={handleStop}
-        />
-      )}
+      {/* Bottom Action Bar */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]}>
+        <TouchableOpacity
+          onPress={() => openDialog("create")}
+          style={styles.bottomBtnLeft}
+        >
+          <MaterialCommunityIcons name="folder-plus-outline" size={24} color={colors.primary} />
+          <Text style={styles.bottomBtnText}>Direktorijum</Text>
+        </TouchableOpacity>
 
-      {!isActiveSession && (
-        <>
-          <FAB
-            icon="plus"
-            style={styles.fabSecondary}
-            color="#FFF"
-            onPress={() => openDialog("create")}
+        <TouchableOpacity
+          onPress={handleRecordPress}
+          style={styles.bottomBtnRight}
+        >
+          <MaterialCommunityIcons
+            name={isRecording ? "stop-circle" : "microphone"}
+            size={24}
+            color={isRecording ? colors.danger : colors.primary}
           />
-          <FAB
-            icon="microphone"
-            style={styles.fab}
-            color="#FFF"
-            onPress={handleStartRecording}
-          />
-        </>
-      )}
+          <Text style={[styles.bottomBtnText, isRecording && { color: colors.danger }]}>
+            {isRecording ? "Zaustavi" : "Snimi"}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <Portal>
         {/* Create / Edit Dialog */}
@@ -505,6 +481,17 @@ export default function DirectoryHomeScreen({ navigation }) {
         </Dialog>
       </Portal>
 
+      {isRecording && (
+        <RecordingOverlay
+          meteringHistory={meteringHistory}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
+          onStop={stopRecording}
+        />
+      )}
+
       <Snackbar
         visible={!!snackbar}
         onDismiss={() => setSnackbar("")}
@@ -519,8 +506,8 @@ export default function DirectoryHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 140 },
-  empty: { flex: 1, justifyContent: "center", alignItems: "center" },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
 
   headerArea: {
@@ -615,20 +602,32 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // FABs
-  fab: {
-    position: "absolute",
-    bottom: 28,
-    right: 24,
-    backgroundColor: colors.primary,
-    borderRadius: radii.xl,
+  // Bottom action bar
+  bottomBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
   },
-  fabSecondary: {
-    position: "absolute",
-    bottom: 96,
-    right: 24,
-    backgroundColor: colors.muted,
-    borderRadius: radii.xl,
+  bottomBtnLeft: {
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  bottomBtnRight: {
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  bottomBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: colors.primary,
+    marginTop: 4,
   },
 
   // Dialog
