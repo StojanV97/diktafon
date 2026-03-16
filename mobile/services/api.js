@@ -5,15 +5,35 @@
 // ============================================================
 export const BASE_URL = "http://192.168.0.10:8000";
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
+export function parseErrorMessage(status, body) {
+  try {
+    const json = JSON.parse(body);
+    return json.detail || json.message || `Server error (${status})`;
+  } catch {
+    return `Server error (${status})`;
+  }
+}
+
 export async function request(path, options = {}) {
   const url = `${BASE_URL}${path}`;
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HTTP ${res.status}: ${body}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(parseErrorMessage(res.status, body));
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Request timed out");
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  if (res.status === 204) return null;
-  return res.json();
 }
 
 export async function uploadAndTranscribe(fileUri, filename, mimeType, onProgress) {

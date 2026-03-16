@@ -44,6 +44,10 @@ export default function JournalHomeScreen({ navigation }) {
         text: "Kreiraj",
         onPress: async (name) => {
           if (!name?.trim()) return;
+          if (name.trim().length > 100) {
+            Alert.alert("Greška", "Naziv ne može biti duži od 100 karaktera.");
+            return;
+          }
           try {
             const folder = await createFolder(name.trim(), engine);
             setFolders((prev) => [folder, ...prev]);
@@ -70,6 +74,10 @@ export default function JournalHomeScreen({ navigation }) {
         text: "Sačuvaj",
         onPress: async (name) => {
           if (!name?.trim()) return;
+          if (name.trim().length > 100) {
+            Alert.alert("Greška", "Naziv ne može biti duži od 100 karaktera.");
+            return;
+          }
           try {
             const updated = await renameFolder(id, name.trim());
             setFolders((prev) => prev.map((f) => (f.id === id ? updated : f)));

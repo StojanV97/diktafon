@@ -1,4 +1,6 @@
-import { BASE_URL, request } from "./api";
+import { BASE_URL, request, parseErrorMessage } from "./api";
+
+const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — audio uploads can be large
 
 // ── Folders ─────────────────────────────────────────────
 
@@ -36,16 +38,25 @@ export async function uploadEntry(folderId, fileUri, filename, mimeType) {
     type: mimeType || "audio/m4a",
   });
 
-  const res = await fetch(`${BASE_URL}/journal/folders/${folderId}/entries`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Upload failed (${res.status}): ${body}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}/journal/folders/${folderId}/entries`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(parseErrorMessage(res.status, body));
+    }
+    return res.json();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Upload timed out");
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export async function fetchEntries(folderId) {

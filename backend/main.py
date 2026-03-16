@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
+from typing import Literal
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,7 +23,7 @@ from journal_storage import (
     update_entry_to_processing, list_entries, get_entry, delete_entry,
 )
 from transcription_assemblyai import submit_transcription, check_transcription
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="Diktafon API", version="1.0.0")
 
@@ -59,7 +60,8 @@ async def transcribe(
         )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = os.path.join(tmpdir, file.filename)
+        safe_filename = Path(file.filename).name or "upload"
+        tmp_path = os.path.join(tmpdir, safe_filename)
 
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -129,8 +131,8 @@ def download(record_id: str):
 # ── Journal ──────────────────────────────────────────────
 
 class FolderBody(BaseModel):
-    name: str
-    engine: str = "local"
+    name: str = Field(..., min_length=1, max_length=100)
+    engine: Literal["local", "assemblyai"] = "local"
 
 
 @app.post("/journal/folders")
@@ -173,7 +175,8 @@ async def journal_create_entry(folder_id: str, file: UploadFile = File(...)):
         )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = os.path.join(tmpdir, file.filename)
+        safe_filename = Path(file.filename).name or "upload"
+        tmp_path = os.path.join(tmpdir, safe_filename)
 
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
