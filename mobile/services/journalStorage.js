@@ -326,6 +326,32 @@ export async function fetchDailyLogStats() {
   };
 }
 
+export async function getDailyCombinedTranscript(date) {
+  const allEntries = await fetchDailyLogEntries();
+  const dayEntries = allEntries
+    .filter((e) => (e.recorded_date || e.created_at.slice(0, 10)) === date)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const parts = [];
+  for (const entry of dayEntries) {
+    if (entry.status !== "done") continue;
+    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+    let fullText = entry.text || "";
+    if (textFile.exists) {
+      try {
+        fullText = await textFile.text();
+      } catch {
+        // fall back to truncated text from JSON
+      }
+    }
+    const time = new Date(entry.created_at);
+    const h = time.getHours().toString().padStart(2, "0");
+    const m = time.getMinutes().toString().padStart(2, "0");
+    parts.push(`[${h}:${m}]\n${fullText}`);
+  }
+  return parts.join("\n\n");
+}
+
 export async function moveEntryToFolder(entryId, targetFolderId) {
   const entries = await readJSON(entriesFile);
   const entry = entries.find((e) => e.id === entryId);

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Clipboard,
   SectionList,
   RefreshControl,
+  Share,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -30,6 +32,7 @@ import {
   entryAudioUri,
   moveEntryToFolder,
   createDailyLogEntry,
+  getDailyCombinedTranscript,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
 import { useRecorder } from "../hooks/useRecorder";
@@ -111,6 +114,10 @@ export default function DailyLogScreen({ navigation }) {
   const [moveTargetEntryId, setMoveTargetEntryId] = useState(null);
   const [regularFolders, setRegularFolders] = useState([]);
 
+  // Combined transcript per date
+  const [combinedTexts, setCombinedTexts] = useState({});
+  const [expandedTranscripts, setExpandedTranscripts] = useState(new Set());
+
   const [snackbar, setSnackbar] = useState("");
 
   const pollIntervalRef = useRef(null);
@@ -185,6 +192,26 @@ export default function DailyLogScreen({ navigation }) {
         pollIntervalRef.current = null;
       }
     };
+  }, [entries]);
+
+  // Load combined transcripts for dates where all entries are done
+  useEffect(() => {
+    const grouped = groupByDate(entries);
+    for (const { date, data } of grouped) {
+      const allDone = data.length > 0 && data.every((e) => e.status === "done");
+      if (allDone && !combinedTexts[date]) {
+        getDailyCombinedTranscript(date).then((text) => {
+          setCombinedTexts((prev) => ({ ...prev, [date]: text }));
+        });
+      } else if (!allDone && combinedTexts[date]) {
+        // Clear stale combined text if entries changed (e.g., new recording added)
+        setCombinedTexts((prev) => {
+          const next = { ...prev };
+          delete next[date];
+          return next;
+        });
+      }
+    }
   }, [entries]);
 
   const toggleSection = (date) => {
@@ -387,6 +414,74 @@ export default function DailyLogScreen({ navigation }) {
     );
   };
 
+  const copyCombinedText = (date) => {
+    const text = combinedTexts[date];
+    if (!text) return;
+    Clipboard.setString(text);
+    setSnackbar("Tekst je kopiran.");
+  };
+
+  const shareCombinedText = async (date) => {
+    const text = combinedTexts[date];
+    if (!text) return;
+    try {
+      await Share.share({ message: text, title: `Dnevni Log — ${formatSectionDate(date)}` });
+    } catch {
+      // user dismissed
+    }
+  };
+
+  const toggleTranscriptExpanded = (date) => {
+    setExpandedTranscripts((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  const renderSectionFooter = ({ section }) => {
+    const { date } = section;
+    const text = combinedTexts[date];
+    if (!text || collapsedDates.has(date)) return null;
+
+    const isExpanded = expandedTranscripts.has(date);
+    const isLong = text.length > 300;
+
+    return (
+      <View style={[styles.combinedCard, elevation.sm]}>
+        <View style={styles.combinedHeader}>
+          <View style={styles.combinedTitleRow}>
+            <MaterialCommunityIcons name="text-box-outline" size={18} color={colors.primary} />
+            <Text style={styles.combinedTitle}>Kombinovani transkript</Text>
+          </View>
+          <View style={styles.combinedActions}>
+            <TouchableOpacity onPress={() => copyCombinedText(date)} style={styles.combinedActionBtn}>
+              <MaterialCommunityIcons name="content-copy" size={18} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => shareCombinedText(date)} style={styles.combinedActionBtn}>
+              <MaterialCommunityIcons name="share-variant" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text
+          style={styles.combinedText}
+          numberOfLines={isExpanded ? undefined : 8}
+          selectable={isExpanded}
+        >
+          {text}
+        </Text>
+        {isLong && (
+          <TouchableOpacity onPress={() => toggleTranscriptExpanded(date)}>
+            <Text style={styles.expandBtn}>
+              {isExpanded ? "Sakrij" : "Prikazi ceo tekst"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   const renderItem = ({ item }) => {
     const status = item.status ?? "done";
     const isRecorded = status === "recorded";
@@ -489,6 +584,7 @@ export default function DailyLogScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
+        renderSectionFooter={renderSectionFooter}
         contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
         stickySectionHeadersEnabled={false}
         refreshControl={
@@ -742,5 +838,51 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     marginRight: spacing.md,
+  },
+
+  // Combined transcript
+  combinedCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  combinedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md,
+  },
+  combinedTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  combinedTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: colors.primary,
+  },
+  combinedActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  combinedActionBtn: {
+    padding: spacing.xs,
+  },
+  combinedText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: colors.foreground,
+    lineHeight: 22,
+  },
+  expandBtn: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: colors.primary,
+    marginTop: spacing.sm,
   },
 });
