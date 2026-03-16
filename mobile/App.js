@@ -127,7 +127,7 @@ export default function App() {
               <Stack.Screen
                 name="DailyLog"
                 component={DailyLogScreen}
-                options={{ title: "Dnevni Log" }}
+                options={{ title: "Brzi Zapis" }}
               />
               <Stack.Screen
                 name="Settings"

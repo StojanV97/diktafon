@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Button,
   Dialog,
-  FAB,
   IconButton,
   Menu,
   Portal,
@@ -41,6 +40,7 @@ import * as whisperService from "../services/whisperService";
 import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
+import BottomActionBar from "../components/BottomActionBar";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 function formatDuration(seconds) {
@@ -194,16 +194,18 @@ export default function DailyLogScreen({ navigation }) {
 
   const grouped = useMemo(() => groupByDate(entries), [entries]);
 
-  // Load combined transcripts for dates where all entries are done
+  // Load combined transcripts for dates where at least one entry is done
   useEffect(() => {
     for (const { date, data } of grouped) {
-      const allDone = data.length > 0 && data.every((e) => e.status === "done");
-      if (allDone && !combinedTexts[date]) {
+      const doneCount = data.filter((e) => e.status === "done").length;
+      if (doneCount > 0) {
         getDailyCombinedTranscript(date).then((text) => {
-          setCombinedTexts((prev) => ({ ...prev, [date]: text }));
+          setCombinedTexts((prev) => {
+            if (prev[date] === text) return prev;
+            return { ...prev, [date]: text };
+          });
         });
-      } else if (!allDone && combinedTexts[date]) {
-        // Clear stale combined text if entries changed (e.g., new recording added)
+      } else if (combinedTexts[date]) {
         setCombinedTexts((prev) => {
           const next = { ...prev };
           delete next[date];
@@ -231,7 +233,7 @@ export default function DailyLogScreen({ navigation }) {
     setEngineDialogVisible(true);
   };
 
-  const openBatchEngineDialog = async (date) => {
+  const openBatchEngineDialog = async (date = null) => {
     setBatchDate(date);
     setEngineTargetId(null);
     const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
@@ -265,11 +267,13 @@ export default function DailyLogScreen({ navigation }) {
       }
     }
 
-    if (batchDate) {
-      // Batch transcription
-      const toTranscribe = entries.filter(
-        (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && e.status === "recorded"
-      );
+    if (!engineTargetId) {
+      // Batch transcription — specific date or all dates (batchDate=null means all)
+      const toTranscribe = batchDate
+        ? entries.filter(
+            (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && e.status === "recorded"
+          )
+        : entries.filter((e) => e.status === "recorded");
       if (engineChoice === "local") {
         for (const entry of toTranscribe) {
           setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, status: "processing" } : e)));
@@ -298,7 +302,7 @@ export default function DailyLogScreen({ navigation }) {
           })
         );
       }
-    } else if (engineTargetId) {
+    } else {
       // Single entry transcription
       const entryId = engineTargetId;
       const entry = await fetchEntry(entryId);
@@ -401,8 +405,6 @@ export default function DailyLogScreen({ navigation }) {
     const { date, allData } = section;
     const isCollapsed = collapsedDates.has(date);
     const totalDur = allData.reduce((s, e) => s + (e.duration_seconds || 0), 0);
-    const untranscribed = allData.filter((e) => e.status === "recorded").length;
-
     return (
       <View style={styles.sectionHeader}>
         <TouchableOpacity
@@ -420,19 +422,6 @@ export default function DailyLogScreen({ navigation }) {
             {allData.length} kl · {formatDuration(totalDur)}
           </Text>
         </TouchableOpacity>
-        {untranscribed > 0 && (
-          <Button
-            mode="contained-tonal"
-            compact
-            onPress={() => openBatchEngineDialog(date)}
-            style={styles.batchBtn}
-            labelStyle={styles.batchBtnLabel}
-            buttonColor={colors.primaryLight}
-            textColor={colors.primary}
-          >
-            Transkribisi sve
-          </Button>
-        )}
       </View>
     );
   };
@@ -448,7 +437,7 @@ export default function DailyLogScreen({ navigation }) {
     const text = combinedTexts[date];
     if (!text) return;
     try {
-      await Share.share({ message: text, title: `Dnevni Log — ${formatSectionDate(date)}` });
+      await Share.share({ message: text, title: `Brzi Zapis — ${formatSectionDate(date)}` });
     } catch {
       // user dismissed
     }
@@ -609,7 +598,7 @@ export default function DailyLogScreen({ navigation }) {
         renderSectionHeader={renderSectionHeader}
         renderSectionFooter={renderSectionFooter}
         contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
-        stickySectionHeadersEnabled={false}
+        stickySectionHeadersEnabled={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -636,11 +625,16 @@ export default function DailyLogScreen({ navigation }) {
       )}
 
       {!isActiveSession && (
-        <FAB
-          icon="microphone"
-          style={styles.fab}
-          color="#FFF"
-          onPress={handleStartRecording}
+        <BottomActionBar
+          leftIcon="home-outline"
+          leftLabel="Home"
+          onLeftPress={() => navigation.navigate("Home")}
+          centerIcon="text-recognition"
+          centerLabel="Transkribisi sve"
+          onCenterPress={() => openBatchEngineDialog(null)}
+          centerDisabled={!entries.some((e) => e.status === "recorded")}
+          onRightPress={handleStartRecording}
+          isRecording={false}
         />
       )}
 
@@ -751,7 +745,7 @@ export default function DailyLogScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { padding: spacing.lg, paddingBottom: 120 },
+  list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
 
@@ -761,7 +755,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.xs,
+    backgroundColor: colors.background,
   },
   sectionHeaderLeft: {
     flexDirection: "row",
@@ -774,11 +770,6 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     marginLeft: spacing.xs,
   },
-  batchBtn: {
-    borderRadius: radii.sm,
-    marginLeft: spacing.sm,
-  },
-  batchBtnLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   // Card
   card: {
@@ -842,15 +833,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   transcribeBtnLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-
-  // FAB
-  fab: {
-    position: "absolute",
-    bottom: 28,
-    right: 24,
-    backgroundColor: colors.primary,
-    borderRadius: radii.xl,
-  },
 
   // Dialogs
   dialog: {

@@ -31,6 +31,7 @@ import {
 } from "../services/journalStorage";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
+import BottomActionBar from "../components/BottomActionBar";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 
 function formatDate(iso) {
@@ -225,7 +226,7 @@ export default function DirectoryHomeScreen({ navigation }) {
           <MaterialCommunityIcons name="calendar-today" size={24} color={colors.primary} />
         </View>
         <View style={styles.danasBody}>
-          <Text style={styles.danasTitle}>Danas</Text>
+          <Text style={styles.danasTitle}>Brzi Zapis</Text>
           {dailyStats.clipCount > 0 ? (
             <Text style={[typography.caption, { marginTop: 2 }]}>
               {dailyStats.clipCount} {dailyStats.clipCount === 1 ? "snimak" : "snimaka"} · {formatDuration(dailyStats.totalDuration)}
@@ -337,30 +338,13 @@ export default function DirectoryHomeScreen({ navigation }) {
         }
       />
 
-      {/* Bottom Action Bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]}>
-        <TouchableOpacity
-          onPress={() => openDialog("create")}
-          style={styles.bottomBtnLeft}
-        >
-          <MaterialCommunityIcons name="folder-plus-outline" size={24} color={colors.primary} />
-          <Text style={styles.bottomBtnText}>Direktorijum</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleRecordPress}
-          style={styles.bottomBtnRight}
-        >
-          <MaterialCommunityIcons
-            name={isRecording ? "stop-circle" : "microphone"}
-            size={24}
-            color={isRecording ? colors.danger : colors.primary}
-          />
-          <Text style={[styles.bottomBtnText, isRecording && { color: colors.danger }]}>
-            {isRecording ? "Zaustavi" : "Snimi"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <BottomActionBar
+        leftIcon="folder-plus-outline"
+        leftLabel="Direktorijum"
+        onLeftPress={() => openDialog("create")}
+        onRightPress={handleRecordPress}
+        isRecording={isRecording}
+      />
 
       <Portal>
         {/* Create / Edit Dialog */}
@@ -600,34 +584,6 @@ const styles = StyleSheet.create({
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
     color: colors.primary,
-  },
-
-  // Bottom action bar
-  bottomBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.background,
-  },
-  bottomBtnLeft: {
-    alignItems: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-  },
-  bottomBtnRight: {
-    alignItems: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-  },
-  bottomBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    color: colors.primary,
-    marginTop: 4,
   },
 
   // Dialog

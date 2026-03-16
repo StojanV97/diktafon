@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Button,
   Dialog,
-  FAB,
   IconButton,
   Menu,
   Portal,
@@ -37,6 +36,7 @@ import * as whisperService from "../services/whisperService";
 import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
+import BottomActionBar from "../components/BottomActionBar";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const AUDIO_TYPES = [
@@ -60,7 +60,6 @@ export default function DirectoryScreen({ route, navigation }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(null);
@@ -421,28 +420,18 @@ export default function DirectoryScreen({ route, navigation }) {
         />
       )}
 
-      <FAB.Group
-        open={fabOpen}
-        visible={!isActiveSession}
-        icon={fabOpen ? "close" : "microphone"}
-        actions={[
-          {
-            icon: "microphone",
-            label: "Snimi",
-            onPress: handleStartRecording,
-            style: { backgroundColor: colors.primary },
-          },
-          {
-            icon: "file-upload-outline",
-            label: "Uvezi fajl",
-            onPress: importFile,
-            style: { backgroundColor: colors.primary },
-          },
-        ]}
-        onStateChange={({ open }) => setFabOpen(open)}
-        fabStyle={styles.recordFab}
-        color="#FFF"
-      />
+      {!isActiveSession && (
+        <BottomActionBar
+          leftIcon="home-outline"
+          leftLabel="Home"
+          onLeftPress={() => navigation.navigate("Home")}
+          centerIcon="file-upload-outline"
+          centerLabel="Uvezi"
+          onCenterPress={importFile}
+          onRightPress={handleStartRecording}
+          isRecording={false}
+        />
+      )}
 
       <Portal>
         {/* Delete dialog */}
@@ -539,7 +528,7 @@ export default function DirectoryScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { padding: spacing.lg, paddingBottom: 140 },
+  list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
 
@@ -595,11 +584,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: spacing.sm,
-  },
-
-  recordFab: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.xl,
   },
 
   // Dialog

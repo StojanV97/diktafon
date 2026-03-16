@@ -158,16 +158,24 @@ export default function EntryScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Meta section */}
-      <View style={styles.meta}>
+      {/* Meta + Transcript (scrollable) */}
+      <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
         <Text style={typography.heading}>{record.filename}</Text>
-        <Text style={[typography.caption, { marginTop: spacing.xs }]}>
+        <Text style={[typography.caption, { marginTop: spacing.xs, marginBottom: spacing.lg }]}>
           {formatDate(record.created_at)}
           {record.duration_seconds > 0 && `  \u2022  ${formatDuration(record.duration_seconds)}`}
         </Text>
-      </View>
 
-      {/* Player card */}
+        <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>
+        {record.text
+          ? <Text style={styles.bodyText} selectable>{record.text}</Text>
+          : <Text style={[typography.body, { color: colors.muted, fontStyle: 'italic' }]}>
+              Transkript nije dostupan. Vrati se i tapni „Transkribisi".
+            </Text>
+        }
+      </ScrollView>
+
+      {/* Player card — pinned above bottom bar */}
       {record?.audio_file && (
         <View style={[styles.playerCard, elevation.md]}>
           <Pressable
@@ -220,17 +228,6 @@ export default function EntryScreen({ route, navigation }) {
           </View>
         </View>
       )}
-
-      {/* Transcript section */}
-      <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
-        <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>
-        {record.text
-          ? <Text style={styles.bodyText} selectable>{record.text}</Text>
-          : <Text style={[typography.body, { color: colors.muted, fontStyle: 'italic' }]}>
-              Transkript nije dostupan. Vrati se i tapni „Transkribisi".
-            </Text>
-        }
-      </ScrollView>
 
       {/* Bottom actions */}
       <View style={[styles.actions, elevation.sm]}>
@@ -288,20 +285,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
 
-  // Meta
-  meta: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-  },
-
-  // Player card
+  // Player card — pinned above bottom bar
   playerCard: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    borderRadius: radii.lg,
     padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
   },
   progressBarTrack: {
     height: 4,
@@ -345,7 +334,7 @@ const styles = StyleSheet.create({
   },
 
   // Transcript
-  textScroll: { flex: 1 },
+  textScroll: { flex: 1, backgroundColor: colors.surface },
   textContent: { padding: spacing.lg },
   bodyText: {
     fontFamily: "Inter_400Regular",
