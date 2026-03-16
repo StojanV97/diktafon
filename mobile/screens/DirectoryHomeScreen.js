@@ -223,8 +223,18 @@ export default function DirectoryHomeScreen({ navigation }) {
 
   const ListHeader = () => (
     <View style={[styles.headerArea, { paddingTop: insets.top + spacing.lg }]}>
-      <Text style={typography.monoLabel}>APP</Text>
-      <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktafon</Text>
+      <View style={styles.headerTitleRow}>
+        <View>
+          <Text style={typography.monoLabel}>APP</Text>
+          <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktafon</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Settings")}
+          style={styles.settingsBtn}
+        >
+          <MaterialCommunityIcons name="cog-outline" size={22} color={colors.muted} />
+        </TouchableOpacity>
+      </View>
 
       {/* Danas card */}
       <TouchableOpacity
@@ -516,6 +526,20 @@ const styles = StyleSheet.create({
   headerArea: {
     paddingHorizontal: spacing.xs,
     paddingBottom: spacing.xl,
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xs,
   },
 
   // Danas card

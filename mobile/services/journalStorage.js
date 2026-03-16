@@ -61,6 +61,19 @@ export async function migrateData() {
   }
   if (changed) writeJSON(foldersFile, folders);
 
+  // Reset entries stuck in "processing" for >24 hours back to "recorded"
+  const entries = await readJSON(entriesFile);
+  let entriesFixed = false;
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  for (const entry of entries) {
+    if (entry.status === "processing" && new Date(entry.created_at).getTime() < oneDayAgo) {
+      entry.status = "recorded";
+      delete entry.assemblyai_id;
+      entriesFixed = true;
+    }
+  }
+  if (entriesFixed) writeJSON(entriesFile, entries);
+
   // Backfill recorded_date for existing daily log entries
   const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
   if (dailyLogFolder) {

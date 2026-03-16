@@ -9,6 +9,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.local.diktafon",
+      "buildNumber": "1",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Microphone access for recording audio."
       }
@@ -31,7 +32,21 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.0"
+          },
+          "android": {
+            "minSdkVersion": 24,
+            "ndkVersion": "26.1.10909125"
+          }
+        }
+      ],
+      "expo-dev-client",
+      "expo-secure-store"
     ]
   }
 }

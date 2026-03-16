@@ -16,10 +16,12 @@ import {
   IconButton,
   Menu,
   Portal,
+  ProgressBar,
   RadioButton,
   Snackbar,
   Text,
 } from "react-native-paper";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   fetchDailyLogEntries,
@@ -35,6 +37,8 @@ import {
   getDailyCombinedTranscript,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
+import * as whisperService from "../services/whisperService";
+import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import { colors, spacing, radii, elevation, typography } from "../theme";
@@ -113,6 +117,10 @@ export default function DailyLogScreen({ navigation }) {
   const [moveDialogVisible, setMoveDialogVisible] = useState(false);
   const [moveTargetEntryId, setMoveTargetEntryId] = useState(null);
   const [regularFolders, setRegularFolders] = useState([]);
+
+  // Model download dialog
+  const [modelDownloadVisible, setModelDownloadVisible] = useState(false);
+  const [modelDownloadProgress, setModelDownloadProgress] = useState(0);
 
   // Combined transcript per date
   const [combinedTexts, setCombinedTexts] = useState({});
@@ -223,23 +231,48 @@ export default function DailyLogScreen({ navigation }) {
     });
   };
 
-  const openSingleEngineDialog = (entryId) => {
+  const openSingleEngineDialog = async (entryId) => {
     setMenuVisible(null);
     setEngineTargetId(entryId);
     setBatchDate(null);
-    setEngineChoice("local");
+    const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
+    setEngineChoice(defaultEngine);
     setEngineDialogVisible(true);
   };
 
-  const openBatchEngineDialog = (date) => {
+  const openBatchEngineDialog = async (date) => {
     setBatchDate(date);
     setEngineTargetId(null);
-    setEngineChoice("local");
+    const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
+    setEngineChoice(defaultEngine);
     setEngineDialogVisible(true);
   };
 
   const onTranscribeConfirm = async () => {
     setEngineDialogVisible(false);
+
+    // Pre-flight checks
+    if (engineChoice === "local") {
+      const status = whisperService.getModelStatus();
+      if (!status.downloaded) {
+        setModelDownloadProgress(0);
+        setModelDownloadVisible(true);
+        try {
+          await whisperService.downloadModel((p) => setModelDownloadProgress(p));
+        } catch (e) {
+          setModelDownloadVisible(false);
+          setSnackbar("Preuzimanje modela nije uspelo: " + e.message);
+          return;
+        }
+        setModelDownloadVisible(false);
+      }
+    } else if (engineChoice === "assemblyai") {
+      const hasKey = await assemblyAIService.hasApiKey();
+      if (!hasKey) {
+        setSnackbar("Potreban je API kljuc. Podesi ga u Podesavanjima.");
+        return;
+      }
+    }
 
     if (batchDate) {
       // Batch transcription
@@ -647,9 +680,9 @@ export default function DailyLogScreen({ navigation }) {
               >
                 <RadioButton value="local" color={colors.primary} />
                 <View style={styles.engineInfo}>
-                  <Text style={[typography.heading, { fontSize: 15 }]}>Lokalni model — Besplatno</Text>
+                  <Text style={[typography.heading, { fontSize: 15 }]}>Na uredjaju — Besplatno</Text>
                   <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                    Osnovna transkripcija. Radi lokalno, bez slanja podataka van uredjaja.
+                    Transkripcija na uredjaju (Whisper AI). Potpuno privatno, bez interneta. Model ~140MB (preuzima se jednom).
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -662,6 +695,7 @@ export default function DailyLogScreen({ navigation }) {
                   <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
                   <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
                     Prepoznavanje govornika, visa tacnost, automatske interpunkcije.
+                    {"\n"}Potreban API kljuc (podesi u Podesavanjima).
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -671,6 +705,20 @@ export default function DailyLogScreen({ navigation }) {
             <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
             <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Transkribisi</Button>
           </Dialog.Actions>
+        </Dialog>
+
+        {/* Model download dialog */}
+        <Dialog visible={modelDownloadVisible} dismissable={false} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>Preuzimanje modela</Dialog.Title>
+          <Dialog.Content>
+            <Text style={[typography.body, { marginBottom: spacing.md }]}>
+              Preuzimanje Whisper modela (~140 MB)...
+            </Text>
+            <ProgressBar progress={modelDownloadProgress} color={colors.primary} style={{ height: 6, borderRadius: 3 }} />
+            <Text style={[typography.caption, { marginTop: spacing.xs, textAlign: "center" }]}>
+              {Math.round(modelDownloadProgress * 100)}%
+            </Text>
+          </Dialog.Content>
         </Dialog>
 
         {/* Move to folder dialog */}
