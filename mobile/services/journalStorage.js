@@ -145,7 +145,7 @@ export async function deleteFolder(id) {
   const entries = await readJSON(entriesFile);
   const toDelete = entries.filter((e) => e.folder_id === id);
   toDelete.forEach((e) => {
-    const audioFile = new File(audioDir, `${e.id}.m4a`);
+    const audioFile = new File(audioDir, `${e.id}.wav`);
     if (audioFile.exists) audioFile.delete();
     const textFile = new File(textsDir, `journal_${e.id}.txt`);
     if (textFile.exists) textFile.delete();
@@ -160,9 +160,9 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
   ensureDirs();
   const id = generateUUID();
 
-  // Copy audio from recorder temp path to journal/audio/{id}.m4a
+  // Copy audio from recorder temp path to journal/audio/{id}.wav
   const source = new File(audioSourceUri);
-  const dest = new File(audioDir, `${id}.m4a`);
+  const dest = new File(audioDir, `${id}.wav`);
   source.copy(dest);
 
   const entry = {
@@ -173,7 +173,7 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
     created_at: new Date().toISOString(),
     duration_seconds: durationSeconds,
     status: "recorded",
-    audio_file: `${id}.m4a`,
+    audio_file: `${id}.wav`,
   };
 
   const entries = await readJSON(entriesFile);
@@ -211,7 +211,7 @@ export async function deleteEntry(entryId) {
   entries.splice(idx, 1);
   writeJSON(entriesFile, entries);
 
-  const audioFile = new File(audioDir, `${entryId}.m4a`);
+  const audioFile = new File(audioDir, `${entryId}.wav`);
   if (audioFile.exists) audioFile.delete();
   const textFile = new File(textsDir, `journal_${entryId}.txt`);
   if (textFile.exists) textFile.delete();
@@ -262,7 +262,7 @@ export async function failEntry(entryId, error) {
 // ── Audio ───────────────────────────────────────────────
 
 export function entryAudioUri(entryId) {
-  const file = new File(audioDir, `${entryId}.m4a`);
+  const file = new File(audioDir, `${entryId}.wav`);
   return file.uri;
 }
 
@@ -292,11 +292,11 @@ export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
   const id = generateUUID();
 
   const source = new File(audioSourceUri);
-  const dest = new File(audioDir, `${id}.m4a`);
+  const dest = new File(audioDir, `${id}.wav`);
   source.copy(dest);
 
   const now = new Date();
-  const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
+  const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
 
   const entry = {
     id,
@@ -306,7 +306,7 @@ export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
     created_at: now.toISOString(),
     duration_seconds: durationSeconds,
     status: "recorded",
-    audio_file: `${id}.m4a`,
+    audio_file: `${id}.wav`,
     recorded_date: now.toISOString().slice(0, 10),
   };
 

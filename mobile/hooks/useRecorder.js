@@ -3,13 +3,36 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
   AudioModule,
-  RecordingPresets,
+  IOSOutputFormat,
+  AudioQuality,
   setAudioModeAsync,
 } from "expo-audio";
 
+const WHISPER_RECORDING_OPTIONS = {
+  extension: '.wav',
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 256000,
+  android: {
+    outputFormat: 'default',
+    audioEncoder: 'default',
+  },
+  ios: {
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: AudioQuality.MAX,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/wav',
+    bitsPerSecond: 256000,
+  },
+};
+
 export function useRecorder({ onRecordingComplete }) {
   const audioRecorder = useAudioRecorder({
-    ...RecordingPresets.HIGH_QUALITY,
+    ...WHISPER_RECORDING_OPTIONS,
     isMeteringEnabled: true,
   });
   const recorderState = useAudioRecorderState(audioRecorder, 100);
@@ -61,7 +84,7 @@ export function useRecorder({ onRecordingComplete }) {
     if (!uri) return;
 
     const now = new Date();
-    const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
+    const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
     const durationSeconds = Math.floor(elapsed / 1000);
     await onRecordingComplete(uri, durationSeconds, filename);
   };
