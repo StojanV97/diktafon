@@ -1,0 +1,114 @@
+import React from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "react-native-paper";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { colors, spacing, radii, typography } from "../theme";
+
+function formatTimer(ms) {
+  const total = Math.floor((ms ?? 0) / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop }) {
+  return (
+    <View style={styles.recordArea}>
+      <View style={styles.waveform}>
+        {meteringHistory.map((m, i) => {
+          const normalized = Math.max(0, Math.min(1, (m + 60) / 60));
+          return (
+            <View
+              key={i}
+              style={[
+                styles.waveformBar,
+                { height: 4 + normalized * 36, opacity: isPaused ? 0.4 : 1 },
+              ]}
+            />
+          );
+        })}
+      </View>
+      <Text style={[styles.timer, isPaused && styles.timerPaused]}>
+        {formatTimer(elapsed)}
+      </Text>
+      <View style={styles.recordControls}>
+        <TouchableOpacity
+          style={styles.pauseBtn}
+          onPress={isPaused ? onResume : onPause}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons
+            name={isPaused ? "play" : "pause"}
+            size={28}
+            color="#FFF"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.stopBtn}
+          onPress={onStop}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="stop" size={24} color={colors.foreground} />
+        </TouchableOpacity>
+      </View>
+      <Text style={[typography.caption, { marginTop: spacing.sm }]}>
+        {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  recordArea: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  timer: {
+    fontFamily: "JetBrainsMono_500Medium",
+    fontSize: 32,
+    color: colors.danger,
+    fontVariant: ["tabular-nums"],
+    marginBottom: spacing.lg,
+  },
+  timerPaused: { color: colors.muted },
+  recordControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
+  },
+  pauseBtn: {
+    backgroundColor: colors.danger,
+    borderRadius: radii.xl,
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stopBtn: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: radii.xl,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  waveform: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 48,
+    gap: 3,
+    marginBottom: spacing.lg,
+  },
+  waveformBar: {
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: colors.danger,
+  },
+});

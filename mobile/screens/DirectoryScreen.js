@@ -19,7 +19,6 @@ import {
   Text,
 } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import {
   createEntry,
@@ -32,6 +31,8 @@ import {
   entryAudioUri,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
+import { useRecorder } from "../hooks/useRecorder";
+import RecordingOverlay from "../components/RecordingOverlay";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const AUDIO_TYPES = [
@@ -50,19 +51,11 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function formatTimer(ms) {
-  const total = Math.floor((ms ?? 0) / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 export default function DirectoryScreen({ route, navigation }) {
   const { id: folderId } = route.params;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
 
   // Menu state
@@ -83,15 +76,18 @@ export default function DirectoryScreen({ route, navigation }) {
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
 
-  const audioRecorder = useAudioRecorder({
-    ...RecordingPresets.HIGH_QUALITY,
-    isMeteringEnabled: true,
-  });
-  const recorderState = useAudioRecorderState(audioRecorder, 100);
-  const [meteringHistory, setMeteringHistory] = useState([]);
-  const prevIsRecording = useRef(false);
-
   const pollIntervalRef = useRef(null);
+
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+    onRecordingComplete: async (uri, durationSeconds, filename) => {
+      try {
+        const entry = await createEntry(folderId, filename, uri, durationSeconds);
+        setEntries((prev) => [entry, ...prev]);
+      } catch (e) {
+        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+      }
+    },
+  });
 
   // AI Insights button in header
   useEffect(() => {
@@ -165,82 +161,33 @@ export default function DirectoryScreen({ route, navigation }) {
     };
   }, [entries]);
 
-  useEffect(() => {
-    if (recorderState.isRecording) {
-      setMeteringHistory((prev) => {
-        const next = [...prev, recorderState.metering ?? -160];
-        return next.length > 40 ? next.slice(next.length - 40) : next;
-      });
-    }
-    prevIsRecording.current = recorderState.isRecording;
-  }, [recorderState.metering, recorderState.isRecording]);
-
-  const startRecording = async () => {
+  const handleStartRecording = async () => {
     try {
-      const status = await AudioModule.requestRecordingPermissionsAsync();
-      if (!status.granted) {
-        setSnackbar("Potrebna je dozvola za mikrofon.");
-        return;
-      }
-
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: true,
-      });
-
-      await audioRecorder.prepareToRecordAsync();
-      const recStatus = audioRecorder.getStatus();
-      if (!recStatus.canRecord) {
-        setSnackbar("Snimac nije spreman.");
-        return;
-      }
-      audioRecorder.record();
-      setIsPaused(false);
+      await startRecording();
     } catch (e) {
-      setSnackbar("Snimanje nije uspelo: " + e.message);
+      setSnackbar(e.message);
     }
   };
 
-  const pauseRecording = async () => {
+  const handlePause = async () => {
     try {
-      await audioRecorder.pause();
-      setIsPaused(true);
+      await pauseRecording();
     } catch (e) {
       setSnackbar("Pauza nije uspela: " + e.message);
     }
   };
 
-  const resumeRecording = async () => {
+  const handleResume = async () => {
     try {
-      audioRecorder.record();
-      setIsPaused(false);
+      await resumeRecording();
     } catch (e) {
       setSnackbar("Nastavak nije uspeo: " + e.message);
     }
   };
 
-  const stopRecording = async () => {
+  const handleStop = async () => {
     try {
-      const elapsed = recorderState.durationMillis ?? 0;
-      await audioRecorder.stop();
-      setIsPaused(false);
-      setMeteringHistory([]);
-
-      await setAudioModeAsync({ allowsRecording: false });
-
-      const uri = audioRecorder.uri;
-      if (!uri) return;
-
-      const now = new Date();
-      const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
-      const durationSeconds = Math.floor(elapsed / 1000);
-
-      try {
-        const entry = await createEntry(folderId, filename, uri, durationSeconds);
-        setEntries((prev) => [entry, ...prev]);
-      } catch (e) {
-        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
-      }
+      await stopRecording();
     } catch (e) {
       setSnackbar("Zaustavljanje nije uspelo: " + e.message);
     }
@@ -418,9 +365,7 @@ export default function DirectoryScreen({ route, navigation }) {
     );
   }
 
-  const isRecording = recorderState.isRecording;
   const isActiveSession = isRecording || isPaused;
-  const elapsed = recorderState.durationMillis ?? 0;
 
   return (
     <View style={styles.container}>
@@ -443,50 +388,15 @@ export default function DirectoryScreen({ route, navigation }) {
         }
       />
 
-      {/* Recording overlay */}
       {isActiveSession && (
-        <View style={styles.recordArea}>
-          <View style={styles.waveform}>
-            {meteringHistory.map((m, i) => {
-              const normalized = Math.max(0, Math.min(1, (m + 60) / 60));
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.waveformBar,
-                    { height: 4 + normalized * 36, opacity: isPaused ? 0.4 : 1 },
-                  ]}
-                />
-              );
-            })}
-          </View>
-          <Text style={[styles.timer, isPaused && styles.timerPaused]}>
-            {formatTimer(elapsed)}
-          </Text>
-          <View style={styles.recordControls}>
-            <TouchableOpacity
-              style={styles.pauseBtn}
-              onPress={isPaused ? resumeRecording : pauseRecording}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons
-                name={isPaused ? "play" : "pause"}
-                size={28}
-                color="#FFF"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.stopBtn}
-              onPress={stopRecording}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="stop" size={24} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[typography.caption, { marginTop: spacing.sm }]}>
-            {isPaused ? "Nastavi ili zaustavi" : "Pauziraj ili zaustavi"}
-          </Text>
-        </View>
+        <RecordingOverlay
+          meteringHistory={meteringHistory}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+        />
       )}
 
       <FAB.Group
@@ -497,7 +407,7 @@ export default function DirectoryScreen({ route, navigation }) {
           {
             icon: "microphone",
             label: "Snimi",
-            onPress: startRecording,
+            onPress: handleStartRecording,
             style: { backgroundColor: colors.primary },
           },
           {
@@ -650,62 +560,9 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
 
-  // Recording overlay
-  recordArea: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-  },
-  timer: {
-    fontFamily: "JetBrainsMono_500Medium",
-    fontSize: 32,
-    color: colors.danger,
-    fontVariant: ["tabular-nums"],
-    marginBottom: spacing.lg,
-  },
-  timerPaused: { color: colors.muted },
-  recordControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-  },
-  pauseBtn: {
-    backgroundColor: colors.danger,
-    borderRadius: radii.xl,
-    width: 56,
-    height: 56,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stopBtn: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: radii.xl,
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   recordFab: {
     backgroundColor: colors.primary,
     borderRadius: radii.xl,
-  },
-  waveform: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 48,
-    gap: 3,
-    marginBottom: spacing.lg,
-  },
-  waveformBar: {
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: colors.danger,
   },
 
   // Dialog

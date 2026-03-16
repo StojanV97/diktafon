@@ -21,11 +21,28 @@ import {
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { fetchFolders, createFolder, deleteFolder, updateFolder, getAllTags } from "../services/journalStorage";
+import {
+  fetchFolders,
+  createFolder,
+  deleteFolder,
+  updateFolder,
+  getAllTags,
+  fetchDailyLogStats,
+  createDailyLogEntry,
+} from "../services/journalStorage";
+import { useRecorder } from "../hooks/useRecorder";
+import RecordingOverlay from "../components/RecordingOverlay";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString("sr-Latn-RS");
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export default function DirectoryHomeScreen({ navigation }) {
@@ -33,6 +50,9 @@ export default function DirectoryHomeScreen({ navigation }) {
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Daily log stats
+  const [dailyStats, setDailyStats] = useState({ clipCount: 0, totalDuration: 0, latestTimestamp: null });
 
   // Dialog state
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -54,10 +74,23 @@ export default function DirectoryHomeScreen({ navigation }) {
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
 
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+    onRecordingComplete: async (uri, durationSeconds) => {
+      try {
+        await createDailyLogEntry(uri, durationSeconds);
+        const stats = await fetchDailyLogStats();
+        setDailyStats(stats);
+      } catch (e) {
+        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+      }
+    },
+  });
+
   const load = useCallback(async () => {
     try {
-      const data = await fetchFolders();
+      const [data, stats] = await Promise.all([fetchFolders(), fetchDailyLogStats()]);
       setFolders(data);
+      setDailyStats(stats);
     } catch (e) {
       setSnackbar(e.message);
     } finally {
@@ -70,6 +103,38 @@ export default function DirectoryHomeScreen({ navigation }) {
     const unsubscribe = navigation.addListener("focus", load);
     return unsubscribe;
   }, [navigation, load]);
+
+  const handleStartRecording = async () => {
+    try {
+      await startRecording();
+    } catch (e) {
+      setSnackbar(e.message);
+    }
+  };
+
+  const handlePause = async () => {
+    try {
+      await pauseRecording();
+    } catch (e) {
+      setSnackbar("Pauza nije uspela: " + e.message);
+    }
+  };
+
+  const handleResume = async () => {
+    try {
+      await resumeRecording();
+    } catch (e) {
+      setSnackbar("Nastavak nije uspeo: " + e.message);
+    }
+  };
+
+  const handleStop = async () => {
+    try {
+      await stopRecording();
+    } catch (e) {
+      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
+    }
+  };
 
   const openDialog = async (mode, folder) => {
     setDialogMode(mode);
@@ -153,10 +218,35 @@ export default function DirectoryHomeScreen({ navigation }) {
     setDeleteTarget(null);
   };
 
+  // Filter out daily log folder from regular list
+  const regularFolders = folders.filter((f) => !f.is_daily_log);
+
   const ListHeader = () => (
     <View style={[styles.headerArea, { paddingTop: insets.top + spacing.lg }]}>
       <Text style={typography.monoLabel}>APP</Text>
       <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktafon</Text>
+
+      {/* Danas card */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("DailyLog")}
+        style={[styles.danasCard, elevation.sm]}
+      >
+        <View style={styles.danasIconWrap}>
+          <MaterialCommunityIcons name="calendar-today" size={24} color={colors.primary} />
+        </View>
+        <View style={styles.danasBody}>
+          <Text style={styles.danasTitle}>Danas</Text>
+          {dailyStats.clipCount > 0 ? (
+            <Text style={[typography.caption, { marginTop: 2 }]}>
+              {dailyStats.clipCount} {dailyStats.clipCount === 1 ? "snimak" : "snimaka"} · {formatDuration(dailyStats.totalDuration)}
+            </Text>
+          ) : (
+            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>Nema snimaka</Text>
+          )}
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -234,14 +324,16 @@ export default function DirectoryHomeScreen({ navigation }) {
     );
   }
 
+  const isActiveSession = isRecording || isPaused;
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={folders}
+        data={regularFolders}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
-        contentContainerStyle={folders.length === 0 ? styles.empty : styles.list}
+        contentContainerStyle={regularFolders.length === 0 ? styles.empty : styles.list}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -256,12 +348,33 @@ export default function DirectoryHomeScreen({ navigation }) {
         }
       />
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        color="#FFF"
-        onPress={() => openDialog("create")}
-      />
+      {isActiveSession && (
+        <RecordingOverlay
+          meteringHistory={meteringHistory}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+        />
+      )}
+
+      {!isActiveSession && (
+        <>
+          <FAB
+            icon="plus"
+            style={styles.fabSecondary}
+            color="#FFF"
+            onPress={() => openDialog("create")}
+          />
+          <FAB
+            icon="microphone"
+            style={styles.fab}
+            color="#FFF"
+            onPress={handleStartRecording}
+          />
+        </>
+      )}
 
       <Portal>
         {/* Create / Edit Dialog */}
@@ -396,13 +509,38 @@ export default function DirectoryHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: 140 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
 
   headerArea: {
     paddingHorizontal: spacing.xs,
     paddingBottom: spacing.xl,
+  },
+
+  // Danas card
+  danasCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  danasIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.md,
+  },
+  danasBody: { flex: 1 },
+  danasTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    color: colors.foreground,
   },
 
   // Card
@@ -453,12 +591,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // FAB
+  // FABs
   fab: {
     position: "absolute",
     bottom: 28,
     right: 24,
     backgroundColor: colors.primary,
+    borderRadius: radii.xl,
+  },
+  fabSecondary: {
+    position: "absolute",
+    bottom: 96,
+    right: 24,
+    backgroundColor: colors.muted,
     borderRadius: radii.xl,
   },
 

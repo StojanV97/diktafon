@@ -60,6 +60,20 @@ export async function migrateData() {
     }
   }
   if (changed) writeJSON(foldersFile, folders);
+
+  // Backfill recorded_date for existing daily log entries
+  const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
+  if (dailyLogFolder) {
+    const entries = await readJSON(entriesFile);
+    let entriesChanged = false;
+    for (const entry of entries) {
+      if (entry.folder_id === dailyLogFolder.id && !entry.recorded_date) {
+        entry.recorded_date = entry.created_at.slice(0, 10);
+        entriesChanged = true;
+      }
+    }
+    if (entriesChanged) writeJSON(entriesFile, entries);
+  }
 }
 
 // ── Folders ─────────────────────────────────────────────
@@ -237,4 +251,86 @@ export async function failEntry(entryId, error) {
 export function entryAudioUri(entryId) {
   const file = new File(audioDir, `${entryId}.m4a`);
   return file.uri;
+}
+
+// ── Daily Log ───────────────────────────────────────────
+
+export async function getOrCreateDailyLogFolder() {
+  const folders = await readJSON(foldersFile);
+  let folder = folders.find((f) => f.is_daily_log === true);
+  if (!folder) {
+    folder = {
+      id: generateUUID(),
+      name: "Dnevni Log",
+      color: "#3B5EDB",
+      tags: [],
+      is_daily_log: true,
+      created_at: new Date().toISOString(),
+    };
+    folders.unshift(folder);
+    writeJSON(foldersFile, folders);
+  }
+  return folder;
+}
+
+export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
+  const folder = await getOrCreateDailyLogFolder();
+  ensureDirs();
+  const id = generateUUID();
+
+  const source = new File(audioSourceUri);
+  const dest = new File(audioDir, `${id}.m4a`);
+  source.copy(dest);
+
+  const now = new Date();
+  const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.m4a`;
+
+  const entry = {
+    id,
+    folder_id: folder.id,
+    filename,
+    text: "",
+    created_at: now.toISOString(),
+    duration_seconds: durationSeconds,
+    status: "recorded",
+    audio_file: `${id}.m4a`,
+    recorded_date: now.toISOString().slice(0, 10),
+  };
+
+  const entries = await readJSON(entriesFile);
+  entries.unshift(entry);
+  writeJSON(entriesFile, entries);
+  return entry;
+}
+
+export async function fetchDailyLogEntries() {
+  const folders = await readJSON(foldersFile);
+  const folder = folders.find((f) => f.is_daily_log === true);
+  if (!folder) return [];
+  const entries = await readJSON(entriesFile);
+  return entries
+    .filter((e) => e.folder_id === folder.id)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+export async function fetchDailyLogStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = await fetchDailyLogEntries();
+  const todayEntries = entries.filter(
+    (e) => (e.recorded_date || e.created_at.slice(0, 10)) === today
+  );
+  return {
+    clipCount: todayEntries.length,
+    totalDuration: todayEntries.reduce((sum, e) => sum + (e.duration_seconds || 0), 0),
+    latestTimestamp: todayEntries.length > 0 ? todayEntries[0].created_at : null,
+  };
+}
+
+export async function moveEntryToFolder(entryId, targetFolderId) {
+  const entries = await readJSON(entriesFile);
+  const entry = entries.find((e) => e.id === entryId);
+  if (!entry) return null;
+  entry.folder_id = targetFolderId;
+  writeJSON(entriesFile, entries);
+  return { ...entry };
 }

@@ -12,6 +12,7 @@ import { migrateData } from "./services/journalStorage";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
+import DailyLogScreen from "./screens/DailyLogScreen";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -77,6 +78,11 @@ export default function App() {
               name="Entry"
               component={EntryScreen}
               options={{ title: "Zapis" }}
+            />
+            <Stack.Screen
+              name="DailyLog"
+              component={DailyLogScreen}
+              options={{ title: "Dnevni Log" }}
             />
           </Stack.Navigator>
         </NavigationContainer>
