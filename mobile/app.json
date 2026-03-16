@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Diktafon",
+    "name": "Diktaphone",
     "slug": "diktafon",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#111111"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.local.diktafon",
       "permissions": [

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
+  ActivityIndicator,
   Button,
   Divider,
   ProgressBar,
@@ -12,8 +13,11 @@ import {
 } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
 import * as whisperService from "../services/whisperService";
 import * as assemblyAIService from "../services/assemblyAIService";
+import * as backupService from "../services/backupService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const ENGINE_STORAGE_KEY = "default_transcription_engine";
@@ -37,6 +41,9 @@ export default function SettingsScreen() {
 
   // Default engine
   const [defaultEngine, setDefaultEngine] = useState("local");
+
+  // Backup
+  const [backupLoading, setBackupLoading] = useState(false);
 
   const [snackbar, setSnackbar] = useState("");
 
@@ -93,6 +100,60 @@ export default function SettingsScreen() {
   const handleEngineChange = async (value) => {
     setDefaultEngine(value);
     await AsyncStorage.setItem(ENGINE_STORAGE_KEY, value);
+  };
+
+  const handleCreateBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const uri = await backupService.createBackup();
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/zip",
+        UTI: "public.zip-archive",
+      });
+      setSnackbar("Backup je kreiran.");
+    } catch (e) {
+      setSnackbar("Backup nije uspeo: " + e.message);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/zip",
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const fileUri = result.assets[0].uri;
+
+      Alert.alert(
+        "Oporavak iz backup-a",
+        "Ovo ce zameniti sve trenutne podatke. Nastaviti?",
+        [
+          { text: "Otkazi", style: "cancel" },
+          {
+            text: "Nastavi",
+            style: "destructive",
+            onPress: async () => {
+              setBackupLoading(true);
+              try {
+                const stats = await backupService.restoreFromBackup(fileUri);
+                setSnackbar(
+                  `Oporavak zavrsen: ${stats.folders} fascikli, ${stats.entries} unosa, ${stats.audioFiles} snimaka, ${stats.textFiles} transkripata.`
+                );
+              } catch (e) {
+                setSnackbar("Oporavak nije uspeo: " + e.message);
+              } finally {
+                setBackupLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (e) {
+      setSnackbar("Oporavak nije uspeo: " + e.message);
+    }
   };
 
   return (
@@ -240,6 +301,49 @@ export default function SettingsScreen() {
             </RadioButton.Group>
           </View>
         </View>
+
+        {/* Section 4: Backup & Restore */}
+        <View style={[styles.section, elevation.sm]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Backup i oporavak</Text>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.sectionBody}>
+            <Text style={[typography.caption, { marginBottom: spacing.md }]}>
+              Sacuvaj ili oporavi sve fascikle, snimke i transkripte.
+            </Text>
+            {backupLoading && (
+              <ActivityIndicator
+                animating
+                color={colors.primary}
+                style={{ marginBottom: spacing.md }}
+              />
+            )}
+            <View style={styles.btnColumn}>
+              <Button
+                mode="contained"
+                onPress={handleCreateBackup}
+                loading={backupLoading}
+                disabled={backupLoading}
+                buttonColor={colors.primary}
+                icon="download"
+                style={styles.btn}
+              >
+                Kreiraj backup
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleRestore}
+                disabled={backupLoading}
+                icon="upload"
+                style={styles.btn}
+              >
+                Oporavi iz backup-a
+              </Button>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       <Snackbar
@@ -285,6 +389,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   btn: { borderRadius: radii.sm },
+  btnColumn: {
+    gap: spacing.sm,
+  },
 
   input: { backgroundColor: colors.surface },
 
