@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   SectionList,
   RefreshControl,
@@ -8,13 +8,9 @@ import {
 } from "react-native";
 import {
   ActivityIndicator,
-  Button,
-  Dialog,
   IconButton,
   Menu,
   Portal,
-  ProgressBar,
-  RadioButton,
   Snackbar,
   Text,
 } from "react-native-paper";
@@ -24,22 +20,19 @@ import * as DocumentPicker from "expo-document-picker";
 import {
   createEntry,
   fetchEntries,
-  fetchEntry,
   deleteEntry,
-  updateEntryToProcessing,
-  completeEntry,
-  failEntry,
-  entryAudioUri,
 } from "../services/journalStorage";
-import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
-import * as whisperService from "../services/whisperService";
-import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
+import { useTranscription } from "../hooks/useTranscription";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
 import CalendarStrip from "../components/CalendarStrip";
 import { AppHeaderLeft, AppHeaderRight } from "../components/AppHeader";
 import AIInsightsDialog from "../components/AIInsightsDialog";
+import EngineChoiceDialog from "../components/EngineChoiceDialog";
+import ModelDownloadDialog from "../components/ModelDownloadDialog";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
+import { statusConfig, groupByDate } from "../utils/entryUtils";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
@@ -47,18 +40,6 @@ const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
 function formatMonthSectionHeader(dateStr) {
   const date = new Date(dateStr + "T00:00:00");
   return `${SECTION_DAYS[date.getDay()]} ${date.getDate()}.`;
-}
-
-function groupByDateForMonth(entries) {
-  const map = {};
-  for (const e of entries) {
-    const date = e.recorded_date || e.created_at.slice(0, 10);
-    if (!map[date]) map[date] = [];
-    map[date].push(e);
-  }
-  return Object.keys(map)
-    .sort((a, b) => b.localeCompare(a))
-    .map((date) => ({ title: formatMonthSectionHeader(date), date, data: map[date] }));
 }
 
 const AUDIO_TYPES = [
@@ -99,15 +80,8 @@ export default function DirectoryScreen({ route, navigation }) {
   // AI dialog
   const [aiDialogVisible, setAiDialogVisible] = useState(false);
 
-  // Model download dialog
-  const [modelDownloadVisible, setModelDownloadVisible] = useState(false);
-  const [modelDownloadProgress, setModelDownloadProgress] = useState(0);
-
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
-
-  const entriesRef = useRef(entries);
-  entriesRef.current = entries;
 
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds, filename) => {
@@ -118,6 +92,11 @@ export default function DirectoryScreen({ route, navigation }) {
         setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
       }
     },
+  });
+
+  const { startTranscription, modelDownload } = useTranscription({
+    entries,
+    setEntries,
   });
 
   // Header: app logo on left, AI button on right
@@ -150,39 +129,6 @@ export default function DirectoryScreen({ route, navigation }) {
     const unsubscribe = navigation.addListener("focus", load);
     return unsubscribe;
   }, [navigation, load]);
-
-  // Poll processing entries every 5 seconds
-  const hasProcessing = useMemo(() => entries.some((e) => e.status === "processing"), [entries]);
-
-  useEffect(() => {
-    if (!hasProcessing) return;
-
-    const intervalId = setInterval(async () => {
-      const processing = entriesRef.current.filter(
-        (e) => e.status === "processing" && e.assemblyai_id
-      );
-      if (processing.length === 0) return;
-
-      await Promise.all(
-        processing.map(async (e) => {
-          try {
-            const result = await checkAssemblyAI(e.assemblyai_id);
-            if (result.status === "done") {
-              const updated = await completeEntry(e.id, result.text, result.duration_seconds);
-              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-            } else if (result.status === "error") {
-              const updated = await failEntry(e.id, result.error);
-              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-            }
-          } catch {
-            // Retry next interval
-          }
-        })
-      );
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [hasProcessing]);
 
   const handleMonthChange = useCallback((year, month) => {
     if (month < 0) { year -= 1; month = 11; }
@@ -219,7 +165,10 @@ export default function DirectoryScreen({ route, navigation }) {
       );
       return [{ title: "", date: selectedDay, data: dayEntries }];
     }
-    return groupByDateForMonth(monthEntries);
+    return groupByDate(monthEntries).map((s) => ({
+      ...s,
+      title: formatMonthSectionHeader(s.date),
+    }));
   }, [monthEntries, selectedDay]);
 
   const renderSectionHeader = useCallback(({ section }) => {
@@ -299,51 +248,10 @@ export default function DirectoryScreen({ route, navigation }) {
 
   const onTranscribeConfirm = async () => {
     setEngineDialogVisible(false);
-    const entryId = engineTargetId;
-    if (!entryId) return;
-
-    // Pre-flight checks
-    if (engineChoice === "local") {
-      const status = whisperService.getModelStatus();
-      if (!status.downloaded) {
-        setModelDownloadProgress(0);
-        setModelDownloadVisible(true);
-        try {
-          await whisperService.downloadModel((p) => setModelDownloadProgress(p));
-        } catch (e) {
-          setModelDownloadVisible(false);
-          setSnackbar("Preuzimanje modela nije uspelo: " + e.message);
-          return;
-        }
-        setModelDownloadVisible(false);
-      }
-    } else if (engineChoice === "assemblyai") {
-      const hasKey = await assemblyAIService.hasApiKey();
-      if (!hasKey) {
-        setSnackbar("Potreban je API kljuc. Podesi ga u Podesavanjima.");
-        return;
-      }
-    }
-
-    const entry = await fetchEntry(entryId);
-    const audioUri = entryAudioUri(entryId);
-
-    try {
-      if (engineChoice === "assemblyai") {
-        const { assemblyai_id } = await submitAssemblyAI(audioUri, entry.filename);
-        const updated = await updateEntryToProcessing(entryId, assemblyai_id);
-        setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
-      } else {
-        setEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, status: "processing" } : e)));
-        const { text, duration_seconds } = await transcribeLocal(audioUri, entry.filename);
-        const updated = await completeEntry(entryId, text, duration_seconds);
-        setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
-      }
-    } catch (e) {
-      const updated = await failEntry(entryId, e.message);
-      if (updated) setEntries((prev) => prev.map((en) => (en.id === entryId ? updated : en)));
-      setSnackbar(e.message);
-    }
+    if (!engineTargetId) return;
+    const result = await startTranscription(engineTargetId, engineChoice);
+    if (!result.started) setSnackbar(result.message);
+    else if (result.error) setSnackbar(result.error);
   };
 
   const onDeletePress = (entryId, filename) => {
@@ -358,19 +266,6 @@ export default function DirectoryScreen({ route, navigation }) {
     setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
-  };
-
-  const statusConfig = (status) => {
-    switch (status) {
-      case "recorded":
-        return { label: "Snimljeno", icon: "check", bg: colors.primaryLight, fg: colors.primary };
-      case "processing":
-        return { label: "Transkribuje...", icon: "progress-clock", bg: colors.warningLight, fg: colors.warning };
-      case "error":
-        return { label: "Greska", icon: "alert-circle-outline", bg: colors.dangerLight, fg: colors.danger };
-      default:
-        return { label: "Gotovo", icon: "check-circle-outline", bg: colors.successLight, fg: colors.success };
-    }
   };
 
   const renderItem = useCallback(({ item }) => {
@@ -539,73 +434,24 @@ export default function DirectoryScreen({ route, navigation }) {
       )}
 
       <Portal>
-        {/* Delete dialog */}
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Obrisi zapis</Dialog.Title>
-          <Dialog.Content>
-            <Text style={typography.body}>
-              Obrisati "{deleteTarget?.filename}"?
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onDeleteConfirm} textColor={colors.danger}>Obrisi</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Engine choice dialog */}
-        <Dialog visible={engineDialogVisible} onDismiss={() => setEngineDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Izaberi tip transkripcije</Dialog.Title>
-          <Dialog.Content>
-            <RadioButton.Group onValueChange={setEngineChoice} value={engineChoice}>
-              <TouchableOpacity
-                style={styles.engineRow}
-                onPress={() => setEngineChoice("local")}
-              >
-                <RadioButton value="local" color={colors.primary} />
-                <View style={styles.engineInfo}>
-                  <Text style={[typography.heading, { fontSize: 15 }]}>Na uredjaju — Besplatno</Text>
-                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                    Transkripcija na uredjaju (Whisper AI). Potpuno privatno, bez interneta. Model ~140MB (preuzima se jednom).
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.engineRow}
-                onPress={() => setEngineChoice("assemblyai")}
-              >
-                <RadioButton value="assemblyai" color={colors.primary} />
-                <View style={styles.engineInfo}>
-                  <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
-                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                    Prepoznavanje govornika (ko je govorio sta), visa tacnost, podrska za akcentovane govore, automatske interpunkcije i detekcija tema.
-                    {"\n"}Potreban API kljuc (podesi u Podesavanjima).
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </RadioButton.Group>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Pokreni</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Model download dialog */}
-        <Dialog visible={modelDownloadVisible} dismissable={false} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Preuzimanje modela</Dialog.Title>
-          <Dialog.Content>
-            <Text style={[typography.body, { marginBottom: spacing.md }]}>
-              Preuzimanje Whisper modela (~140 MB)...
-            </Text>
-            <ProgressBar progress={modelDownloadProgress} color={colors.primary} style={{ height: 6, borderRadius: 3 }} />
-            <Text style={[typography.caption, { marginTop: spacing.xs, textAlign: "center" }]}>
-              {Math.round(modelDownloadProgress * 100)}%
-            </Text>
-          </Dialog.Content>
-        </Dialog>
-
-        {/* AI Insights dialog */}
+        <DeleteConfirmDialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+          onConfirm={onDeleteConfirm}
+          title="Obrisi zapis"
+          message={`Obrisati "${deleteTarget?.filename}"?`}
+        />
+        <EngineChoiceDialog
+          visible={engineDialogVisible}
+          onDismiss={() => setEngineDialogVisible(false)}
+          onConfirm={onTranscribeConfirm}
+          engineChoice={engineChoice}
+          onEngineChange={setEngineChoice}
+        />
+        <ModelDownloadDialog
+          visible={modelDownload.visible}
+          progress={modelDownload.progress}
+        />
         <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
       </Portal>
 
@@ -723,15 +569,4 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Dialog
-  dialog: {
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-  },
-  engineRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: spacing.sm,
-  },
-  engineInfo: { flex: 1, paddingLeft: spacing.xs },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AppState,
   SectionList,
@@ -16,8 +16,6 @@ import {
   IconButton,
   Menu,
   Portal,
-  ProgressBar,
-  RadioButton,
   Snackbar,
   Text,
 } from "react-native-paper";
@@ -26,24 +24,21 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   fetchDailyLogEntries,
   fetchFolders,
-  fetchEntry,
   deleteEntry,
-  updateEntryToProcessing,
-  completeEntry,
-  failEntry,
-  entryAudioUri,
   moveEntryToFolder,
   createDailyLogEntry,
   getDailyCombinedTranscripts,
 } from "../services/journalStorage";
-import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
-import * as whisperService from "../services/whisperService";
-import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
+import { useTranscription } from "../hooks/useTranscription";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
 import { AppHeaderLeft, AppHeaderRight } from "../components/AppHeader";
 import AIInsightsDialog from "../components/AIInsightsDialog";
+import EngineChoiceDialog from "../components/EngineChoiceDialog";
+import ModelDownloadDialog from "../components/ModelDownloadDialog";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
+import { statusConfig, groupByDate } from "../utils/entryUtils";
 import { syncWidgetData } from "../services/widgetDataService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
@@ -71,31 +66,6 @@ function formatSectionDate(dateStr) {
   if (dateStr === yesterday) return `Juce — ${day}. ${month}`;
   return `${day}. ${month}`;
 }
-
-function groupByDate(entries) {
-  const map = {};
-  for (const e of entries) {
-    const date = e.recorded_date || e.created_at.slice(0, 10);
-    if (!map[date]) map[date] = [];
-    map[date].push(e);
-  }
-  return Object.keys(map)
-    .sort((a, b) => b.localeCompare(a))
-    .map((date) => ({ date, data: map[date] }));
-}
-
-const statusConfig = (status) => {
-  switch (status) {
-    case "recorded":
-      return { label: "Snimljeno", icon: "check", bg: colors.primaryLight, fg: colors.primary };
-    case "processing":
-      return { label: "Transkribuje...", icon: "progress-clock", bg: colors.warningLight, fg: colors.warning };
-    case "error":
-      return { label: "Greska", icon: "alert-circle-outline", bg: colors.dangerLight, fg: colors.danger };
-    default:
-      return { label: "Gotovo", icon: "check-circle-outline", bg: colors.successLight, fg: colors.success };
-  }
-};
 
 const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
 
@@ -128,18 +98,11 @@ export default function DailyLogScreen({ navigation, route }) {
   const [moveTargetEntryId, setMoveTargetEntryId] = useState(null);
   const [regularFolders, setRegularFolders] = useState([]);
 
-  // Model download dialog
-  const [modelDownloadVisible, setModelDownloadVisible] = useState(false);
-  const [modelDownloadProgress, setModelDownloadProgress] = useState(0);
-
   // Combined transcript per date
   const [combinedTexts, setCombinedTexts] = useState({});
   const [expandedTranscripts, setExpandedTranscripts] = useState(new Set());
 
   const [snackbar, setSnackbar] = useState("");
-
-  const entriesRef = useRef(entries);
-  entriesRef.current = entries;
 
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds) => {
@@ -151,6 +114,12 @@ export default function DailyLogScreen({ navigation, route }) {
         setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
       }
     },
+  });
+
+  const { startTranscription, startBatchTranscription, modelDownload } = useTranscription({
+    entries,
+    setEntries,
+    onComplete: syncWidgetData,
   });
 
   const load = useCallback(async () => {
@@ -190,40 +159,6 @@ export default function DailyLogScreen({ navigation, route }) {
       setTimeout(() => handleStartRecording(), 500);
     }
   }, [route.params?.action]);
-
-  // Poll processing entries every 5 seconds
-  const hasProcessing = useMemo(() => entries.some((e) => e.status === "processing"), [entries]);
-
-  useEffect(() => {
-    if (!hasProcessing) return;
-
-    const intervalId = setInterval(async () => {
-      const processing = entriesRef.current.filter(
-        (e) => e.status === "processing" && e.assemblyai_id
-      );
-      if (processing.length === 0) return;
-
-      await Promise.all(
-        processing.map(async (e) => {
-          try {
-            const result = await checkAssemblyAI(e.assemblyai_id);
-            if (result.status === "done") {
-              const updated = await completeEntry(e.id, result.text, result.duration_seconds);
-              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-              syncWidgetData();
-            } else if (result.status === "error") {
-              const updated = await failEntry(e.id, result.error);
-              if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
-            }
-          } catch {
-            // Retry next interval
-          }
-        })
-      );
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [hasProcessing]);
 
   const grouped = useMemo(() => groupByDate(entries), [entries]);
 
@@ -271,89 +206,19 @@ export default function DailyLogScreen({ navigation, route }) {
 
   const onTranscribeConfirm = async () => {
     setEngineDialogVisible(false);
-
-    // Pre-flight checks
-    if (engineChoice === "local") {
-      const status = whisperService.getModelStatus();
-      if (!status.downloaded) {
-        setModelDownloadProgress(0);
-        setModelDownloadVisible(true);
-        try {
-          await whisperService.downloadModel((p) => setModelDownloadProgress(p));
-        } catch (e) {
-          setModelDownloadVisible(false);
-          setSnackbar("Preuzimanje modela nije uspelo: " + e.message);
-          return;
-        }
-        setModelDownloadVisible(false);
-      }
-    } else if (engineChoice === "assemblyai") {
-      const hasKey = await assemblyAIService.hasApiKey();
-      if (!hasKey) {
-        setSnackbar("Potreban je API kljuc. Podesi ga u Podesavanjima.");
-        return;
-      }
-    }
-
+    let result;
     if (!engineTargetId) {
-      // Batch transcription — specific date or all dates (batchDate=null means all)
       const toTranscribe = batchDate
         ? entries.filter(
             (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && e.status === "recorded"
           )
         : entries.filter((e) => e.status === "recorded");
-      if (engineChoice === "local") {
-        for (const entry of toTranscribe) {
-          setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, status: "processing" } : e)));
-          try {
-            const audioUri = entryAudioUri(entry.id);
-            const { text, duration_seconds } = await transcribeLocal(audioUri, entry.filename);
-            const updated = await completeEntry(entry.id, text, duration_seconds);
-            setEntries((prev) => prev.map((e) => (e.id === entry.id ? updated : e)));
-          } catch (err) {
-            const updated = await failEntry(entry.id, err.message);
-            if (updated) setEntries((prev) => prev.map((e) => (e.id === entry.id ? updated : e)));
-          }
-        }
-      } else {
-        await Promise.all(
-          toTranscribe.map(async (entry) => {
-            try {
-              const audioUri = entryAudioUri(entry.id);
-              const { assemblyai_id } = await submitAssemblyAI(audioUri, entry.filename);
-              const updated = await updateEntryToProcessing(entry.id, assemblyai_id);
-              setEntries((prev) => prev.map((e) => (e.id === entry.id ? updated : e)));
-            } catch (err) {
-              const updated = await failEntry(entry.id, err.message);
-              if (updated) setEntries((prev) => prev.map((e) => (e.id === entry.id ? updated : e)));
-            }
-          })
-        );
-      }
+      result = await startBatchTranscription(toTranscribe.map((e) => e.id), engineChoice);
     } else {
-      // Single entry transcription
-      const entryId = engineTargetId;
-      const entry = await fetchEntry(entryId);
-      const audioUri = entryAudioUri(entryId);
-      try {
-        if (engineChoice === "assemblyai") {
-          const { assemblyai_id } = await submitAssemblyAI(audioUri, entry.filename);
-          const updated = await updateEntryToProcessing(entryId, assemblyai_id);
-          setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
-        } else {
-          setEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, status: "processing" } : e)));
-          const { text, duration_seconds } = await transcribeLocal(audioUri, entry.filename);
-          const updated = await completeEntry(entryId, text, duration_seconds);
-          setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)));
-        }
-      } catch (e) {
-        const updated = await failEntry(entryId, e.message);
-        if (updated) setEntries((prev) => prev.map((en) => (en.id === entryId ? updated : en)));
-        setSnackbar(e.message);
-      }
+      result = await startTranscription(engineTargetId, engineChoice);
     }
-
-    syncWidgetData();
+    if (!result.started) setSnackbar(result.message);
+    else if (result.error) setSnackbar(result.error);
   };
 
   const onDeletePress = (entryId, filename) => {
@@ -703,87 +568,33 @@ export default function DailyLogScreen({ navigation, route }) {
       )}
 
       <Portal>
-        {/* Delete all dialog */}
-        <Dialog visible={deleteAllDialogVisible} onDismiss={() => setDeleteAllDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Obrisi sve zapise</Dialog.Title>
-          <Dialog.Content>
-            <Text style={typography.body}>
-              Obrisati svih {entries.length} zapisa iz Brzog Zapisa? Ovo ukljucuje sve snimke i transkripte.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteAllDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onDeleteAllConfirm} textColor={colors.danger}>Obrisi sve</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Delete dialog */}
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Obrisi zapis</Dialog.Title>
-          <Dialog.Content>
-            <Text style={typography.body}>Obrisati ovaj snimak?</Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onDeleteConfirm} textColor={colors.danger}>Obrisi</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Engine choice dialog */}
-        <Dialog visible={engineDialogVisible} onDismiss={() => setEngineDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>
-            {batchDate ? "Batch transkripcija" : "Izaberi tip transkripcije"}
-          </Dialog.Title>
-          <Dialog.Content>
-            <RadioButton.Group onValueChange={setEngineChoice} value={engineChoice}>
-              <TouchableOpacity
-                style={styles.engineRow}
-                onPress={() => setEngineChoice("local")}
-              >
-                <RadioButton value="local" color={colors.primary} />
-                <View style={styles.engineInfo}>
-                  <Text style={[typography.heading, { fontSize: 15 }]}>Na uredjaju — Besplatno</Text>
-                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                    Transkripcija na uredjaju (Whisper AI). Potpuno privatno, bez interneta. Model ~140MB (preuzima se jednom).
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.engineRow}
-                onPress={() => setEngineChoice("assemblyai")}
-              >
-                <RadioButton value="assemblyai" color={colors.primary} />
-                <View style={styles.engineInfo}>
-                  <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
-                  <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                    Prepoznavanje govornika, visa tacnost, automatske interpunkcije.
-                    {"\n"}Potreban API kljuc (podesi u Podesavanjima).
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </RadioButton.Group>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEngineDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onTranscribeConfirm} textColor={colors.primary}>Pokreni</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Model download dialog */}
-        <Dialog visible={modelDownloadVisible} dismissable={false} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Preuzimanje modela</Dialog.Title>
-          <Dialog.Content>
-            <Text style={[typography.body, { marginBottom: spacing.md }]}>
-              Preuzimanje Whisper modela (~140 MB)...
-            </Text>
-            <ProgressBar progress={modelDownloadProgress} color={colors.primary} style={{ height: 6, borderRadius: 3 }} />
-            <Text style={[typography.caption, { marginTop: spacing.xs, textAlign: "center" }]}>
-              {Math.round(modelDownloadProgress * 100)}%
-            </Text>
-          </Dialog.Content>
-        </Dialog>
-
-        {/* AI Insights dialog */}
+        <DeleteConfirmDialog
+          visible={deleteAllDialogVisible}
+          onDismiss={() => setDeleteAllDialogVisible(false)}
+          onConfirm={onDeleteAllConfirm}
+          title="Obrisi sve zapise"
+          message={`Obrisati svih ${entries.length} zapisa iz Brzog Zapisa? Ovo ukljucuje sve snimke i transkripte.`}
+          confirmLabel="Obrisi sve"
+        />
+        <DeleteConfirmDialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+          onConfirm={onDeleteConfirm}
+          title="Obrisi zapis"
+          message="Obrisati ovaj snimak?"
+        />
+        <EngineChoiceDialog
+          visible={engineDialogVisible}
+          onDismiss={() => setEngineDialogVisible(false)}
+          onConfirm={onTranscribeConfirm}
+          engineChoice={engineChoice}
+          onEngineChange={setEngineChoice}
+          title={batchDate ? "Batch transkripcija" : undefined}
+        />
+        <ModelDownloadDialog
+          visible={modelDownload.visible}
+          progress={modelDownload.progress}
+        />
         <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
 
         {/* Move to folder dialog */}
@@ -922,18 +733,10 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Dialogs
   dialog: {
     borderRadius: radii.lg,
     backgroundColor: colors.surface,
   },
-  engineRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: spacing.sm,
-  },
-  engineInfo: { flex: 1, paddingLeft: spacing.xs },
-
   folderRow: {
     flexDirection: "row",
     alignItems: "center",

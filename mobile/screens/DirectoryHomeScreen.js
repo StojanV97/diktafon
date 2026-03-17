@@ -32,6 +32,7 @@ import {
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 
 function formatDate(iso) {
@@ -450,19 +451,13 @@ export default function DirectoryHomeScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>Obrisi direktorijum</Dialog.Title>
-          <Dialog.Content>
-            <Text style={typography.body}>
-              Obrisati "{deleteTarget?.name}" i sve zapise u njemu?
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onDeleteConfirm} textColor={colors.danger}>Obrisi</Button>
-          </Dialog.Actions>
-        </Dialog>
+        <DeleteConfirmDialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+          onConfirm={onDeleteConfirm}
+          title="Obrisi direktorijum"
+          message={`Obrisati "${deleteTarget?.name}" i sve zapise u njemu?`}
+        />
       </Portal>
 
       {isRecording && (

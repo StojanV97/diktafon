@@ -447,6 +447,57 @@ export async function getDailyCombinedTranscripts(dates) {
   return results;
 }
 
+// ── Bulk Import/Export ──────────────────────────────────
+
+export async function exportAllData() {
+  const folders = await readJSON(foldersFile);
+  const entries = await readJSON(entriesFile);
+
+  const audioFiles = [];
+  const textFiles = [];
+
+  for (const entry of entries) {
+    const audioFile = new File(audioDir, `${entry.id}.wav`);
+    if (audioFile.exists) {
+      audioFiles.push({ id: entry.id, data: audioFile.bytes() });
+    }
+    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+    if (textFile.exists) {
+      textFiles.push({ id: entry.id, text: await textFile.text() });
+    }
+  }
+
+  return { folders, entries, audioFiles, textFiles };
+}
+
+export function importAllData(data) {
+  ensureDirs();
+  writeJSON(foldersFile, data.folders);
+  writeJSON(entriesFile, data.entries);
+
+  let audioCount = 0;
+  let textCount = 0;
+
+  for (const { id, data: audioData } of data.audioFiles) {
+    const dest = new File(audioDir, `${id}.wav`);
+    dest.write(audioData);
+    audioCount++;
+  }
+
+  for (const { id, text } of data.textFiles) {
+    const dest = new File(textsDir, `journal_${id}.txt`);
+    dest.write(text);
+    textCount++;
+  }
+
+  return {
+    folders: data.folders.length,
+    entries: data.entries.length,
+    audioFiles: audioCount,
+    textFiles: textCount,
+  };
+}
+
 export async function moveEntryToFolder(entryId, targetFolderId) {
   const entries = await readJSON(entriesFile);
   const entry = entries.find((e) => e.id === entryId);
