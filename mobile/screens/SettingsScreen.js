@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
+  Dialog,
   Divider,
+  Portal,
   ProgressBar,
   RadioButton,
   Snackbar,
@@ -18,9 +20,12 @@ import * as DocumentPicker from "expo-document-picker";
 import * as whisperService from "../services/whisperService";
 import * as assemblyAIService from "../services/assemblyAIService";
 import * as backupService from "../services/backupService";
+import { fetchFolders, getFolder } from "../services/journalStorage";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const ENGINE_STORAGE_KEY = "default_transcription_engine";
+const AUTO_MOVE_FOLDER_KEY = "daily_log_auto_move_folder_id";
+const AUTO_MOVE_FOLDER_NAME_KEY = "daily_log_auto_move_folder_name";
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
@@ -42,6 +47,11 @@ export default function SettingsScreen() {
   // Default engine
   const [defaultEngine, setDefaultEngine] = useState("local");
 
+  // Auto-move
+  const [autoMoveFolder, setAutoMoveFolder] = useState(null);
+  const [autoMoveFolders, setAutoMoveFolders] = useState([]);
+  const [autoMoveDialogVisible, setAutoMoveDialogVisible] = useState(false);
+
   // Backup
   const [backupLoading, setBackupLoading] = useState(false);
 
@@ -54,6 +64,17 @@ export default function SettingsScreen() {
     setSavedKey(key);
     const engine = (await AsyncStorage.getItem(ENGINE_STORAGE_KEY)) || "local";
     setDefaultEngine(engine);
+
+    const savedFolderId = await AsyncStorage.getItem(AUTO_MOVE_FOLDER_KEY);
+    if (savedFolderId) {
+      const folder = await getFolder(savedFolderId);
+      if (folder) {
+        setAutoMoveFolder({ id: folder.id, name: folder.name, color: folder.color });
+      } else {
+        await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_KEY);
+        await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -100,6 +121,27 @@ export default function SettingsScreen() {
   const handleEngineChange = async (value) => {
     setDefaultEngine(value);
     await AsyncStorage.setItem(ENGINE_STORAGE_KEY, value);
+  };
+
+  const handleOpenAutoMoveDialog = async () => {
+    const allFolders = await fetchFolders();
+    setAutoMoveFolders(allFolders.filter((f) => !f.is_daily_log));
+    setAutoMoveDialogVisible(true);
+  };
+
+  const handleSelectAutoMoveFolder = async (folder) => {
+    await AsyncStorage.setItem(AUTO_MOVE_FOLDER_KEY, folder.id);
+    await AsyncStorage.setItem(AUTO_MOVE_FOLDER_NAME_KEY, folder.name);
+    setAutoMoveFolder({ id: folder.id, name: folder.name, color: folder.color });
+    setAutoMoveDialogVisible(false);
+    setSnackbar(`Automatsko premestanje: ${folder.name}`);
+  };
+
+  const handleClearAutoMove = async () => {
+    await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_KEY);
+    await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
+    setAutoMoveFolder(null);
+    setSnackbar("Automatsko premestanje iskljuceno.");
   };
 
   const handleCreateBackup = async () => {
@@ -302,7 +344,51 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Section 4: Backup & Restore */}
+        {/* Section 4: Brzi Zapis auto-move */}
+        <View style={[styles.section, elevation.sm]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="folder-move-outline" size={20} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Brzi Zapis</Text>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.sectionBody}>
+            <Text style={[typography.caption, { marginBottom: spacing.md }]}>
+              Automatski premesti zavrsene zapise u izabrani folder.
+            </Text>
+            <View style={styles.autoMoveStatus}>
+              {autoMoveFolder ? (
+                <View style={styles.autoMoveFolderInfo}>
+                  <View style={[styles.autoMoveDot, { backgroundColor: autoMoveFolder.color || colors.primary }]} />
+                  <Text style={typography.body}>{autoMoveFolder.name}</Text>
+                </View>
+              ) : (
+                <Text style={[typography.body, { color: colors.muted }]}>Iskljuceno</Text>
+              )}
+            </View>
+            <View style={styles.btnRow}>
+              <Button
+                mode="contained"
+                onPress={handleOpenAutoMoveDialog}
+                buttonColor={colors.primary}
+                style={styles.btn}
+              >
+                Izaberi folder
+              </Button>
+              {autoMoveFolder && (
+                <Button
+                  mode="outlined"
+                  onPress={handleClearAutoMove}
+                  textColor={colors.danger}
+                  style={styles.btn}
+                >
+                  Iskljuci
+                </Button>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Section 5: Backup & Restore */}
         <View style={[styles.section, elevation.sm]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.primary} />
@@ -345,6 +431,38 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Portal>
+        <Dialog
+          visible={autoMoveDialogVisible}
+          onDismiss={() => setAutoMoveDialogVisible(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={typography.heading}>Izaberi folder</Dialog.Title>
+          <Dialog.Content>
+            {autoMoveFolders.length === 0 ? (
+              <Text style={typography.body}>Nema dostupnih foldera.</Text>
+            ) : (
+              autoMoveFolders.map((folder) => (
+                <TouchableOpacity
+                  key={folder.id}
+                  style={styles.folderRow}
+                  onPress={() => handleSelectAutoMoveFolder(folder)}
+                >
+                  <View style={[styles.folderDot, { backgroundColor: folder.color || colors.primary }]} />
+                  <Text style={[typography.body, { flex: 1 }]}>{folder.name}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.muted} />
+                </TouchableOpacity>
+              ))
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setAutoMoveDialogVisible(false)} textColor={colors.muted}>
+              Otkazi
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar
         visible={!!snackbar}
@@ -401,4 +519,36 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   radioInfo: { flex: 1, paddingLeft: spacing.xs },
+
+  autoMoveStatus: {
+    marginBottom: spacing.md,
+  },
+  autoMoveFolderInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  autoMoveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: spacing.sm,
+  },
+
+  dialog: {
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+  },
+  folderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+  },
+  folderDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: spacing.md,
+  },
 });

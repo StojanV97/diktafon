@@ -10,6 +10,8 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-
 import { theme, colors } from "./theme";
 import { migrateData } from "./services/journalStorage";
 import { releaseContext } from "./services/whisperService";
+import { syncWidgetData } from "./services/widgetDataService";
+import { runAutoMove } from "./services/autoMoveService";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
@@ -19,6 +21,15 @@ import SettingsScreen from "./screens/SettingsScreen";
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
+
+const linking = {
+  prefixes: ["com.local.diktafon://"],
+  config: {
+    screens: {
+      DailyLog: { path: "dailylog" },
+    },
+  },
+};
 
 const stackScreenOptions = {
   animation: "slide_from_right",
@@ -73,7 +84,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    migrateData().then(() => setReady(true));
+    migrateData().then(() => {
+      setReady(true);
+      syncWidgetData();
+      runAutoMove();
+    });
   }, []);
 
   // Release whisper context when app goes to background
@@ -81,6 +96,8 @@ export default function App() {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "background") {
         releaseContext();
+      } else if (state === "active") {
+        runAutoMove();
       }
     });
     return () => subscription.remove();
@@ -106,7 +123,7 @@ export default function App() {
     <PaperProvider theme={theme}>
       <ErrorBoundary>
         <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <StatusBar style="dark" />
             <Stack.Navigator screenOptions={stackScreenOptions}>
               <Stack.Screen
