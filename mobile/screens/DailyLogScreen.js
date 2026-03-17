@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   Clipboard,
   SectionList,
   RefreshControl,
@@ -41,6 +42,9 @@ import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
+import { AppHeaderLeft, AppHeaderRight } from "../components/AppHeader";
+import AIInsightsDialog from "../components/AIInsightsDialog";
+import { syncWidgetData } from "../services/widgetDataService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 function formatDuration(seconds) {
@@ -93,7 +97,7 @@ const statusConfig = (status) => {
   }
 };
 
-export default function DailyLogScreen({ navigation }) {
+export default function DailyLogScreen({ navigation, route }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,9 +107,13 @@ export default function DailyLogScreen({ navigation }) {
 
   const [menuVisible, setMenuVisible] = useState(null);
 
-  // Delete dialog
+  // AI dialog
+  const [aiDialogVisible, setAiDialogVisible] = useState(false);
+
+  // Delete dialog (single + all)
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteAllDialogVisible, setDeleteAllDialogVisible] = useState(false);
 
   // Engine dialog (single or batch)
   const [engineDialogVisible, setEngineDialogVisible] = useState(false);
@@ -136,6 +144,7 @@ export default function DailyLogScreen({ navigation }) {
       try {
         const entry = await createDailyLogEntry(uri, durationSeconds);
         setEntries((prev) => [entry, ...prev]);
+        syncWidgetData();
       } catch (e) {
         setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
       }
@@ -159,6 +168,22 @@ export default function DailyLogScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, load]);
 
+  useEffect(() => {
+    navigation.setOptions({
+      headerBackVisible: false,
+      headerLeft: () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
+      headerRight: () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
+    });
+  }, [navigation]);
+
+  // Auto-start recording when opened via widget deep link
+  useEffect(() => {
+    if (route.params?.action === "record") {
+      navigation.setParams({ action: undefined });
+      setTimeout(() => handleStartRecording(), 500);
+    }
+  }, [route.params?.action]);
+
   // Poll processing entries every 5 seconds
   const hasProcessing = useMemo(() => entries.some((e) => e.status === "processing"), [entries]);
 
@@ -178,6 +203,7 @@ export default function DailyLogScreen({ navigation }) {
             if (result.status === "done") {
               const updated = await completeEntry(e.id, result.text, result.duration_seconds);
               if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
+              syncWidgetData();
             } else if (result.status === "error") {
               const updated = await failEntry(e.id, result.error);
               if (updated) setEntries((prev) => prev.map((p) => (p.id === e.id ? updated : p)));
@@ -324,6 +350,8 @@ export default function DailyLogScreen({ navigation }) {
         setSnackbar(e.message);
       }
     }
+
+    syncWidgetData();
   };
 
   const onDeletePress = (entryId, filename) => {
@@ -338,6 +366,18 @@ export default function DailyLogScreen({ navigation }) {
     setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
+    syncWidgetData();
+  };
+
+  const onDeleteAllConfirm = async () => {
+    setDeleteAllDialogVisible(false);
+    const count = entries.length;
+    for (const entry of entries) {
+      await deleteEntry(entry.id);
+    }
+    setEntries([]);
+    syncWidgetData();
+    setSnackbar(`Obrisano ${count} zapisa.`);
   };
 
   const onMovePress = async (entryId) => {
@@ -362,6 +402,14 @@ export default function DailyLogScreen({ navigation }) {
       setSnackbar(e.message);
     }
   };
+
+  // Re-fetch entries when app comes to foreground (reflects auto-move from App.js)
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") load();
+    });
+    return () => subscription.remove();
+  }, [load]);
 
   const handleStartRecording = async () => {
     try {
@@ -636,9 +684,9 @@ export default function DailyLogScreen({ navigation }) {
 
       {!isActiveSession && (
         <BottomActionBar
-          leftIcon="home-outline"
-          leftLabel="Home"
-          onLeftPress={() => navigation.navigate("Home")}
+          leftIcon="delete-sweep-outline"
+          leftLabel="Obriši sve"
+          onLeftPress={() => entries.length > 0 ? setDeleteAllDialogVisible(true) : undefined}
           centerIcon="text-recognition"
           centerLabel="Sve u tekst"
           onCenterPress={() => openBatchEngineDialog(null)}
@@ -649,6 +697,20 @@ export default function DailyLogScreen({ navigation }) {
       )}
 
       <Portal>
+        {/* Delete all dialog */}
+        <Dialog visible={deleteAllDialogVisible} onDismiss={() => setDeleteAllDialogVisible(false)} style={styles.dialog}>
+          <Dialog.Title style={typography.heading}>Obrisi sve zapise</Dialog.Title>
+          <Dialog.Content>
+            <Text style={typography.body}>
+              Obrisati svih {entries.length} zapisa iz Brzog Zapisa? Ovo ukljucuje sve snimke i transkripte.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteAllDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={onDeleteAllConfirm} textColor={colors.danger}>Obrisi sve</Button>
+          </Dialog.Actions>
+        </Dialog>
+
         {/* Delete dialog */}
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={styles.dialog}>
           <Dialog.Title style={typography.heading}>Obrisi zapis</Dialog.Title>
@@ -714,6 +776,9 @@ export default function DailyLogScreen({ navigation }) {
             </Text>
           </Dialog.Content>
         </Dialog>
+
+        {/* AI Insights dialog */}
+        <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
 
         {/* Move to folder dialog */}
         <Dialog visible={moveDialogVisible} onDismiss={() => setMoveDialogVisible(false)} style={styles.dialog}>

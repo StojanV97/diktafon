@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  FlatList,
+  SectionList,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -37,16 +37,34 @@ import * as assemblyAIService from "../services/assemblyAIService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
+import CalendarStrip from "../components/CalendarStrip";
+import { AppHeaderLeft, AppHeaderRight } from "../components/AppHeader";
+import AIInsightsDialog from "../components/AIInsightsDialog";
 import { colors, spacing, radii, elevation, typography } from "../theme";
+
+const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
+
+function formatMonthSectionHeader(dateStr) {
+  const date = new Date(dateStr + "T00:00:00");
+  return `${SECTION_DAYS[date.getDay()]} ${date.getDate()}.`;
+}
+
+function groupByDateForMonth(entries) {
+  const map = {};
+  for (const e of entries) {
+    const date = e.recorded_date || e.created_at.slice(0, 10);
+    if (!map[date]) map[date] = [];
+    map[date].push(e);
+  }
+  return Object.keys(map)
+    .sort((a, b) => b.localeCompare(a))
+    .map((date) => ({ title: formatMonthSectionHeader(date), date, data: map[date] }));
+}
 
 const AUDIO_TYPES = [
   "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
   "audio/flac", "audio/aac", "audio/x-m4a", "audio/webm", "audio/*",
 ];
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString("sr-Latn-RS");
-}
 
 function formatDuration(seconds) {
   if (!seconds) return "";
@@ -60,6 +78,11 @@ export default function DirectoryScreen({ route, navigation }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Calendar state
+  const [viewedYear, setViewedYear] = useState(() => new Date().getFullYear());
+  const [viewedMonth, setViewedMonth] = useState(() => new Date().getMonth());
+  const [selectedDay, setSelectedDay] = useState(null);
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(null);
@@ -97,14 +120,12 @@ export default function DirectoryScreen({ route, navigation }) {
     },
   });
 
-  // AI Insights button in header
+  // Header: app logo on left, AI button on right
   useEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity onPress={() => setAiDialogVisible(true)} style={styles.aiBtn}>
-          <MaterialCommunityIcons name="creation" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      ),
+      headerBackVisible: false,
+      headerLeft: () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
+      headerRight: () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
     });
   }, [navigation]);
 
@@ -157,6 +178,55 @@ export default function DirectoryScreen({ route, navigation }) {
 
     return () => clearInterval(intervalId);
   }, [hasProcessing]);
+
+  const handleMonthChange = useCallback((year, month) => {
+    if (month < 0) { year -= 1; month = 11; }
+    if (month > 11) { year += 1; month = 0; }
+    setViewedYear(year);
+    setViewedMonth(month);
+    setSelectedDay(null);
+  }, []);
+
+  // Stage 1: Filter to viewed month
+  const monthEntries = useMemo(() => {
+    const prefix = `${viewedYear}-${String(viewedMonth + 1).padStart(2, "0")}`;
+    return entries.filter((e) => {
+      const date = e.recorded_date || e.created_at.slice(0, 10);
+      return date.startsWith(prefix);
+    });
+  }, [entries, viewedYear, viewedMonth]);
+
+  // Entry counts per day (for CalendarStrip dots)
+  const entryCounts = useMemo(() => {
+    const map = new Map();
+    for (const e of monthEntries) {
+      const date = e.recorded_date || e.created_at.slice(0, 10);
+      map.set(date, (map.get(date) || 0) + 1);
+    }
+    return map;
+  }, [monthEntries]);
+
+  // Stage 2: Build sections
+  const sections = useMemo(() => {
+    if (selectedDay) {
+      const dayEntries = monthEntries.filter((e) =>
+        (e.recorded_date || e.created_at.slice(0, 10)) === selectedDay
+      );
+      return [{ title: "", date: selectedDay, data: dayEntries }];
+    }
+    return groupByDateForMonth(monthEntries);
+  }, [monthEntries, selectedDay]);
+
+  const renderSectionHeader = useCallback(({ section }) => {
+    if (selectedDay) return null;
+    const count = section.data.length;
+    return (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{section.title}</Text>
+        <Text style={styles.sectionCount}>{count}</Text>
+      </View>
+    );
+  }, [selectedDay]);
 
   const handleStartRecording = async () => {
     try {
@@ -352,8 +422,6 @@ export default function DirectoryScreen({ route, navigation }) {
           </View>
         </View>
 
-        <Text style={[typography.caption, { marginBottom: spacing.sm }]}>{formatDate(item.created_at)}</Text>
-
         {/* Status badge row */}
         <View style={styles.statusRow}>
           <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
@@ -398,11 +466,29 @@ export default function DirectoryScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={entries}
+      <CalendarStrip
+        viewedYear={viewedYear}
+        viewedMonth={viewedMonth}
+        onMonthChange={handleMonthChange}
+        selectedDay={selectedDay}
+        onDaySelect={setSelectedDay}
+        entryCounts={entryCounts}
+      />
+      {selectedDay && (
+        <View style={styles.filterBar}>
+          <Text style={styles.filterCount}>{entryCounts.get(selectedDay) || 0} snimaka</Text>
+          <TouchableOpacity onPress={() => setSelectedDay(null)}>
+            <Text style={styles.filterLink}>Prikaži sve</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
+        renderSectionHeader={selectedDay ? () => null : renderSectionHeader}
+        contentContainerStyle={sections.length === 0 || (sections.length === 1 && sections[0].data.length === 0) ? styles.empty : styles.list}
+        stickySectionHeadersEnabled={!selectedDay}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -411,9 +497,10 @@ export default function DirectoryScreen({ route, navigation }) {
           />
         }
         ListEmptyComponent={
-          <Text style={[typography.body, styles.emptyText]}>
-            Nema zapisa.{"\n"}Tapni mikrofon da snimis.
-          </Text>
+          <View style={styles.emptyWrap}>
+            <MaterialCommunityIcons name="microphone-outline" size={48} color={colors.muted} style={{ marginBottom: spacing.md, opacity: 0.4 }} />
+            <Text style={[typography.body, styles.emptyText]}>Nema snimaka</Text>
+          </View>
         }
       />
 
@@ -510,17 +597,7 @@ export default function DirectoryScreen({ route, navigation }) {
         </Dialog>
 
         {/* AI Insights dialog */}
-        <Dialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={typography.heading}>AI uvidi</Dialog.Title>
-          <Dialog.Content>
-            <Text style={[typography.body, { lineHeight: 22 }]}>
-              {"AI analiza ce omoguciti:\n\u2022 Automatsko sazimanje transkripata\n\u2022 Prepoznavanje govornika i tema\n\u2022 Pametan pregled kljucnih tacaka\n\u2022 Pretraga po sadrzaju unutar direktorijuma\n\nOva funkcija je u razvoju i bice dostupna uskoro."}
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setAiDialogVisible(false)} textColor={colors.primary}>Zatvori</Button>
-          </Dialog.Actions>
-        </Dialog>
+        <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
       </Portal>
 
       <Snackbar
@@ -540,6 +617,53 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
+
+  // Section header
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background,
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: colors.muted,
+    textTransform: "uppercase",
+  },
+  sectionCount: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: colors.muted,
+  },
+
+  // Filter bar
+  filterBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  filterCount: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: colors.foreground,
+  },
+  filterLink: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: colors.primary,
+  },
+
+  // Empty state
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Card
   card: {
@@ -588,18 +712,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: colors.primary,
-  },
-
-  // AI button
-  aiBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: spacing.sm,
   },
 
   // Dialog
