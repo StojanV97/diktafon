@@ -21,7 +21,7 @@ import {
   Snackbar,
   Text,
 } from "react-native-paper";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getSettings } from "../services/settingsService";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   fetchDailyLogEntries,
@@ -256,7 +256,7 @@ export default function DailyLogScreen({ navigation, route }) {
     setMenuVisible(null);
     setEngineTargetId(entryId);
     setBatchDate(null);
-    const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
+    const { defaultEngine } = await getSettings();
     setEngineChoice(defaultEngine);
     setEngineDialogVisible(true);
   };
@@ -264,7 +264,7 @@ export default function DailyLogScreen({ navigation, route }) {
   const openBatchEngineDialog = async (date = null) => {
     setBatchDate(date);
     setEngineTargetId(null);
-    const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
+    const { defaultEngine } = await getSettings();
     setEngineChoice(defaultEngine);
     setEngineDialogVisible(true);
   };

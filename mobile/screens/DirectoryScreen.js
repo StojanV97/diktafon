@@ -18,7 +18,7 @@ import {
   Snackbar,
   Text,
 } from "react-native-paper";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getSettings } from "../services/settingsService";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -292,7 +292,7 @@ export default function DirectoryScreen({ route, navigation }) {
   const openEngineDialog = async (entryId) => {
     setMenuVisible(null);
     setEngineTargetId(entryId);
-    const defaultEngine = (await AsyncStorage.getItem("default_transcription_engine")) || "local";
+    const { defaultEngine } = await getSettings();
     setEngineChoice(defaultEngine);
     setEngineDialogVisible(true);
   };

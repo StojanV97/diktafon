@@ -1,16 +1,15 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchDailyLogEntries, getFolder, moveEntryToFolder, deleteEntryAudio } from "./journalStorage";
+import { getSettings, updateSettings } from "./settingsService";
 import { syncWidgetData } from "./widgetDataService";
 
 export async function runAutoMove() {
   try {
-    const targetFolderId = await AsyncStorage.getItem("daily_log_auto_move_folder_id");
-    if (!targetFolderId) return null;
+    const settings = await getSettings();
+    if (!settings.autoMoveFolderId) return null;
 
-    const folder = await getFolder(targetFolderId);
+    const folder = await getFolder(settings.autoMoveFolderId);
     if (!folder) {
-      await AsyncStorage.removeItem("daily_log_auto_move_folder_id");
-      await AsyncStorage.removeItem("daily_log_auto_move_folder_name");
+      await updateSettings({ autoMoveFolderId: null, autoMoveFolderName: null });
       return null;
     }
 
@@ -21,11 +20,9 @@ export async function runAutoMove() {
     );
     if (toMove.length === 0) return null;
 
-    const keepAudio = (await AsyncStorage.getItem("daily_log_auto_move_keep_audio")) === "true";
-
     for (const entry of toMove) {
-      await moveEntryToFolder(entry.id, targetFolderId);
-      if (!keepAudio) {
+      await moveEntryToFolder(entry.id, settings.autoMoveFolderId);
+      if (!settings.autoMoveKeepAudio) {
         deleteEntryAudio(entry.id);
       }
     }

@@ -14,7 +14,6 @@ import {
   TextInput,
   TouchableRipple,
 } from "react-native-paper";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
@@ -22,12 +21,8 @@ import * as whisperService from "../services/whisperService";
 import * as assemblyAIService from "../services/assemblyAIService";
 import * as backupService from "../services/backupService";
 import { fetchFolders, getFolder } from "../services/journalStorage";
+import { getSettings, updateSettings } from "../services/settingsService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
-
-const ENGINE_STORAGE_KEY = "default_transcription_engine";
-const AUTO_MOVE_FOLDER_KEY = "daily_log_auto_move_folder_id";
-const AUTO_MOVE_FOLDER_NAME_KEY = "daily_log_auto_move_folder_name";
-const KEEP_AUDIO_KEY = "daily_log_auto_move_keep_audio";
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
@@ -65,22 +60,19 @@ export default function SettingsScreen() {
     const key = (await assemblyAIService.getApiKey()) || "";
     setApiKey(key);
     setSavedKey(key);
-    const engine = (await AsyncStorage.getItem(ENGINE_STORAGE_KEY)) || "local";
-    setDefaultEngine(engine);
 
-    const savedFolderId = await AsyncStorage.getItem(AUTO_MOVE_FOLDER_KEY);
-    if (savedFolderId) {
-      const folder = await getFolder(savedFolderId);
+    const settings = await getSettings();
+    setDefaultEngine(settings.defaultEngine);
+    setKeepAudioOnMove(settings.autoMoveKeepAudio);
+
+    if (settings.autoMoveFolderId) {
+      const folder = await getFolder(settings.autoMoveFolderId);
       if (folder) {
         setAutoMoveFolder({ id: folder.id, name: folder.name, color: folder.color });
       } else {
-        await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_KEY);
-        await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
+        await updateSettings({ autoMoveFolderId: null, autoMoveFolderName: null });
       }
     }
-
-    const keepAudio = (await AsyncStorage.getItem(KEEP_AUDIO_KEY)) === "true";
-    setKeepAudioOnMove(keepAudio);
   }, []);
 
   useEffect(() => {
@@ -126,7 +118,7 @@ export default function SettingsScreen() {
 
   const handleEngineChange = async (value) => {
     setDefaultEngine(value);
-    await AsyncStorage.setItem(ENGINE_STORAGE_KEY, value);
+    await updateSettings({ defaultEngine: value });
   };
 
   const handleOpenAutoMoveDialog = async () => {
@@ -136,23 +128,21 @@ export default function SettingsScreen() {
   };
 
   const handleSelectAutoMoveFolder = async (folder) => {
-    await AsyncStorage.setItem(AUTO_MOVE_FOLDER_KEY, folder.id);
-    await AsyncStorage.setItem(AUTO_MOVE_FOLDER_NAME_KEY, folder.name);
+    await updateSettings({ autoMoveFolderId: folder.id, autoMoveFolderName: folder.name });
     setAutoMoveFolder({ id: folder.id, name: folder.name, color: folder.color });
     setAutoMoveDialogVisible(false);
     setSnackbar(`Automatsko premestanje: ${folder.name}`);
   };
 
   const handleClearAutoMove = async () => {
-    await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_KEY);
-    await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
+    await updateSettings({ autoMoveFolderId: null, autoMoveFolderName: null });
     setAutoMoveFolder(null);
     setSnackbar("Automatsko premestanje iskljuceno.");
   };
 
   const handleToggleKeepAudio = async (value) => {
     setKeepAudioOnMove(value);
-    await AsyncStorage.setItem(KEEP_AUDIO_KEY, value ? "true" : "false");
+    await updateSettings({ autoMoveKeepAudio: value });
   };
 
   const handleCreateBackup = async () => {
