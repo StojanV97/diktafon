@@ -294,6 +294,18 @@ export async function completeEntry(entryId, text, durationSeconds) {
   return { ...entry, text };
 }
 
+export async function updateEntryText(entryId, newText) {
+  ensureDirs()
+  const textFile = new File(textsDir, `journal_${entryId}.txt`)
+  textFile.write(newText)
+  const entries = await readJSON(entriesFile)
+  const entry = entries.find((e) => e.id === entryId)
+  if (!entry) return null
+  entry.text = truncateText(newText)
+  writeJSON(entriesFile, entries)
+  return { ...entry, text: newText }
+}
+
 export async function failEntry(entryId, error) {
   const entries = await readJSON(entriesFile);
   const entry = entries.find((e) => e.id === entryId);
