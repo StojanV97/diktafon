@@ -65,6 +65,11 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const loadingStyles = StyleSheet.create({
+  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  flex1: { flex: 1 },
+});
+
 const errorStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   title: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: colors.foreground, marginBottom: 16 },
@@ -112,7 +117,7 @@ export default function App() {
   if (!fontsLoaded || !ready) {
     return (
       <PaperProvider theme={theme}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+        <View style={loadingStyles.container}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </PaperProvider>
@@ -122,7 +127,7 @@ export default function App() {
   return (
     <PaperProvider theme={theme}>
       <ErrorBoundary>
-        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <View style={loadingStyles.flex1} onLayout={onLayoutRootView}>
           <NavigationContainer linking={linking}>
             <StatusBar style="dark" />
             <Stack.Navigator screenOptions={stackScreenOptions}>

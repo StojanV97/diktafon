@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing } from "../theme";
 
-export default function BottomActionBar({
+function BottomActionBar({
   leftIcon,
   leftLabel,
   onLeftPress,
@@ -54,6 +54,8 @@ export default function BottomActionBar({
     </View>
   );
 }
+
+export default React.memo(BottomActionBar);
 
 const styles = StyleSheet.create({
   bottomBar: {

@@ -121,13 +121,18 @@ export default function DirectoryScreen({ route, navigation }) {
   });
 
   // Header: app logo on left, AI button on right
+  const headerLeft = useCallback(
+    () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
+    [navigation]
+  );
+  const headerRight = useCallback(
+    () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
+    []
+  );
+
   useEffect(() => {
-    navigation.setOptions({
-      headerBackVisible: false,
-      headerLeft: () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
-      headerRight: () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
-    });
-  }, [navigation]);
+    navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
+  }, [navigation, headerLeft, headerRight]);
 
   const load = useCallback(async () => {
     try {
@@ -368,7 +373,7 @@ export default function DirectoryScreen({ route, navigation }) {
     }
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     const status = item.status ?? "done";
     const isRecorded = status === "recorded";
     const isProcessing = status === "processing";
@@ -452,7 +457,7 @@ export default function DirectoryScreen({ route, navigation }) {
         )}
       </TouchableOpacity>
     );
-  };
+  }, [menuVisible, navigation]);
 
   if (loading) {
     return (
@@ -489,6 +494,10 @@ export default function DirectoryScreen({ route, navigation }) {
         renderSectionHeader={selectedDay ? () => null : renderSectionHeader}
         contentContainerStyle={sections.length === 0 || (sections.length === 1 && sections[0].data.length === 0) ? styles.empty : styles.list}
         stickySectionHeadersEnabled={!selectedDay}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
+        removeClippedSubviews={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -240,7 +240,7 @@ export default function DirectoryHomeScreen({ navigation }) {
     </View>
   ), [insets.top, dailyStats]);
 
-  const renderItem = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     const color = item.color || FOLDER_COLORS[0];
     const tags = item.tags || [];
     const visibleTags = tags.slice(0, 3);
@@ -304,7 +304,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         </Menu>
       </TouchableOpacity>
     );
-  };
+  }, [menuVisible, navigation]);
 
   if (loading) {
     return (

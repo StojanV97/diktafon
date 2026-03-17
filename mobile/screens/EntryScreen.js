@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Clipboard,
   Pressable,
   ScrollView,
   Share,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ExpoClipboard from "expo-clipboard";
 import {
   ActivityIndicator,
   Menu,
@@ -83,7 +83,7 @@ export default function EntryScreen({ route, navigation }) {
 
   const copyText = () => {
     if (!record?.text) return;
-    Clipboard.setString(record.text);
+    ExpoClipboard.setStringAsync(record.text);
     setSnackbar("Tekst je kopiran u clipboard.");
   };
 

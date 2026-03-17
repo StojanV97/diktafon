@@ -11,7 +11,7 @@ function formatTimer(ms) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop, onCancel }) {
+function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop, onCancel }) {
   return (
     <View style={styles.recordArea}>
       <View style={styles.waveform}>
@@ -64,6 +64,8 @@ export default function RecordingOverlay({ meteringHistory, elapsed, isPaused, o
     </View>
   );
 }
+
+export default React.memo(RecordingOverlay);
 
 const styles = StyleSheet.create({
   recordArea: {

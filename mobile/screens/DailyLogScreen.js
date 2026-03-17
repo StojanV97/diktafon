@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
-  Clipboard,
   SectionList,
   RefreshControl,
   Share,
@@ -9,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ExpoClipboard from "expo-clipboard";
 import {
   ActivityIndicator,
   Button,
@@ -34,7 +34,7 @@ import {
   entryAudioUri,
   moveEntryToFolder,
   createDailyLogEntry,
-  getDailyCombinedTranscript,
+  getDailyCombinedTranscripts,
 } from "../services/journalStorage";
 import { transcribeLocal, submitAssemblyAI, checkAssemblyAI } from "../services/journalApi";
 import * as whisperService from "../services/whisperService";
@@ -97,12 +97,14 @@ const statusConfig = (status) => {
   }
 };
 
+const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
+
 export default function DailyLogScreen({ navigation, route }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [collapsedDates, setCollapsedDates] = useState(new Set());
 
   const [menuVisible, setMenuVisible] = useState(null);
@@ -168,13 +170,18 @@ export default function DailyLogScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation, load]);
 
+  const headerLeft = useCallback(
+    () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
+    [navigation]
+  );
+  const headerRight = useCallback(
+    () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
+    []
+  );
+
   useEffect(() => {
-    navigation.setOptions({
-      headerBackVisible: false,
-      headerLeft: () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
-      headerRight: () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
-    });
-  }, [navigation]);
+    navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
+  }, [navigation, headerLeft, headerRight]);
 
   // Auto-start recording when opened via widget deep link
   useEffect(() => {
@@ -222,23 +229,18 @@ export default function DailyLogScreen({ navigation, route }) {
 
   // Load combined transcripts for dates where at least one entry is done
   useEffect(() => {
-    for (const { date, data } of grouped) {
-      const doneCount = data.filter((e) => e.status === "done").length;
-      if (doneCount > 0) {
-        getDailyCombinedTranscript(date).then((text) => {
-          setCombinedTexts((prev) => {
-            if (prev[date] === text) return prev;
-            return { ...prev, [date]: text };
-          });
-        });
-      } else if (combinedTexts[date]) {
-        setCombinedTexts((prev) => {
-          const next = { ...prev };
-          delete next[date];
-          return next;
-        });
-      }
+    const datesWithDone = grouped
+      .filter(({ data }) => data.some((e) => e.status === "done"))
+      .map(({ date }) => date);
+
+    if (datesWithDone.length === 0) {
+      setCombinedTexts({});
+      return;
     }
+
+    getDailyCombinedTranscripts(datesWithDone).then((results) => {
+      setCombinedTexts(results);
+    });
   }, [grouped]);
 
   const toggleSection = (date) => {
@@ -457,7 +459,7 @@ export default function DailyLogScreen({ navigation, route }) {
     data: collapsedDates.has(date) ? [] : data,
   }));
 
-  const renderSectionHeader = ({ section }) => {
+  const renderSectionHeader = useCallback(({ section }) => {
     const { date, allData } = section;
     const isCollapsed = collapsedDates.has(date);
     const totalDur = allData.reduce((s, e) => s + (e.duration_seconds || 0), 0);
@@ -474,20 +476,20 @@ export default function DailyLogScreen({ navigation, route }) {
             color={colors.muted}
           />
           <Text style={styles.sectionTitle}>{formatSectionDate(date)}</Text>
-          <Text style={[typography.caption, { marginLeft: spacing.sm }]}>
+          <Text style={sectionCountStyle}>
             {allData.length} kl · {formatDuration(totalDur)}
           </Text>
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [collapsedDates]);
 
-  const copyCombinedText = (date) => {
+  const copyCombinedText = useCallback((date) => {
     const text = combinedTexts[date];
     if (!text) return;
-    Clipboard.setString(text);
+    ExpoClipboard.setStringAsync(text);
     setSnackbar("Tekst je kopiran.");
-  };
+  }, [combinedTexts]);
 
   const shareCombinedText = async (date) => {
     const text = combinedTexts[date];
@@ -508,7 +510,7 @@ export default function DailyLogScreen({ navigation, route }) {
     });
   };
 
-  const renderSectionFooter = ({ section }) => {
+  const renderSectionFooter = useCallback(({ section }) => {
     const { date } = section;
     const text = combinedTexts[date];
     if (!text || collapsedDates.has(date)) return null;
@@ -548,9 +550,9 @@ export default function DailyLogScreen({ navigation, route }) {
         )}
       </View>
     );
-  };
+  }, [combinedTexts, collapsedDates, expandedTranscripts]);
 
-  const renderItem = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     const status = item.status ?? "done";
     const isRecorded = status === "recorded";
     const isProcessing = status === "processing";
@@ -634,7 +636,7 @@ export default function DailyLogScreen({ navigation, route }) {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [menuVisible, navigation]);
 
   if (loading) {
     return (
@@ -656,6 +658,10 @@ export default function DailyLogScreen({ navigation, route }) {
         renderSectionFooter={renderSectionFooter}
         contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
         stickySectionHeadersEnabled={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
+        removeClippedSubviews={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

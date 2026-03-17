@@ -58,6 +58,9 @@
         }
       ],
       "./plugins/withWidgetFix"
-    ]
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
   }
 }

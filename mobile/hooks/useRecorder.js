@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -37,14 +37,15 @@ export function useRecorder({ onRecordingComplete }) {
   });
   const recorderState = useAudioRecorderState(audioRecorder, 100);
   const [isPaused, setIsPaused] = useState(false);
+  const meteringBuffer = useRef([]);
   const [meteringHistory, setMeteringHistory] = useState([]);
 
   useEffect(() => {
     if (recorderState.isRecording) {
-      setMeteringHistory((prev) => {
-        const next = [...prev, recorderState.metering ?? -160];
-        return next.length > 40 ? next.slice(next.length - 40) : next;
-      });
+      const buf = meteringBuffer.current;
+      if (buf.length >= 40) buf.shift();
+      buf.push(recorderState.metering ?? -160);
+      setMeteringHistory([...buf]);
     }
   }, [recorderState.metering, recorderState.isRecording]);
 
@@ -77,6 +78,7 @@ export function useRecorder({ onRecordingComplete }) {
     const elapsed = recorderState.durationMillis ?? 0;
     await audioRecorder.stop();
     setIsPaused(false);
+    meteringBuffer.current = [];
     setMeteringHistory([]);
     await setAudioModeAsync({ allowsRecording: false });
 
@@ -92,6 +94,7 @@ export function useRecorder({ onRecordingComplete }) {
   const cancelRecording = async () => {
     await audioRecorder.stop();
     setIsPaused(false);
+    meteringBuffer.current = [];
     setMeteringHistory([]);
     await setAudioModeAsync({ allowsRecording: false });
   };

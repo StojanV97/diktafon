@@ -14,6 +14,10 @@ const textsDir = new Directory(journalDir, "texts");
 const foldersFile = new File(journalDir, "folders.json");
 const entriesFile = new File(journalDir, "entries.json");
 
+// In-memory cache — avoids re-reading + JSON-parsing on every read (esp. 5s polling)
+let _foldersCache = null;
+let _entriesCache = null;
+
 function ensureDirs() {
   journalDir.create({ idempotent: true });
   audioDir.create({ idempotent: true });
@@ -21,29 +25,39 @@ function ensureDirs() {
 }
 
 async function readJSON(file) {
+  // Return cached data if available (avoids disk I/O + JSON.parse)
+  if (file === foldersFile && _foldersCache !== null) return _foldersCache;
+  if (file === entriesFile && _entriesCache !== null) return _entriesCache;
+
+  let result;
   try {
-    if (!file.exists) return [];
-    const raw = await file.text();
-    return JSON.parse(raw);
+    if (!file.exists) { result = []; }
+    else {
+      const raw = await file.text();
+      result = JSON.parse(raw);
+    }
   } catch (e) {
     // Main file is corrupted — try the backup
     const bakFile = new File(file.parentDirectory, file.name + ".bak");
     if (bakFile.exists) {
       try {
         const bakRaw = await bakFile.text();
-        const data = JSON.parse(bakRaw);
+        result = JSON.parse(bakRaw);
         console.warn(`readJSON: ${file.name} corrupted, recovered from .bak`);
-        // Restore main file from backup
         file.write(bakRaw);
-        return data;
       } catch {
         console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
+        result = [];
       }
     } else {
       console.warn(`readJSON: ${file.name} corrupted, no .bak available`);
+      result = [];
     }
-    return [];
   }
+
+  if (file === foldersFile) _foldersCache = result;
+  else if (file === entriesFile) _entriesCache = result;
+  return result;
 }
 
 function writeJSON(file, data) {
@@ -61,6 +75,10 @@ function writeJSON(file, data) {
   // Move temp file to real path (atomic on most filesystems)
   if (file.exists) file.delete();
   tmpFile.move(file);
+
+  // Update cache with written data
+  if (file === foldersFile) _foldersCache = data;
+  else if (file === entriesFile) _entriesCache = data;
 }
 
 function truncateText(text, max = 200) {
@@ -396,6 +414,37 @@ export async function getDailyCombinedTranscript(date) {
     parts.push(`[${h}:${m}]\n${fullText}`);
   }
   return parts.join("\n\n");
+}
+
+export async function getDailyCombinedTranscripts(dates) {
+  const allEntries = await fetchDailyLogEntries();
+  const results = {};
+
+  for (const date of dates) {
+    const dayEntries = allEntries
+      .filter((e) => (e.recorded_date || e.created_at.slice(0, 10)) === date)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const parts = [];
+    for (const entry of dayEntries) {
+      if (entry.status !== "done") continue;
+      const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+      let fullText = entry.text || "";
+      if (textFile.exists) {
+        try {
+          fullText = await textFile.text();
+        } catch {
+          // fall back to truncated text from JSON
+        }
+      }
+      const time = new Date(entry.created_at);
+      const h = time.getHours().toString().padStart(2, "0");
+      const m = time.getMinutes().toString().padStart(2, "0");
+      parts.push(`[${h}:${m}]\n${fullText}`);
+    }
+    results[date] = parts.join("\n\n");
+  }
+  return results;
 }
 
 export async function moveEntryToFolder(entryId, targetFolderId) {
