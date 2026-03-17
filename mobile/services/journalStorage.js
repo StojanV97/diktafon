@@ -294,6 +294,11 @@ export function entryAudioUri(entryId) {
   return file.uri;
 }
 
+export function deleteEntryAudio(entryId) {
+  const audioFile = new File(audioDir, `${entryId}.wav`);
+  if (audioFile.exists) audioFile.delete();
+}
+
 // ── Daily Log ───────────────────────────────────────────
 
 export async function getOrCreateDailyLogFolder() {

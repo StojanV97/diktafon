@@ -9,6 +9,7 @@ import {
   ProgressBar,
   RadioButton,
   Snackbar,
+  Switch,
   Text,
   TextInput,
   TouchableRipple,
@@ -26,6 +27,7 @@ import { colors, spacing, radii, elevation, typography } from "../theme";
 const ENGINE_STORAGE_KEY = "default_transcription_engine";
 const AUTO_MOVE_FOLDER_KEY = "daily_log_auto_move_folder_id";
 const AUTO_MOVE_FOLDER_NAME_KEY = "daily_log_auto_move_folder_name";
+const KEEP_AUDIO_KEY = "daily_log_auto_move_keep_audio";
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
@@ -51,6 +53,7 @@ export default function SettingsScreen() {
   const [autoMoveFolder, setAutoMoveFolder] = useState(null);
   const [autoMoveFolders, setAutoMoveFolders] = useState([]);
   const [autoMoveDialogVisible, setAutoMoveDialogVisible] = useState(false);
+  const [keepAudioOnMove, setKeepAudioOnMove] = useState(false);
 
   // Backup
   const [backupLoading, setBackupLoading] = useState(false);
@@ -75,6 +78,9 @@ export default function SettingsScreen() {
         await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
       }
     }
+
+    const keepAudio = (await AsyncStorage.getItem(KEEP_AUDIO_KEY)) === "true";
+    setKeepAudioOnMove(keepAudio);
   }, []);
 
   useEffect(() => {
@@ -142,6 +148,11 @@ export default function SettingsScreen() {
     await AsyncStorage.removeItem(AUTO_MOVE_FOLDER_NAME_KEY);
     setAutoMoveFolder(null);
     setSnackbar("Automatsko premestanje iskljuceno.");
+  };
+
+  const handleToggleKeepAudio = async (value) => {
+    setKeepAudioOnMove(value);
+    await AsyncStorage.setItem(KEEP_AUDIO_KEY, value ? "true" : "false");
   };
 
   const handleCreateBackup = async () => {
@@ -385,6 +396,26 @@ export default function SettingsScreen() {
                 </Button>
               )}
             </View>
+            {autoMoveFolder && (
+              <TouchableRipple
+                onPress={() => handleToggleKeepAudio(!keepAudioOnMove)}
+                style={styles.toggleRow}
+              >
+                <View style={styles.toggleRowInner}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={typography.body}>Sacuvaj snimke pri premestanju</Text>
+                    <Text style={[typography.caption, { marginTop: 2 }]}>
+                      Podrazumevano se brisu snimci, cuva se samo transkript
+                    </Text>
+                  </View>
+                  <Switch
+                    value={keepAudioOnMove}
+                    onValueChange={handleToggleKeepAudio}
+                    color={colors.primary}
+                  />
+                </View>
+              </TouchableRipple>
+            )}
           </View>
         </View>
 
@@ -532,6 +563,15 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     marginRight: spacing.sm,
+  },
+
+  toggleRow: {
+    marginTop: spacing.md,
+  },
+  toggleRowInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   dialog: {

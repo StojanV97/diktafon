@@ -560,7 +560,7 @@ export default function DailyLogScreen({ navigation, route }) {
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => isDone && navigation.navigate("Entry", { id: item.id })}
+        onPress={() => navigation.navigate("Entry", { id: item.id })}
         style={[styles.card, elevation.sm]}
       >
         <View style={styles.cardRow}>
