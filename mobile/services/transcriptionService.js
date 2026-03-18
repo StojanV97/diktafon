@@ -26,7 +26,7 @@ export async function transcribeSingle(entryId, engine, { onStatusChange, onErro
   try {
     if (engine === "assemblyai") {
       const speakerLabels = (entry.recording_type || "beleshka") === "razgovor"
-      const { assemblyai_id } = await assemblyAIService.submitAndGetId(audioUri, { speakerLabels })
+      const { assemblyai_id } = await assemblyAIService.submit(audioUri, { speakerLabels })
       const updated = await updateEntryToProcessing(entryId, assemblyai_id)
       onStatusChange?.(entryId, updated)
     } else {
@@ -66,7 +66,7 @@ export async function pollProcessingEntries(entries) {
   await Promise.all(
     processing.map(async (e) => {
       try {
-        const result = await assemblyAIService.checkTranscript(e.assemblyai_id)
+        const result = await assemblyAIService.check(e.assemblyai_id)
         if (result.status === "done") {
           const updated = await completeEntry(e.id, result.text, result.duration_seconds)
           if (updated) changed.push({ entryId: e.id, entry: updated })

@@ -1,8 +1,6 @@
 import { Platform } from "react-native"
-import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as Sentry from "@sentry/react-native"
-
-const SYNC_ENABLED_KEY = "icloud_sync_enabled"
+import { getSettings, updateSettings } from "./settingsService"
 
 // Lazy import — react-native-cloud-store is iOS-only native module
 let CloudStore = null
@@ -22,16 +20,16 @@ function getCloudStore() {
 
 export async function isSyncEnabled() {
   if (Platform.OS !== "ios") return false
-  const val = await AsyncStorage.getItem(SYNC_ENABLED_KEY)
-  return val === "true"
+  const settings = await getSettings()
+  return settings.icloudSyncEnabled
 }
 
 export async function enableSync() {
-  await AsyncStorage.setItem(SYNC_ENABLED_KEY, "true")
+  await updateSettings({ icloudSyncEnabled: true })
 }
 
 export async function disableSync() {
-  await AsyncStorage.setItem(SYNC_ENABLED_KEY, "false")
+  await updateSettings({ icloudSyncEnabled: false })
 }
 
 // ── iCloud Availability ────────────────────────────────

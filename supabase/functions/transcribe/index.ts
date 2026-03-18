@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+const MONTHLY_MINUTES_LIMIT = 120
 const ASSEMBLYAI_API_KEY = Deno.env.get("ASSEMBLYAI_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -49,9 +50,9 @@ serve(async (req) => {
       })
     }
 
-    // Check usage cap (120 min/month)
-    if (profile.transcription_minutes_used >= 120) {
-      return new Response(JSON.stringify({ error: "Monthly transcription limit reached (120 min)" }), {
+    // Check usage cap
+    if (profile.transcription_minutes_used >= MONTHLY_MINUTES_LIMIT) {
+      return new Response(JSON.stringify({ error: `Monthly transcription limit reached (${MONTHLY_MINUTES_LIMIT} min)` }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
@@ -168,6 +169,8 @@ async function handleStatus(req: Request, headers: Record<string, string>) {
   })
 }
 
+// NOTE: formatUtterances is also duplicated in mobile/services/assemblyAIService.js
+// (separate Deno runtime, no shared code path — intentional duplication)
 function formatUtterances(data: any): string {
   if (!data.utterances || data.utterances.length === 0) {
     return data.text || ""

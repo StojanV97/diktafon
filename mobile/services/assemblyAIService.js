@@ -192,7 +192,26 @@ function decode(base64) {
   return bytes
 }
 
+// ── Unified Entry Points ───────────────────────────────
+// Auto-select direct vs proxy mode based on auth session.
+
+export async function submit(fileUri, options = {}) {
+  if (await isProxyMode()) {
+    return submitViaProxy(fileUri, options)
+  }
+  return submitAndGetId(fileUri, options)
+}
+
+export async function check(transcriptId) {
+  if (await isProxyMode()) {
+    return checkViaProxy(transcriptId)
+  }
+  return checkTranscript(transcriptId)
+}
+
 // ── Speaker Formatting ──────────────────────────────────
+// NOTE: formatUtterances is also duplicated in supabase/functions/transcribe/index.ts
+// (separate Deno runtime, no shared code path — intentional duplication)
 
 function formatUtterances(data) {
   if (!data.utterances || data.utterances.length === 0) {

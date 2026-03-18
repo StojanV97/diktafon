@@ -5,6 +5,18 @@
  * works against in-memory data rather than real disk I/O.
  */
 
+// ── Module mocks for transitive dependencies ─────────
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  multiGet: jest.fn().mockResolvedValue([]),
+  multiSet: jest.fn().mockResolvedValue(undefined),
+  multiRemove: jest.fn().mockResolvedValue(undefined),
+}))
+jest.mock("react-native", () => ({ Platform: { OS: "ios" } }))
+jest.mock("@sentry/react-native", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}))
+
 // ── In-memory filesystem stub ──────────────────────────
 // Variables prefixed with "mock" are allowed inside jest.mock() factory
 const mockFiles = {} // path → content string

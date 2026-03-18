@@ -4,6 +4,18 @@
  * a single combined entry and the originals are removed.
  */
 
+// ── Module mocks for transitive dependencies ─────────
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  multiGet: jest.fn().mockResolvedValue([]),
+  multiSet: jest.fn().mockResolvedValue(undefined),
+  multiRemove: jest.fn().mockResolvedValue(undefined),
+}))
+jest.mock("react-native", () => ({ Platform: { OS: "ios" } }))
+jest.mock("@sentry/react-native", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}))
+
 // ── Mock expo-file-system ──────────────────────────────────
 const mockFiles = {}
 

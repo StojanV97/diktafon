@@ -99,9 +99,9 @@ function writeJSON(file, data) {
 
     // Fire-and-forget iCloud sync
     if (file === foldersFile) {
-      syncJSONToICloud("folders.json", data).catch(() => {})
+      syncJSONToICloud("folders.json", data).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
     } else if (file === entriesFile) {
-      syncJSONToICloud("entries.json", data).catch(() => {})
+      syncJSONToICloud("entries.json", data).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
     }
   } catch (e) {
     console.warn(`writeJSON: failed to write ${file.name}:`, e);
@@ -295,7 +295,7 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
   writeJSON(entriesFile, entries);
 
   // Sync audio to iCloud (fire-and-forget)
-  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch(() => {})
+  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
   return entry;
 }
@@ -367,7 +367,7 @@ export async function completeEntry(entryId, text, durationSeconds) {
   writeJSON(entriesFile, entries);
 
   // Sync transcript to iCloud
-  writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch(() => {})
+  writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
   return { ...entry, text };
 }
@@ -384,7 +384,7 @@ export async function updateEntryText(entryId, newText) {
   writeJSON(entriesFile, entries)
 
   // Sync transcript to iCloud
-  writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch(() => {})
+  writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
   return { ...entry, text: newText }
 }
@@ -467,7 +467,7 @@ export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
   writeJSON(entriesFile, entries);
 
   // Sync audio to iCloud
-  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch(() => {})
+  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
   return entry;
 }

@@ -5,6 +5,7 @@ const REVENUECAT_API_KEY_IOS = "YOUR_REVENUECAT_IOS_KEY"
 const REVENUECAT_API_KEY_ANDROID = "YOUR_REVENUECAT_ANDROID_KEY"
 
 const PREMIUM_ENTITLEMENT = "premium"
+export const MONTHLY_MINUTES_LIMIT = 120
 
 let _initialized = false
 
@@ -79,8 +80,7 @@ export async function restorePurchases() {
 // ── Usage Tracking (read from Supabase profile) ───────
 
 export function getUsageFromProfile(profile) {
-  if (!profile) return { used: 0, limit: 120, remaining: 120 }
+  if (!profile) return { used: 0, limit: MONTHLY_MINUTES_LIMIT, remaining: MONTHLY_MINUTES_LIMIT }
   const used = profile.transcription_minutes_used || 0
-  const limit = 120
-  return { used, limit, remaining: Math.max(0, limit - used) }
+  return { used, limit: MONTHLY_MINUTES_LIMIT, remaining: Math.max(0, MONTHLY_MINUTES_LIMIT - used) }
 }

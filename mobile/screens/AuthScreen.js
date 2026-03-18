@@ -4,7 +4,6 @@ import { Button, Text } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import * as AppleAuthentication from "expo-apple-authentication"
 import { signInWithApple } from "../services/authService"
-import { loginUser } from "../services/subscriptionService"
 import { colors, spacing, radii, elevation, typography } from "../theme"
 
 export default function AuthScreen({ navigation }) {
@@ -15,11 +14,8 @@ export default function AuthScreen({ navigation }) {
     setLoading(true)
     setError(null)
     try {
-      const data = await signInWithApple()
-      // Link RevenueCat to Supabase user
-      if (data?.user?.id) {
-        await loginUser(data.user.id)
-      }
+      await signInWithApple()
+      // RevenueCat linking is handled by App.js onAuthStateChange listener
       navigation.goBack()
     } catch (e) {
       if (e.code === "ERR_REQUEST_CANCELED") {
