@@ -25,6 +25,12 @@ const SCHEMA = {
     parse: (v) => v === "true",
     serialize: (v) => (v ? "true" : "false"),
   },
+  icloudSyncEnabled: {
+    key: "icloud_sync_enabled",
+    default: false,
+    parse: (v) => v === "true",
+    serialize: (v) => (v ? "true" : "false"),
+  },
 }
 
 const NAMES = Object.keys(SCHEMA)

@@ -9,15 +9,19 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
-import { migrateData, getCorruptionStatus } from "./services/journalStorage";
+import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries } from "./services/journalStorage";
 import { releaseContext } from "./services/whisperService";
 import { syncWidgetData } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
+import { onAuthStateChange } from "./services/authService";
+import { initPurchases, loginUser } from "./services/subscriptionService";
+import { pullAndMerge, isSyncEnabled } from "./services/icloudSyncService";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
 import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+import AuthScreen from "./screens/AuthScreen";
 
 Sentry.init({
   // TODO: Replace with your Sentry DSN
@@ -100,7 +104,16 @@ function App() {
   });
 
   useEffect(() => {
-    migrateData().then(() => {
+    async function init() {
+      await migrateData();
+
+      // Init RevenueCat
+      try {
+        await initPurchases("ios");
+      } catch (e) {
+        console.warn("RevenueCat init failed:", e.message);
+      }
+
       setReady(true);
       syncWidgetData();
       runAutoMove();
@@ -113,7 +126,24 @@ function App() {
           [{ text: "U redu" }]
         );
       }
-    });
+
+      // iCloud sync on launch
+      try {
+        const syncEnabled = await isSyncEnabled();
+        if (syncEnabled) {
+          const localFolders = await getRawFolders();
+          const localEntries = await getRawEntries();
+          const result = await pullAndMerge(localFolders, localEntries);
+          if (result.changed) {
+            overwriteFolders(result.folders);
+            overwriteEntries(result.entries);
+          }
+        }
+      } catch (e) {
+        console.warn("iCloud sync on launch failed:", e.message);
+      }
+    }
+    init();
   }, []);
 
   // Release whisper context when app goes to background
@@ -126,6 +156,16 @@ function App() {
       }
     });
     return () => subscription.remove();
+  }, []);
+
+  // Auth state listener — link RevenueCat on sign-in
+  useEffect(() => {
+    const subscription = onAuthStateChange((session) => {
+      if (session?.user?.id) {
+        loginUser(session.user.id).catch(() => {});
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const onLayoutRootView = useCallback(async () => {
@@ -175,6 +215,11 @@ function App() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ title: "Podesavanja" }}
+              />
+              <Stack.Screen
+                name="Auth"
+                component={AuthScreen}
+                options={{ title: "Prijava" }}
               />
             </Stack.Navigator>
           </NavigationContainer>

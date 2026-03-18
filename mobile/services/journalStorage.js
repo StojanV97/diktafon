@@ -1,5 +1,11 @@
 import { File, Directory, Paths } from "expo-file-system";
 import * as Sentry from "@sentry/react-native";
+import {
+  syncJSONToICloud,
+  uploadFileToICloud,
+  writeFileToICloud,
+  isSyncEnabled,
+} from "./icloudSyncService";
 
 function generateUUID() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -90,6 +96,13 @@ function writeJSON(file, data) {
     // Update cache with written data
     if (file === foldersFile) _foldersCache = data;
     else if (file === entriesFile) _entriesCache = data;
+
+    // Fire-and-forget iCloud sync
+    if (file === foldersFile) {
+      syncJSONToICloud("folders.json", data).catch(() => {})
+    } else if (file === entriesFile) {
+      syncJSONToICloud("entries.json", data).catch(() => {})
+    }
   } catch (e) {
     console.warn(`writeJSON: failed to write ${file.name}:`, e);
     Sentry.captureException(e);
@@ -147,6 +160,28 @@ export async function migrateData() {
   }
   if (entriesFixed) writeJSON(entriesFile, entries);
 
+  // Backfill updated_at from created_at for conflict resolution
+  const allEntries = await readJSON(entriesFile);
+  let updatedAtFixed = false;
+  for (const entry of allEntries) {
+    if (!entry.updated_at) {
+      entry.updated_at = entry.created_at;
+      updatedAtFixed = true;
+    }
+  }
+  if (updatedAtFixed) writeJSON(entriesFile, allEntries);
+
+  // Backfill updated_at on folders
+  const allFolders = await readJSON(foldersFile);
+  let foldersUpdatedAtFixed = false;
+  for (const folder of allFolders) {
+    if (!folder.updated_at) {
+      folder.updated_at = folder.created_at;
+      foldersUpdatedAtFixed = true;
+    }
+  }
+  if (foldersUpdatedAtFixed) writeJSON(foldersFile, allFolders);
+
   // Backfill recorded_date for existing daily log entries
   const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
   if (dailyLogFolder) {
@@ -166,12 +201,14 @@ export async function migrateData() {
 
 export async function createFolder(name, color = "#4A9EFF", tags = []) {
   const folders = await readJSON(foldersFile);
+  const now = new Date().toISOString()
   const folder = {
     id: generateUUID(),
     name,
     color,
     tags,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
   };
   folders.unshift(folder);
   writeJSON(foldersFile, folders);
@@ -194,6 +231,7 @@ export async function updateFolder(id, updates) {
   if (updates.name !== undefined) folder.name = updates.name;
   if (updates.color !== undefined) folder.color = updates.color;
   if (updates.tags !== undefined) folder.tags = updates.tags;
+  folder.updated_at = new Date().toISOString();
   writeJSON(foldersFile, folders);
   return folder;
 }
@@ -238,12 +276,14 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
   const dest = new File(audioDir, `${id}.wav`);
   source.copy(dest);
 
+  const now = new Date().toISOString()
   const entry = {
     id,
     folder_id: folderId,
     filename,
     text: "",
-    created_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
     duration_seconds: durationSeconds,
     status: "recorded",
     audio_file: `${id}.wav`,
@@ -253,6 +293,10 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
   const entries = await readJSON(entriesFile);
   entries.unshift(entry);
   writeJSON(entriesFile, entries);
+
+  // Sync audio to iCloud (fire-and-forget)
+  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch(() => {})
+
   return entry;
 }
 
@@ -300,6 +344,7 @@ export async function updateEntryToProcessing(entryId, assemblyaiId) {
   if (!entry) return null;
   entry.status = "processing";
   entry.assemblyai_id = assemblyaiId;
+  entry.updated_at = new Date().toISOString();
   writeJSON(entriesFile, entries);
   return { ...entry };
 }
@@ -317,8 +362,13 @@ export async function completeEntry(entryId, text, durationSeconds) {
   entry.status = "done";
   entry.text = truncateText(text);
   entry.duration_seconds = durationSeconds;
+  entry.updated_at = new Date().toISOString();
   delete entry.assemblyai_id;
   writeJSON(entriesFile, entries);
+
+  // Sync transcript to iCloud
+  writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch(() => {})
+
   return { ...entry, text };
 }
 
@@ -330,7 +380,12 @@ export async function updateEntryText(entryId, newText) {
   const entry = entries.find((e) => e.id === entryId)
   if (!entry) return null
   entry.text = truncateText(newText)
+  entry.updated_at = new Date().toISOString()
   writeJSON(entriesFile, entries)
+
+  // Sync transcript to iCloud
+  writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch(() => {})
+
   return { ...entry, text: newText }
 }
 
@@ -340,6 +395,7 @@ export async function failEntry(entryId, error) {
   if (!entry) return null;
   entry.status = "error";
   entry.text = error;
+  entry.updated_at = new Date().toISOString();
   delete entry.assemblyai_id;
   writeJSON(entriesFile, entries);
   return { ...entry };
@@ -363,13 +419,15 @@ export async function getOrCreateDailyLogFolder() {
   const folders = await readJSON(foldersFile);
   let folder = folders.find((f) => f.is_daily_log === true);
   if (!folder) {
+    const now = new Date().toISOString()
     folder = {
       id: generateUUID(),
       name: "Dnevni Log",
       color: "#3B5EDB",
       tags: [],
       is_daily_log: true,
-      created_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
     };
     folders.unshift(folder);
     writeJSON(foldersFile, folders);
@@ -389,22 +447,28 @@ export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
   const now = new Date();
   const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
 
+  const nowISO = now.toISOString()
   const entry = {
     id,
     folder_id: folder.id,
     filename,
     text: "",
-    created_at: now.toISOString(),
+    created_at: nowISO,
+    updated_at: nowISO,
     duration_seconds: durationSeconds,
     status: "recorded",
     audio_file: `${id}.wav`,
-    recorded_date: now.toISOString().slice(0, 10),
+    recorded_date: nowISO.slice(0, 10),
     recording_type: "beleshka",
   };
 
   const entries = await readJSON(entriesFile);
   entries.unshift(entry);
   writeJSON(entriesFile, entries);
+
+  // Sync audio to iCloud
+  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch(() => {})
+
   return entry;
 }
 
@@ -538,6 +602,7 @@ export async function consolidateDailyLogEntries(date) {
     filename: `kombinovano_${date}.txt`,
     text: truncateText(combinedText),
     created_at: dayDone[0].created_at,
+    updated_at: new Date().toISOString(),
     duration_seconds: totalDuration,
     status: "done",
     audio_file: null,
@@ -612,11 +677,30 @@ export function importAllData(data) {
   };
 }
 
+// ── iCloud Sync Support ─────────────────────────────────
+
+export async function getRawFolders() {
+  return readJSON(foldersFile)
+}
+
+export async function getRawEntries() {
+  return readJSON(entriesFile)
+}
+
+export function overwriteFolders(folders) {
+  writeJSON(foldersFile, folders)
+}
+
+export function overwriteEntries(entries) {
+  writeJSON(entriesFile, entries)
+}
+
 export async function moveEntryToFolder(entryId, targetFolderId) {
   const entries = await readJSON(entriesFile);
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return null;
   entry.folder_id = targetFolderId;
+  entry.updated_at = new Date().toISOString();
   writeJSON(entriesFile, entries);
   return { ...entry };
 }

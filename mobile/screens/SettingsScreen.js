@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -22,6 +22,10 @@ import * as assemblyAIService from "../services/assemblyAIService";
 import * as backupService from "../services/backupService";
 import { fetchFolders, getFolder } from "../services/journalStorage";
 import { getSettings, updateSettings } from "../services/settingsService";
+import { getUser, signOut } from "../services/authService";
+import { isICloudAvailable, enableSync, disableSync, getSyncStatus } from "../services/icloudSyncService";
+import { isPremium, getOfferings, purchasePackage, restorePurchases, getUsageFromProfile } from "../services/subscriptionService";
+import { getProfile } from "../services/authService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 function formatBytes(bytes) {
@@ -30,7 +34,7 @@ function formatBytes(bytes) {
   return `${mb.toFixed(1)} MB`;
 }
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   // Whisper model
   const [modelStatus, setModelStatus] = useState(whisperService.getModelStatus());
   const [downloading, setDownloading] = useState(false);
@@ -53,6 +57,19 @@ export default function SettingsScreen() {
   // Backup
   const [backupLoading, setBackupLoading] = useState(false);
 
+  // Account
+  const [user, setUser] = useState(null);
+
+  // iCloud sync
+  const [icloudAvailable, setIcloudAvailable] = useState(false);
+  const [icloudSyncOn, setIcloudSyncOn] = useState(false);
+
+  // Subscription
+  const [premium, setPremium] = useState(false);
+  const [usageInfo, setUsageInfo] = useState(null);
+  const [offerings, setOfferings] = useState(null);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+
   const [snackbar, setSnackbar] = useState("");
 
   const loadSettings = useCallback(async () => {
@@ -64,6 +81,7 @@ export default function SettingsScreen() {
     const settings = await getSettings();
     setDefaultEngine(settings.defaultEngine);
     setKeepAudioOnMove(settings.autoMoveKeepAudio);
+    setIcloudSyncOn(settings.icloudSyncEnabled);
 
     if (settings.autoMoveFolderId) {
       const folder = await getFolder(settings.autoMoveFolderId);
@@ -73,6 +91,35 @@ export default function SettingsScreen() {
         await updateSettings({ autoMoveFolderId: null, autoMoveFolderName: null });
       }
     }
+
+    // Load auth state
+    let currentUser = null;
+    try {
+      currentUser = await getUser();
+      setUser(currentUser);
+    } catch { setUser(null); }
+
+    // Check iCloud availability
+    if (Platform.OS === "ios") {
+      const available = await isICloudAvailable();
+      setIcloudAvailable(available);
+    }
+
+    // Check subscription
+    try {
+      const hasPremium = await isPremium();
+      setPremium(hasPremium);
+      if (currentUser) {
+        const profile = await getProfile();
+        setUsageInfo(getUsageFromProfile(profile));
+      }
+    } catch { /* ignore */ }
+
+    // Load offerings
+    try {
+      const off = await getOfferings();
+      setOfferings(off);
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -145,6 +192,80 @@ export default function SettingsScreen() {
     await updateSettings({ autoMoveKeepAudio: value });
   };
 
+  // ── Account handlers ──────────────────────────────────
+
+  const handleSignIn = () => {
+    navigation.navigate("Auth");
+  };
+
+  const handleSignOut = async () => {
+    Alert.alert(
+      "Odjava",
+      "Da li zelis da se odjavis?",
+      [
+        { text: "Otkazi", style: "cancel" },
+        {
+          text: "Odjavi se",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await signOut();
+              setUser(null);
+              setPremium(false);
+              setUsageInfo(null);
+              setSnackbar("Uspesno si se odjavio/la.");
+            } catch (e) {
+              setSnackbar("Odjava nije uspela: " + e.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ── iCloud sync handlers ─────────────────────────────
+
+  const handleToggleICloudSync = async (value) => {
+    setIcloudSyncOn(value);
+    await updateSettings({ icloudSyncEnabled: value });
+    if (value) {
+      await enableSync();
+      setSnackbar("iCloud sinhronizacija ukljucena.");
+    } else {
+      await disableSync();
+      setSnackbar("iCloud sinhronizacija iskljucena.");
+    }
+  };
+
+  // ── Subscription handlers ────────────────────────────
+
+  const handlePurchase = async (pkg) => {
+    setPurchaseLoading(true);
+    try {
+      const result = await purchasePackage(pkg);
+      setPremium(result);
+      if (result) setSnackbar("Premium je aktiviran!");
+    } catch (e) {
+      if (e.userCancelled) return;
+      setSnackbar("Kupovina nije uspela: " + e.message);
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setPurchaseLoading(true);
+    try {
+      const result = await restorePurchases();
+      setPremium(result);
+      setSnackbar(result ? "Premium je obnovljen!" : "Nema prethodnih kupovina.");
+    } catch (e) {
+      setSnackbar("Obnova nije uspela: " + e.message);
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
   const handleCreateBackup = async () => {
     setBackupLoading(true);
     try {
@@ -161,7 +282,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleRestore = async () => {
+  const handleRestoreBackup = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "application/zip",
@@ -441,7 +562,7 @@ export default function SettingsScreen() {
               </Button>
               <Button
                 mode="outlined"
-                onPress={handleRestore}
+                onPress={handleRestoreBackup}
                 disabled={backupLoading}
                 icon="upload"
                 style={styles.btn}
@@ -449,6 +570,158 @@ export default function SettingsScreen() {
                 Oporavi iz backup-a
               </Button>
             </View>
+          </View>
+        </View>
+        {/* Section 6: Nalog (Account) */}
+        <View style={[styles.section, elevation.sm]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-outline" size={20} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Nalog</Text>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.sectionBody}>
+            {user ? (
+              <>
+                <Text style={typography.body}>
+                  Prijavljen kao:{" "}
+                  <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+                    {user.email || "Apple ID"}
+                  </Text>
+                </Text>
+                <View style={styles.btnRow}>
+                  <Button
+                    mode="outlined"
+                    onPress={handleSignOut}
+                    textColor={colors.danger}
+                    style={styles.btn}
+                  >
+                    Odjavi se
+                  </Button>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[typography.body, { color: colors.muted, marginBottom: spacing.md }]}>
+                  Prijavi se za cloud backup, sinhronizaciju i premium funkcije.
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={handleSignIn}
+                  buttonColor={colors.primary}
+                  icon="login"
+                  style={styles.btn}
+                >
+                  Prijavi se
+                </Button>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Section 7: iCloud Sync (iOS only) */}
+        {Platform.OS === "ios" && (
+          <View style={[styles.section, elevation.sm]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="cloud-sync-outline" size={20} color={colors.primary} />
+              <Text style={styles.sectionTitle}>iCloud sinhronizacija</Text>
+            </View>
+            <Divider style={styles.divider} />
+            <View style={styles.sectionBody}>
+              <Text style={[typography.caption, { marginBottom: spacing.md }]}>
+                Automatski sacuvaj i sinhronizuj sve podatke preko iCloud-a. Besplatno.
+              </Text>
+              {!icloudAvailable ? (
+                <Text style={[typography.body, { color: colors.warning }]}>
+                  iCloud nije dostupan. Proveri da li si prijavljen u iCloud podesavanjima.
+                </Text>
+              ) : (
+                <TouchableRipple
+                  onPress={() => handleToggleICloudSync(!icloudSyncOn)}
+                  style={styles.toggleRow}
+                >
+                  <View style={styles.toggleRowInner}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={typography.body}>Sinhronizacija ukljucena</Text>
+                      <Text style={[typography.caption, { marginTop: 2 }]}>
+                        Fascikle, zapisi i transkripti se cuvaju u iCloud-u
+                      </Text>
+                    </View>
+                    <Switch
+                      value={icloudSyncOn}
+                      onValueChange={handleToggleICloudSync}
+                      color={colors.primary}
+                    />
+                  </View>
+                </TouchableRipple>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Section 8: Pretplata (Subscription) */}
+        <View style={[styles.section, elevation.sm]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="star-outline" size={20} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Pretplata</Text>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.sectionBody}>
+            {premium ? (
+              <>
+                <View style={styles.premiumBadge}>
+                  <MaterialCommunityIcons name="check-decagram" size={20} color={colors.success} />
+                  <Text style={[typography.body, { marginLeft: spacing.sm, fontFamily: "Inter_600SemiBold" }]}>
+                    Diktafon Premium
+                  </Text>
+                </View>
+                {usageInfo && (
+                  <View style={{ marginTop: spacing.md }}>
+                    <Text style={typography.body}>
+                      AssemblyAI transkripcija: {usageInfo.used} / {usageInfo.limit} min ovog meseca
+                    </Text>
+                    <ProgressBar
+                      progress={usageInfo.used / usageInfo.limit}
+                      color={usageInfo.remaining > 20 ? colors.primary : colors.warning}
+                      style={[styles.progressBar, { marginTop: spacing.sm }]}
+                    />
+                    <Text style={[typography.caption, { marginTop: spacing.xs }]}>
+                      Preostalo: {usageInfo.remaining} min
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={[typography.body, { marginBottom: spacing.md }]}>
+                  Otključaj AssemblyAI cloud transkripciju sa prepoznavanjem govornika.
+                </Text>
+                <Text style={[typography.caption, { marginBottom: spacing.lg }]}>
+                  120 min/mesec cloud transkripcije · Visa tacnost · Prepoznavanje govornika
+                </Text>
+                {offerings?.availablePackages?.map((pkg) => (
+                  <Button
+                    key={pkg.identifier}
+                    mode="contained"
+                    onPress={() => handlePurchase(pkg)}
+                    loading={purchaseLoading}
+                    disabled={purchaseLoading}
+                    buttonColor={colors.primary}
+                    style={[styles.btn, { marginBottom: spacing.sm }]}
+                  >
+                    {pkg.product.title} — {pkg.product.priceString}
+                  </Button>
+                ))}
+                <Button
+                  mode="text"
+                  onPress={handleRestore}
+                  disabled={purchaseLoading}
+                  textColor={colors.muted}
+                  style={styles.btn}
+                >
+                  Obnovi kupovinu
+                </Button>
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -562,6 +835,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+
+  premiumBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.successLight,
+    padding: spacing.md,
+    borderRadius: radii.sm,
   },
 
   dialog: {

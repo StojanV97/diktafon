@@ -50,6 +50,8 @@ module.exports = {
       // expo-dev-client only in dev builds — excluded from production
       ...(IS_DEV ? ["expo-dev-client"] : []),
       "expo-secure-store",
+      "expo-apple-authentication",
+      "./plugins/withICloud",
       [
         "react-native-widget-extension",
         {
