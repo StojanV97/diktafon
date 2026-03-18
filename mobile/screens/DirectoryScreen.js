@@ -434,7 +434,7 @@ export default function DirectoryScreen({ route, navigation }) {
       {!isActiveSession && (
         <BottomActionBar
           leftIcon="home-outline"
-          leftLabel="Home"
+          leftLabel="Pocetna"
           onLeftPress={() => navigation.navigate("Home")}
           centerIcon="file-upload-outline"
           centerLabel="Uvezi"

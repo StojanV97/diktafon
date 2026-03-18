@@ -6,6 +6,9 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing } from "../theme";
 
 function BottomActionBar({
+  extraLeftIcon,
+  extraLeftLabel,
+  onExtraLeftPress,
   leftIcon,
   leftLabel,
   onLeftPress,
@@ -20,6 +23,13 @@ function BottomActionBar({
 
   return (
     <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]}>
+      {extraLeftIcon && (
+        <TouchableOpacity onPress={onExtraLeftPress} style={styles.bottomBtn}>
+          <MaterialCommunityIcons name={extraLeftIcon} size={24} color={colors.primary} />
+          <Text style={styles.bottomBtnText}>{extraLeftLabel}</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity onPress={onLeftPress} style={styles.bottomBtn}>
         <MaterialCommunityIcons name={leftIcon} size={24} color={colors.primary} />
         <Text style={styles.bottomBtnText}>{leftLabel}</Text>

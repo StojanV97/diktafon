@@ -599,6 +599,9 @@ export default function DailyLogScreen({ navigation, route }) {
 
       {!isActiveSession && (
         <BottomActionBar
+          extraLeftIcon="home-outline"
+          extraLeftLabel="Pocetna"
+          onExtraLeftPress={() => navigation.navigate("Home")}
           leftIcon="delete-sweep-outline"
           leftLabel="Obriši sve"
           onLeftPress={() => entries.length > 0 ? setDeleteAllDialogVisible(true) : undefined}
