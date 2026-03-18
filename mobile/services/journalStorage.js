@@ -30,6 +30,15 @@ let _corruptionDetected = null;
 // Last write error — for surfacing disk-full / permission errors to the UI
 let _lastWriteError = null;
 
+// Serialized write queue — prevents concurrent read-modify-write races
+let _writeQueue = Promise.resolve()
+
+function withWriteLock(fn) {
+  const result = _writeQueue.then(fn)
+  _writeQueue = result.then(() => {}, () => {})
+  return result
+}
+
 function ensureDirs() {
   journalDir.create({ idempotent: true });
   audioDir.create({ idempotent: true });
@@ -195,24 +204,57 @@ export async function migrateData() {
     }
     if (entriesChanged) writeJSON(entriesFile, dailyEntries);
   }
+
+  await cleanOrphanedFiles();
+}
+
+async function cleanOrphanedFiles() {
+  try {
+    const entries = await readJSON(entriesFile)
+    const entryIds = new Set(entries.map((e) => e.id))
+
+    // Clean orphaned audio files
+    const audioItems = audioDir.list()
+    for (const item of audioItems) {
+      if (!item.name.endsWith(".wav")) continue
+      const id = item.name.replace(".wav", "")
+      if (!entryIds.has(id)) {
+        try { item.delete() } catch {}
+      }
+    }
+
+    // Clean orphaned text files
+    const textItems = textsDir.list()
+    for (const item of textItems) {
+      if (!item.name.endsWith(".txt")) continue
+      const id = item.name.replace("journal_", "").replace(".txt", "")
+      if (!entryIds.has(id)) {
+        try { item.delete() } catch {}
+      }
+    }
+  } catch {
+    // Non-critical — skip if listing fails
+  }
 }
 
 // ── Folders ─────────────────────────────────────────────
 
-export async function createFolder(name, color = "#4A9EFF", tags = []) {
-  const folders = await readJSON(foldersFile);
-  const now = new Date().toISOString()
-  const folder = {
-    id: generateUUID(),
-    name,
-    color,
-    tags,
-    created_at: now,
-    updated_at: now,
-  };
-  folders.unshift(folder);
-  writeJSON(foldersFile, folders);
-  return folder;
+export function createFolder(name, color = "#4A9EFF", tags = []) {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile);
+    const now = new Date().toISOString()
+    const folder = {
+      id: generateUUID(),
+      name,
+      color,
+      tags,
+      created_at: now,
+      updated_at: now,
+    };
+    folders.unshift(folder);
+    writeJSON(foldersFile, folders);
+    return folder;
+  })
 }
 
 export async function fetchFolders() {
@@ -224,16 +266,18 @@ export async function getFolder(id) {
   return folders.find((f) => f.id === id) || null;
 }
 
-export async function updateFolder(id, updates) {
-  const folders = await readJSON(foldersFile);
-  const folder = folders.find((f) => f.id === id);
-  if (!folder) return null;
-  if (updates.name !== undefined) folder.name = updates.name;
-  if (updates.color !== undefined) folder.color = updates.color;
-  if (updates.tags !== undefined) folder.tags = updates.tags;
-  folder.updated_at = new Date().toISOString();
-  writeJSON(foldersFile, folders);
-  return folder;
+export function updateFolder(id, updates) {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile);
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return null;
+    if (updates.name !== undefined) folder.name = updates.name;
+    if (updates.color !== undefined) folder.color = updates.color;
+    if (updates.tags !== undefined) folder.tags = updates.tags;
+    folder.updated_at = new Date().toISOString();
+    writeJSON(foldersFile, folders);
+    return folder;
+  })
 }
 
 export async function getAllTags() {
@@ -245,59 +289,69 @@ export async function getAllTags() {
   return [...tagSet].sort();
 }
 
-export async function deleteFolder(id) {
-  const folders = await readJSON(foldersFile);
-  const idx = folders.findIndex((f) => f.id === id);
-  if (idx === -1) return false;
-  folders.splice(idx, 1);
-  writeJSON(foldersFile, folders);
+export function deleteFolder(id) {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile)
+    const idx = folders.findIndex((f) => f.id === id)
+    if (idx === -1) return false
 
-  // Cascade: delete all entries in this folder
-  const entries = await readJSON(entriesFile);
-  const toDelete = entries.filter((e) => e.folder_id === id);
-  toDelete.forEach((e) => {
-    const audioFile = new File(audioDir, `${e.id}.wav`);
-    if (audioFile.exists) audioFile.delete();
-    const textFile = new File(textsDir, `journal_${e.id}.txt`);
-    if (textFile.exists) textFile.delete();
-  });
-  writeJSON(entriesFile, entries.filter((e) => e.folder_id !== id));
-  return true;
+    // Step 1: Remove entries first (safest — folder still visible if crash)
+    const entries = await readJSON(entriesFile)
+    const toDelete = entries.filter((e) => e.folder_id === id)
+    writeJSON(entriesFile, entries.filter((e) => e.folder_id !== id))
+
+    // Step 2: Clean up files (best-effort)
+    for (const e of toDelete) {
+      try {
+        const audioFile = new File(audioDir, `${e.id}.wav`)
+        if (audioFile.exists) audioFile.delete()
+        const textFile = new File(textsDir, `journal_${e.id}.txt`)
+        if (textFile.exists) textFile.delete()
+      } catch {}
+    }
+
+    // Step 3: Remove folder last
+    folders.splice(idx, 1)
+    writeJSON(foldersFile, folders)
+    return true
+  })
 }
 
 // ── Entries ─────────────────────────────────────────────
 
-export async function createEntry(folderId, filename, audioSourceUri, durationSeconds = 0, recordingType = "beleshka") {
-  ensureDirs();
-  const id = generateUUID();
+export function createEntry(folderId, filename, audioSourceUri, durationSeconds = 0, recordingType = "beleshka") {
+  return withWriteLock(async () => {
+    ensureDirs();
+    const id = generateUUID();
 
-  // Copy audio from recorder temp path to journal/audio/{id}.wav
-  const source = new File(audioSourceUri);
-  const dest = new File(audioDir, `${id}.wav`);
-  source.copy(dest);
+    // Copy audio from recorder temp path to journal/audio/{id}.wav
+    const source = new File(audioSourceUri);
+    const dest = new File(audioDir, `${id}.wav`);
+    source.copy(dest);
 
-  const now = new Date().toISOString()
-  const entry = {
-    id,
-    folder_id: folderId,
-    filename,
-    text: "",
-    created_at: now,
-    updated_at: now,
-    duration_seconds: durationSeconds,
-    status: "recorded",
-    audio_file: `${id}.wav`,
-    recording_type: recordingType,
-  };
+    const now = new Date().toISOString()
+    const entry = {
+      id,
+      folder_id: folderId,
+      filename,
+      text: "",
+      created_at: now,
+      updated_at: now,
+      duration_seconds: durationSeconds,
+      status: "recorded",
+      audio_file: `${id}.wav`,
+      recording_type: recordingType,
+    };
 
-  const entries = await readJSON(entriesFile);
-  entries.unshift(entry);
-  writeJSON(entriesFile, entries);
+    const entries = await readJSON(entriesFile);
+    entries.unshift(entry);
+    writeJSON(entriesFile, entries);
 
-  // Sync audio to iCloud (fire-and-forget)
-  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    // Sync audio to iCloud (fire-and-forget)
+    uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
-  return entry;
+    return entry;
+  })
 }
 
 export async function fetchEntries(folderId) {
@@ -322,83 +376,93 @@ export async function fetchEntry(entryId) {
   return entry;
 }
 
-export async function deleteEntry(entryId) {
-  const entries = await readJSON(entriesFile);
-  const idx = entries.findIndex((e) => e.id === entryId);
-  if (idx === -1) return false;
-  entries.splice(idx, 1);
-  writeJSON(entriesFile, entries);
+export function deleteEntry(entryId) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile);
+    const idx = entries.findIndex((e) => e.id === entryId);
+    if (idx === -1) return false;
+    entries.splice(idx, 1);
+    writeJSON(entriesFile, entries);
 
-  const audioFile = new File(audioDir, `${entryId}.wav`);
-  if (audioFile.exists) audioFile.delete();
-  const textFile = new File(textsDir, `journal_${entryId}.txt`);
-  if (textFile.exists) textFile.delete();
-  return true;
+    const audioFile = new File(audioDir, `${entryId}.wav`);
+    if (audioFile.exists) audioFile.delete();
+    const textFile = new File(textsDir, `journal_${entryId}.txt`);
+    if (textFile.exists) textFile.delete();
+    return true;
+  })
 }
 
 // ── Transcription state ────────────────────────────────
 
-export async function updateEntryToProcessing(entryId, assemblyaiId) {
-  const entries = await readJSON(entriesFile);
-  const entry = entries.find((e) => e.id === entryId);
-  if (!entry) return null;
-  entry.status = "processing";
-  entry.assemblyai_id = assemblyaiId;
-  entry.updated_at = new Date().toISOString();
-  writeJSON(entriesFile, entries);
-  return { ...entry };
+export function updateEntryToProcessing(entryId, assemblyaiId) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    entry.status = "processing";
+    entry.assemblyai_id = assemblyaiId;
+    entry.updated_at = new Date().toISOString();
+    writeJSON(entriesFile, entries);
+    return { ...entry };
+  })
 }
 
-export async function completeEntry(entryId, text, durationSeconds) {
-  ensureDirs();
+export function completeEntry(entryId, text, durationSeconds) {
+  return withWriteLock(async () => {
+    ensureDirs();
 
-  // Write full text to file
-  const textFile = new File(textsDir, `journal_${entryId}.txt`);
-  textFile.write(text);
+    // Write full text to file
+    const textFile = new File(textsDir, `journal_${entryId}.txt`);
+    textFile.write(text);
 
-  const entries = await readJSON(entriesFile);
-  const entry = entries.find((e) => e.id === entryId);
-  if (!entry) return null;
-  entry.status = "done";
-  entry.text = truncateText(text);
-  entry.duration_seconds = durationSeconds;
-  entry.updated_at = new Date().toISOString();
-  delete entry.assemblyai_id;
-  writeJSON(entriesFile, entries);
+    const entries = await readJSON(entriesFile);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    entry.status = "done";
+    entry.text = truncateText(text);
+    entry.duration_seconds = durationSeconds;
+    entry.updated_at = new Date().toISOString();
+    delete entry.assemblyai_id;
+    writeJSON(entriesFile, entries);
 
-  // Sync transcript to iCloud
-  writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    // Sync transcript to iCloud
+    writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
-  return { ...entry, text };
+    return { ...entry, text };
+  })
 }
 
-export async function updateEntryText(entryId, newText) {
-  ensureDirs()
-  const textFile = new File(textsDir, `journal_${entryId}.txt`)
-  textFile.write(newText)
-  const entries = await readJSON(entriesFile)
-  const entry = entries.find((e) => e.id === entryId)
-  if (!entry) return null
-  entry.text = truncateText(newText)
-  entry.updated_at = new Date().toISOString()
-  writeJSON(entriesFile, entries)
+export function updateEntryText(entryId, newText) {
+  return withWriteLock(async () => {
+    ensureDirs()
+    const textFile = new File(textsDir, `journal_${entryId}.txt`)
+    textFile.write(newText)
+    const entries = await readJSON(entriesFile)
+    const entry = entries.find((e) => e.id === entryId)
+    if (!entry) return null
+    entry.text = truncateText(newText)
+    entry.updated_at = new Date().toISOString()
+    writeJSON(entriesFile, entries)
 
-  // Sync transcript to iCloud
-  writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    // Sync transcript to iCloud
+    writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
-  return { ...entry, text: newText }
+    return { ...entry, text: newText }
+  })
 }
 
-export async function failEntry(entryId, error) {
-  const entries = await readJSON(entriesFile);
-  const entry = entries.find((e) => e.id === entryId);
-  if (!entry) return null;
-  entry.status = "error";
-  entry.text = error;
-  entry.updated_at = new Date().toISOString();
-  delete entry.assemblyai_id;
-  writeJSON(entriesFile, entries);
-  return { ...entry };
+export function failEntry(entryId, error) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    entry.status = "error";
+    entry.text = error;
+    entry.updated_at = new Date().toISOString();
+    delete entry.assemblyai_id;
+    writeJSON(entriesFile, entries);
+    return { ...entry };
+  })
 }
 
 // ── Audio ───────────────────────────────────────────────
@@ -415,7 +479,9 @@ export function deleteEntryAudio(entryId) {
 
 // ── Daily Log ───────────────────────────────────────────
 
-export async function getOrCreateDailyLogFolder() {
+// Internal version (no lock) — used by createDailyLogEntry / consolidateDailyLogEntries
+// which already hold the write lock
+async function _getOrCreateDailyLogFolder() {
   const folders = await readJSON(foldersFile);
   let folder = folders.find((f) => f.is_daily_log === true);
   if (!folder) {
@@ -435,41 +501,47 @@ export async function getOrCreateDailyLogFolder() {
   return folder;
 }
 
-export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
-  const folder = await getOrCreateDailyLogFolder();
-  ensureDirs();
-  const id = generateUUID();
+export function getOrCreateDailyLogFolder() {
+  return withWriteLock(() => _getOrCreateDailyLogFolder())
+}
 
-  const source = new File(audioSourceUri);
-  const dest = new File(audioDir, `${id}.wav`);
-  source.copy(dest);
+export function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
+  return withWriteLock(async () => {
+    const folder = await _getOrCreateDailyLogFolder();
+    ensureDirs();
+    const id = generateUUID();
 
-  const now = new Date();
-  const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
+    const source = new File(audioSourceUri);
+    const dest = new File(audioDir, `${id}.wav`);
+    source.copy(dest);
 
-  const nowISO = now.toISOString()
-  const entry = {
-    id,
-    folder_id: folder.id,
-    filename,
-    text: "",
-    created_at: nowISO,
-    updated_at: nowISO,
-    duration_seconds: durationSeconds,
-    status: "recorded",
-    audio_file: `${id}.wav`,
-    recorded_date: nowISO.slice(0, 10),
-    recording_type: "beleshka",
-  };
+    const now = new Date();
+    const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
 
-  const entries = await readJSON(entriesFile);
-  entries.unshift(entry);
-  writeJSON(entriesFile, entries);
+    const nowISO = now.toISOString()
+    const entry = {
+      id,
+      folder_id: folder.id,
+      filename,
+      text: "",
+      created_at: nowISO,
+      updated_at: nowISO,
+      duration_seconds: durationSeconds,
+      status: "recorded",
+      audio_file: `${id}.wav`,
+      recorded_date: nowISO.slice(0, 10),
+      recording_type: "beleshka",
+    };
 
-  // Sync audio to iCloud
-  uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    const entries = await readJSON(entriesFile);
+    entries.unshift(entry);
+    writeJSON(entriesFile, entries);
 
-  return entry;
+    // Sync audio to iCloud
+    uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+
+    return entry;
+  })
 }
 
 export async function fetchDailyLogEntries() {
@@ -554,76 +626,78 @@ export async function getDailyCombinedTranscripts(dates) {
 
 // ── Consolidation ───────────────────────────────────────
 
-export async function consolidateDailyLogEntries(date) {
-  const folder = await getOrCreateDailyLogFolder();
-  const allEntries = await readJSON(entriesFile);
+export function consolidateDailyLogEntries(date) {
+  return withWriteLock(async () => {
+    const folder = await _getOrCreateDailyLogFolder();
+    const allEntries = await readJSON(entriesFile);
 
-  const dayDone = allEntries
-    .filter(
-      (e) =>
-        e.folder_id === folder.id &&
-        (e.recorded_date || e.created_at.slice(0, 10)) === date &&
-        e.status === "done"
-    )
-    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const dayDone = allEntries
+      .filter(
+        (e) =>
+          e.folder_id === folder.id &&
+          (e.recorded_date || e.created_at.slice(0, 10)) === date &&
+          e.status === "done"
+      )
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-  if (dayDone.length === 0) return null;
+    if (dayDone.length === 0) return null;
 
-  // Build combined text with timestamps
-  const parts = [];
-  let totalDuration = 0;
-  for (const entry of dayDone) {
-    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
-    let fullText = entry.text || "";
-    if (textFile.exists) {
-      try {
-        fullText = await textFile.text();
-      } catch {
-        // fall back to truncated text from JSON
+    // Build combined text with timestamps
+    const parts = [];
+    let totalDuration = 0;
+    for (const entry of dayDone) {
+      const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+      let fullText = entry.text || "";
+      if (textFile.exists) {
+        try {
+          fullText = await textFile.text();
+        } catch {
+          // fall back to truncated text from JSON
+        }
       }
+      const time = new Date(entry.created_at);
+      const h = time.getHours().toString().padStart(2, "0");
+      const m = time.getMinutes().toString().padStart(2, "0");
+      parts.push(`[${h}:${m}]\n${fullText}`);
+      totalDuration += entry.duration_seconds || 0;
     }
-    const time = new Date(entry.created_at);
-    const h = time.getHours().toString().padStart(2, "0");
-    const m = time.getMinutes().toString().padStart(2, "0");
-    parts.push(`[${h}:${m}]\n${fullText}`);
-    totalDuration += entry.duration_seconds || 0;
-  }
-  const combinedText = parts.join("\n\n");
+    const combinedText = parts.join("\n\n");
 
-  // Create new combined entry
-  ensureDirs();
-  const id = generateUUID();
-  const combinedTextFile = new File(textsDir, `journal_${id}.txt`);
-  combinedTextFile.write(combinedText);
+    // Create new combined entry
+    ensureDirs();
+    const id = generateUUID();
+    const combinedTextFile = new File(textsDir, `journal_${id}.txt`);
+    combinedTextFile.write(combinedText);
 
-  const combinedEntry = {
-    id,
-    folder_id: folder.id,
-    filename: `kombinovano_${date}.txt`,
-    text: truncateText(combinedText),
-    created_at: dayDone[0].created_at,
-    updated_at: new Date().toISOString(),
-    duration_seconds: totalDuration,
-    status: "done",
-    audio_file: null,
-    recorded_date: date,
-  };
+    const combinedEntry = {
+      id,
+      folder_id: folder.id,
+      filename: `kombinovano_${date}.txt`,
+      text: truncateText(combinedText),
+      created_at: dayDone[0].created_at,
+      updated_at: new Date().toISOString(),
+      duration_seconds: totalDuration,
+      status: "done",
+      audio_file: null,
+      recorded_date: date,
+    };
 
-  // Delete originals (audio + text files)
-  const doneIds = new Set(dayDone.map((e) => e.id));
-  for (const entry of dayDone) {
-    const audioFile = new File(audioDir, `${entry.id}.wav`);
-    if (audioFile.exists) audioFile.delete();
-    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
-    if (textFile.exists) textFile.delete();
-  }
+    // Delete originals (audio + text files)
+    const doneIds = new Set(dayDone.map((e) => e.id));
+    for (const entry of dayDone) {
+      const audioFile = new File(audioDir, `${entry.id}.wav`);
+      if (audioFile.exists) audioFile.delete();
+      const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+      if (textFile.exists) textFile.delete();
+    }
 
-  // Update entries.json: remove originals, add combined
-  const remaining = allEntries.filter((e) => !doneIds.has(e.id));
-  remaining.unshift(combinedEntry);
-  writeJSON(entriesFile, remaining);
+    // Update entries.json: remove originals, add combined
+    const remaining = allEntries.filter((e) => !doneIds.has(e.id));
+    remaining.unshift(combinedEntry);
+    writeJSON(entriesFile, remaining);
 
-  return { ...combinedEntry, text: combinedText };
+    return { ...combinedEntry, text: combinedText };
+  })
 }
 
 // ── Bulk Import/Export ──────────────────────────────────
@@ -695,12 +769,14 @@ export function overwriteEntries(entries) {
   writeJSON(entriesFile, entries)
 }
 
-export async function moveEntryToFolder(entryId, targetFolderId) {
-  const entries = await readJSON(entriesFile);
-  const entry = entries.find((e) => e.id === entryId);
-  if (!entry) return null;
-  entry.folder_id = targetFolderId;
-  entry.updated_at = new Date().toISOString();
-  writeJSON(entriesFile, entries);
-  return { ...entry };
+export function moveEntryToFolder(entryId, targetFolderId) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    entry.folder_id = targetFolderId;
+    entry.updated_at = new Date().toISOString();
+    writeJSON(entriesFile, entries);
+    return { ...entry };
+  })
 }

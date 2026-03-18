@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AppState,
@@ -182,11 +182,15 @@ export default function DailyLogScreen({ navigation, route }) {
   }, [navigation, headerLeft, headerRight]);
 
   // Auto-start recording when opened via widget deep link
+  const autoRecordTimerRef = useRef(null);
   useEffect(() => {
     if (route.params?.action === "record") {
       navigation.setParams({ action: undefined });
-      setTimeout(() => handleStartRecording(), 500);
+      autoRecordTimerRef.current = setTimeout(() => handleStartRecording(), 500);
     }
+    return () => {
+      if (autoRecordTimerRef.current) clearTimeout(autoRecordTimerRef.current);
+    };
   }, [route.params?.action]);
 
   // After AssemblyAI polling resolves all batch entries, consolidate
@@ -220,9 +224,9 @@ export default function DailyLogScreen({ navigation, route }) {
       return;
     }
 
-    getDailyCombinedTranscripts(datesWithDone).then((results) => {
-      setCombinedTexts(results);
-    });
+    getDailyCombinedTranscripts(datesWithDone)
+      .then((results) => setCombinedTexts(results))
+      .catch(() => {});
   }, [grouped]);
 
   const toggleSection = (date) => {
