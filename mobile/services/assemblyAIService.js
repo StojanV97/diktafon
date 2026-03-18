@@ -5,6 +5,31 @@ const DEV_API_KEY = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY
 
 const AAI_BASE = "https://api.assemblyai.com/v2"
 
+const UPLOAD_TIMEOUT_MS = 60000
+const SUBMIT_TIMEOUT_MS = 30000
+const CHECK_TIMEOUT_MS = 15000
+
+function withTimeout(promise, ms) {
+  let timer
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Prekoraceno vreme. Proverite internet vezu.")), ms)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch((e) => {
+      if (e.name === "AbortError") throw new Error("Prekoraceno vreme. Proverite internet vezu.")
+      throw new Error("Greska u mrezi. Proverite internet vezu.")
+    })
+    .finally(() => clearTimeout(timer))
+}
+
 // ── Dev key check ──────────────────────────────────────
 
 export function hasDevKey() {
@@ -14,12 +39,15 @@ export function hasDevKey() {
 // ── Direct AssemblyAI API (dev mode) ───────────────────
 
 async function submitDirect(fileUri, options = {}) {
-  // 1. Upload audio file
-  const uploadRes = await FileSystem.uploadAsync(`${AAI_BASE}/upload`, fileUri, {
-    httpMethod: "POST",
-    headers: { authorization: DEV_API_KEY },
-    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-  })
+  // 1. Upload audio file (with timeout)
+  const uploadRes = await withTimeout(
+    FileSystem.uploadAsync(`${AAI_BASE}/upload`, fileUri, {
+      httpMethod: "POST",
+      headers: { authorization: DEV_API_KEY },
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    }),
+    UPLOAD_TIMEOUT_MS
+  )
   const { upload_url } = JSON.parse(uploadRes.body)
 
   // 2. Create transcript job
@@ -29,23 +57,23 @@ async function submitDirect(fileUri, options = {}) {
     speech_models: ["universal-3-pro", "universal-2"],
     speaker_labels: options.speakerLabels ?? true,
   }
-  const res = await fetch(`${AAI_BASE}/transcript`, {
+  const res = await fetchWithTimeout(`${AAI_BASE}/transcript`, {
     method: "POST",
     headers: {
       authorization: DEV_API_KEY,
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
-  })
+  }, SUBMIT_TIMEOUT_MS)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "AssemblyAI submit failed")
+  if (!res.ok) throw new Error(data.error || "Greska pri slanju na AssemblyAI")
   return { assemblyai_id: data.id }
 }
 
 async function checkDirect(transcriptId) {
-  const res = await fetch(`${AAI_BASE}/transcript/${transcriptId}`, {
+  const res = await fetchWithTimeout(`${AAI_BASE}/transcript/${transcriptId}`, {
     headers: { authorization: DEV_API_KEY },
-  })
+  }, CHECK_TIMEOUT_MS)
   const data = await res.json()
 
   if (data.status === "completed") {

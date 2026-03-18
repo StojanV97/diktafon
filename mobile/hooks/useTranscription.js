@@ -83,12 +83,13 @@ export function useTranscription({ entries, setEntries, onComplete }) {
     const preflightResult = await handlePreflight(engine)
     if (!preflightResult.ready) return { started: false, message: preflightResult.message }
 
+    const errors = []
     await transcribeBatch(entryIds, engine, {
       onStatusChange: updateEntry,
-      onError: () => {},
+      onError: (id, e) => { errors.push({ id, message: e.message }) },
     })
     onComplete?.()
-    return { started: true }
+    return { started: true, errors }
   }
 
   return {

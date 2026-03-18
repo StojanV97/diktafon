@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native"
 import * as whisperService from "./whisperService"
 import * as assemblyAIService from "./assemblyAIService"
 import { isPremium } from "./subscriptionService"
@@ -39,6 +40,7 @@ export async function transcribeSingle(entryId, engine, { onStatusChange, onErro
       onStatusChange?.(entryId, updated)
     }
   } catch (e) {
+    Sentry.captureException(e, { extra: { entryId, engine } })
     const updated = await failEntry(entryId, e.message)
     if (updated) onStatusChange?.(entryId, updated)
     onError?.(entryId, e)
@@ -59,26 +61,46 @@ export async function transcribeBatch(entryIds, engine, callbacks) {
   }
 }
 
+const MAX_POLL_FAILURES = 36 // 36 × 5s = 3 minutes
+const _pollFailureCounts = {}
+
 export async function pollProcessingEntries(entries) {
   const processing = entries.filter(
     (e) => e.status === "processing" && e.assemblyai_id
   )
   if (processing.length === 0) return []
 
+  const processingIds = new Set(processing.map((e) => e.id))
+  // Clean up stale keys for entries no longer processing
+  for (const key of Object.keys(_pollFailureCounts)) {
+    if (!processingIds.has(key)) delete _pollFailureCounts[key]
+  }
+
   const changed = []
   await Promise.all(
     processing.map(async (e) => {
       try {
         const result = await assemblyAIService.check(e.assemblyai_id)
+        // Reset failure count on successful poll
+        delete _pollFailureCounts[e.id]
         if (result.status === "done") {
           const updated = await completeEntry(e.id, result.text, result.duration_seconds)
           if (updated) changed.push({ entryId: e.id, entry: updated })
         } else if (result.status === "error") {
           const updated = await failEntry(e.id, result.error)
           if (updated) changed.push({ entryId: e.id, entry: updated })
+          delete _pollFailureCounts[e.id]
         }
-      } catch {
-        // Retry next interval
+      } catch (err) {
+        _pollFailureCounts[e.id] = (_pollFailureCounts[e.id] || 0) + 1
+        if (_pollFailureCounts[e.id] >= MAX_POLL_FAILURES) {
+          Sentry.captureException(err, {
+            extra: { entryId: e.id, assemblyaiId: e.assemblyai_id, pollFailures: MAX_POLL_FAILURES },
+          })
+          const updated = await failEntry(e.id, "Transkripcija nije uspela. Pokusajte ponovo.")
+          if (updated) changed.push({ entryId: e.id, entry: updated })
+          delete _pollFailureCounts[e.id]
+        }
       }
     })
   )

@@ -238,6 +238,7 @@ export default function DailyLogScreen({ navigation, route }) {
   const onTranscribeConfirm = async () => {
     setEngineDialogVisible(false);
     let result;
+    let batchTotal = 0;
     if (!engineTargetId) {
       const toTranscribe = batchDate
         ? entries.filter(
@@ -245,6 +246,7 @@ export default function DailyLogScreen({ navigation, route }) {
           )
         : entries.filter((e) => e.status === "recorded" || e.status === "error");
       const ids = toTranscribe.map((e) => e.id);
+      batchTotal = ids.length;
       const dates = [...new Set(toTranscribe.map((e) => e.recorded_date || e.created_at.slice(0, 10)))];
 
       if (engineChoice === "assemblyai") {
@@ -262,6 +264,7 @@ export default function DailyLogScreen({ navigation, route }) {
       result = await startTranscription(engineTargetId, engineChoice);
     }
     if (!result.started) setSnackbar(result.message);
+    else if (result.errors?.length > 0) setSnackbar(`${result.errors.length} od ${batchTotal} snimaka nisu transkribovana`);
     else if (result.error) setSnackbar(result.error);
   };
 

@@ -40,6 +40,19 @@ export function useRecorder({ onRecordingComplete }) {
   const meteringBuffer = useRef([]);
   const [meteringHistory, setMeteringHistory] = useState([]);
 
+  const isRecordingRef = useRef(false);
+  isRecordingRef.current = recorderState.isRecording;
+
+  // Cleanup on unmount: stop recording + release audio mode
+  useEffect(() => {
+    return () => {
+      if (isRecordingRef.current) {
+        audioRecorder.stop().catch(() => {});
+        setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (recorderState.isRecording) {
       const buf = meteringBuffer.current;
