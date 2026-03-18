@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   AppState,
   SectionList,
   RefreshControl,
@@ -143,6 +144,30 @@ export default function DailyLogScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation, load]);
 
+  // Prevent back navigation during active recording
+  useEffect(() => {
+    if (!isRecording && !isPaused) return;
+    const unsub = navigation.addListener("beforeRemove", (e) => {
+      e.preventDefault();
+      Alert.alert(
+        "Snimanje u toku",
+        "Snimanje je aktivno. Zelite li da otkazete snimanje i napustite ekran?",
+        [
+          { text: "Nastavi snimanje", style: "cancel" },
+          {
+            text: "Otkazi i napusti",
+            style: "destructive",
+            onPress: () => {
+              cancelRecording().catch(() => {});
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ]
+      );
+    });
+    return unsub;
+  }, [navigation, isRecording, isPaused, cancelRecording]);
+
   const headerLeft = useCallback(
     () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
     [navigation]
@@ -276,22 +301,35 @@ export default function DailyLogScreen({ navigation, route }) {
 
   const onDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    await deleteEntry(deleteTarget.id);
-    setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+    try {
+      await deleteEntry(deleteTarget.id);
+      setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+      syncWidgetData();
+    } catch (e) {
+      setSnackbar("Brisanje nije uspelo: " + e.message);
+    }
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
-    syncWidgetData();
   };
 
   const onDeleteAllConfirm = async () => {
     setDeleteAllDialogVisible(false);
-    const count = entries.length;
+    const total = entries.length;
+    let failures = 0;
     for (const entry of entries) {
-      await deleteEntry(entry.id);
+      try {
+        await deleteEntry(entry.id);
+      } catch {
+        failures++;
+      }
     }
-    setEntries([]);
+    await load();
     syncWidgetData();
-    setSnackbar(`Obrisano ${count} zapisa.`);
+    if (failures > 0) {
+      setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+    } else {
+      setSnackbar(`Obrisano ${total} zapisa.`);
+    }
   };
 
   const onMovePress = async (entryId) => {

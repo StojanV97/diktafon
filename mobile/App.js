@@ -118,7 +118,7 @@ function App() {
       try {
         await initPurchases("ios");
       } catch (e) {
-        console.warn("RevenueCat init failed:", e.message);
+        if (__DEV__) console.warn("RevenueCat init failed:", e.message);
       }
 
       setReady(true);
@@ -147,7 +147,7 @@ function App() {
           }
         }
       } catch (e) {
-        console.warn("iCloud sync on launch failed:", e.message);
+        if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
       }
     }
     init();

@@ -30,7 +30,7 @@ export async function runAutoMove() {
     syncWidgetData();
     return { moved: toMove.length, folderName: folder.name };
   } catch (e) {
-    console.warn("Auto-move failed:", e.message);
+    if (__DEV__) console.warn("Auto-move failed:", e.message);
     return null;
   }
 }

@@ -55,16 +55,16 @@ async function readJSON(file) {
       try {
         const bakRaw = await bakFile.text();
         result = JSON.parse(bakRaw);
-        console.warn(`readJSON: ${file.name} corrupted, recovered from .bak`);
+        if (__DEV__) console.warn(`readJSON: ${file.name} corrupted, recovered from .bak`);
         file.write(bakRaw);
       } catch {
-        console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
+        if (__DEV__) console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
         _corruptionDetected = file.name;
         Sentry.captureMessage(`Data corruption: ${file.name} and .bak both unreadable`, "error");
         result = [];
       }
     } else {
-      console.warn(`readJSON: ${file.name} corrupted, no .bak available`);
+      if (__DEV__) console.warn(`readJSON: ${file.name} corrupted, no .bak available`);
       _corruptionDetected = file.name;
       Sentry.captureMessage(`Data corruption: ${file.name} corrupted, no .bak`, "error");
       result = [];
@@ -104,7 +104,7 @@ function writeJSON(file, data) {
       syncJSONToICloud("entries.json", data).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
     }
   } catch (e) {
-    console.warn(`writeJSON: failed to write ${file.name}:`, e);
+    if (__DEV__) console.warn(`writeJSON: failed to write ${file.name}:`, e);
     Sentry.captureException(e);
     _lastWriteError = e;
     throw e;

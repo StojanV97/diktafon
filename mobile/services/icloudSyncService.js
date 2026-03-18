@@ -12,7 +12,7 @@ function getCloudStore() {
     CloudStore = require("react-native-cloud-store")
     return CloudStore
   } catch {
-    console.warn("icloudSyncService: react-native-cloud-store not available")
+    if (__DEV__) console.warn("icloudSyncService: react-native-cloud-store not available")
     return null
   }
 }
@@ -63,7 +63,7 @@ export async function writeFileToICloud(relativePath, content) {
   try {
     await cs.writeFile(icloudPath(relativePath), content, { override: true })
   } catch (e) {
-    console.warn(`iCloud write failed for ${relativePath}:`, e.message)
+    if (__DEV__) console.warn(`iCloud write failed for ${relativePath}:`, e.message)
     Sentry.captureException(e)
   }
 }
@@ -102,7 +102,7 @@ export async function uploadFileToICloud(localUri, relativePath) {
   try {
     await cs.upload(localUri, icloudPath(relativePath), { override: true })
   } catch (e) {
-    console.warn(`iCloud upload failed for ${relativePath}:`, e.message)
+    if (__DEV__) console.warn(`iCloud upload failed for ${relativePath}:`, e.message)
     Sentry.captureException(e)
   }
 }

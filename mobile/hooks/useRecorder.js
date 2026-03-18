@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Alert, Linking } from "react-native";
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -65,7 +66,15 @@ export function useRecorder({ onRecordingComplete }) {
   const startRecording = async () => {
     const status = await AudioModule.requestRecordingPermissionsAsync();
     if (!status.granted) {
-      throw new Error("Potrebna je dozvola za mikrofon.");
+      Alert.alert(
+        "Dozvola za mikrofon",
+        "Potrebna je dozvola za mikrofon da bi snimanje radilo. Otvorite podesavanja da biste omogucili pristup.",
+        [
+          { text: "Otkazi", style: "cancel" },
+          { text: "Otvori podesavanja", onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
     }
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
     await audioRecorder.prepareToRecordAsync();

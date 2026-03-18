@@ -23,6 +23,6 @@ export async function syncWidgetData() {
     });
     WidgetModule.setWidgetData(data);
   } catch (e) {
-    console.warn("Widget data sync failed:", e);
+    if (__DEV__) console.warn("Widget data sync failed:", e);
   }
 }

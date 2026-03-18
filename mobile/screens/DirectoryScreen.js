@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   SectionList,
   RefreshControl,
   StyleSheet,
@@ -134,6 +135,30 @@ export default function DirectoryScreen({ route, navigation }) {
     const unsubscribe = navigation.addListener("focus", load);
     return unsubscribe;
   }, [navigation, load]);
+
+  // Prevent back navigation during active recording
+  useEffect(() => {
+    if (!isRecording && !isPaused) return;
+    const unsub = navigation.addListener("beforeRemove", (e) => {
+      e.preventDefault();
+      Alert.alert(
+        "Snimanje u toku",
+        "Snimanje je aktivno. Zelite li da otkazete snimanje i napustite ekran?",
+        [
+          { text: "Nastavi snimanje", style: "cancel" },
+          {
+            text: "Otkazi i napusti",
+            style: "destructive",
+            onPress: () => {
+              cancelRecording().catch(() => {});
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ]
+      );
+    });
+    return unsub;
+  }, [navigation, isRecording, isPaused, cancelRecording]);
 
   const handleMonthChange = useCallback((year, month) => {
     if (month < 0) { year -= 1; month = 11; }
@@ -273,8 +298,12 @@ export default function DirectoryScreen({ route, navigation }) {
 
   const onDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    await deleteEntry(deleteTarget.id);
-    setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+    try {
+      await deleteEntry(deleteTarget.id);
+      setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+    } catch (e) {
+      setSnackbar("Brisanje nije uspelo: " + e.message);
+    }
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
   };

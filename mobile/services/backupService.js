@@ -74,7 +74,7 @@ export async function restoreFromBackup(fileUri) {
   try {
     await createBackup();
   } catch (e) {
-    console.warn("Pre-restore backup failed:", e);
+    if (__DEV__) console.warn("Pre-restore backup failed:", e);
   }
 
   return importAllData({ folders, entries, audioFiles, textFiles });
