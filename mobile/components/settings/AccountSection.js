@@ -10,16 +10,22 @@ export default function AccountSection({ navigation, setSnackbar, onUserChanged 
   const [user, setUser] = useState(null)
 
   useEffect(() => {
+    let ignore = false
     ;(async () => {
       try {
         const currentUser = await getUser()
-        setUser(currentUser)
-        onUserChanged?.(currentUser)
+        if (!ignore) {
+          setUser(currentUser)
+          onUserChanged?.(currentUser)
+        }
       } catch {
-        setUser(null)
-        onUserChanged?.(null)
+        if (!ignore) {
+          setUser(null)
+          onUserChanged?.(null)
+        }
       }
     })()
+    return () => { ignore = true }
   }, [])
 
   const handleSignIn = () => {

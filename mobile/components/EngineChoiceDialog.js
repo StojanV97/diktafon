@@ -14,14 +14,13 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
   const [loadingOfferings, setLoadingOfferings] = useState(false)
 
   useEffect(() => {
-    if (!visible) {
-      setShowUpgrade(false)
-      return
-    }
+    if (!visible) { setShowUpgrade(false); return }
+    let ignore = false
     ;(async () => {
       const hasPremium = await isPremium() || hasDevKey()
-      setPremium(hasPremium)
+      if (!ignore) setPremium(hasPremium)
     })()
+    return () => { ignore = true }
   }, [visible])
 
   const handleEngineChange = (value) => {
@@ -38,9 +37,14 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
   const loadOfferingsIfNeeded = async () => {
     if (offerings) return
     setLoadingOfferings(true)
-    const off = await getOfferings()
-    setOfferings(off)
-    setLoadingOfferings(false)
+    try {
+      const off = await getOfferings()
+      setOfferings(off)
+    } catch (e) {
+      if (__DEV__) console.warn("Failed to load offerings:", e.message)
+    } finally {
+      setLoadingOfferings(false)
+    }
   }
 
   const handleConfirm = () => {
@@ -134,7 +138,11 @@ function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSign
   const [authenticated, setAuthenticated] = useState(null)
 
   useEffect(() => {
-    getSession().then((s) => setAuthenticated(!!s))
+    let ignore = false
+    getSession()
+      .then((s) => { if (!ignore) setAuthenticated(!!s) })
+      .catch(() => { if (!ignore) setAuthenticated(false) })
+    return () => { ignore = true }
   }, [])
 
   if (authenticated === false) {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { AppState } from "react-native"
 import * as whisperService from "../services/whisperService"
 import {
   preflight,
@@ -24,6 +25,7 @@ export function useTranscription({ entries, setEntries, onComplete }) {
     if (!hasProcessing) return
 
     const intervalId = setInterval(async () => {
+      if (AppState.currentState !== "active") return
       const changed = await pollProcessingEntries(entriesRef.current)
       if (changed.length === 0) return
       setEntries((prev) =>

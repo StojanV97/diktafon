@@ -23,7 +23,11 @@ export async function runAutoMove() {
     for (const entry of toMove) {
       await moveEntryToFolder(entry.id, settings.autoMoveFolderId);
       if (!settings.autoMoveKeepAudio) {
-        deleteEntryAudio(entry.id);
+        try {
+          deleteEntryAudio(entry.id);
+        } catch (e) {
+          if (__DEV__) console.warn("Auto-move: audio delete failed for", entry.id, e.message);
+        }
       }
     }
 

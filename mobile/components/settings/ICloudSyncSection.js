@@ -12,26 +12,37 @@ export default function ICloudSyncSection({ setSnackbar }) {
   const [icloudSyncOn, setIcloudSyncOn] = useState(false)
 
   useEffect(() => {
+    let ignore = false
     ;(async () => {
-      if (Platform.OS === "ios") {
-        const available = await isICloudAvailable()
-        setIcloudAvailable(available)
+      try {
+        if (Platform.OS === "ios") {
+          const available = await isICloudAvailable()
+          if (!ignore) setIcloudAvailable(available)
+        }
+        const settings = await getSettings()
+        if (!ignore) setIcloudSyncOn(settings.icloudSyncEnabled)
+      } catch (e) {
+        if (__DEV__) console.warn("iCloud init failed:", e.message)
       }
-      const settings = await getSettings()
-      setIcloudSyncOn(settings.icloudSyncEnabled)
     })()
+    return () => { ignore = true }
   }, [])
 
   if (Platform.OS !== "ios") return null
 
   const handleToggleICloudSync = async (value) => {
     setIcloudSyncOn(value)
-    if (value) {
-      await enableSync()
-      setSnackbar("iCloud sinhronizacija ukljucena.")
-    } else {
-      await disableSync()
-      setSnackbar("iCloud sinhronizacija iskljucena.")
+    try {
+      if (value) {
+        await enableSync()
+        setSnackbar("iCloud sinhronizacija ukljucena.")
+      } else {
+        await disableSync()
+        setSnackbar("iCloud sinhronizacija iskljucena.")
+      }
+    } catch (e) {
+      setIcloudSyncOn(!value)
+      setSnackbar("Greska pri promeni iCloud podesavanja.")
     }
   }
 
