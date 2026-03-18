@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SectionList,
   RefreshControl,
@@ -30,6 +30,7 @@ import CalendarStrip from "../components/CalendarStrip";
 import { AppHeaderLeft, AppHeaderRight } from "../components/AppHeader";
 import AIInsightsDialog from "../components/AIInsightsDialog";
 import EngineChoiceDialog from "../components/EngineChoiceDialog";
+import RecordingTypeDialog from "../components/RecordingTypeDialog";
 import ModelDownloadDialog from "../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../utils/entryUtils";
@@ -80,13 +81,17 @@ export default function DirectoryScreen({ route, navigation }) {
   // AI dialog
   const [aiDialogVisible, setAiDialogVisible] = useState(false);
 
+  // Recording type dialog
+  const [recordingTypeDialogVisible, setRecordingTypeDialogVisible] = useState(false);
+  const pendingRecordingTypeRef = useRef("beleshka");
+
   // Snackbar
   const [snackbar, setSnackbar] = useState("");
 
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri, durationSeconds, filename) => {
       try {
-        const entry = await createEntry(folderId, filename, uri, durationSeconds);
+        const entry = await createEntry(folderId, filename, uri, durationSeconds, pendingRecordingTypeRef.current);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
         setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
@@ -182,7 +187,13 @@ export default function DirectoryScreen({ route, navigation }) {
     );
   }, [selectedDay]);
 
-  const handleStartRecording = async () => {
+  const handleStartRecording = () => {
+    setRecordingTypeDialogVisible(true);
+  };
+
+  const onRecordingTypeConfirm = async (type) => {
+    pendingRecordingTypeRef.current = type;
+    setRecordingTypeDialogVisible(false);
     try {
       await startRecording();
     } catch (e) {
@@ -451,6 +462,11 @@ export default function DirectoryScreen({ route, navigation }) {
         <ModelDownloadDialog
           visible={modelDownload.visible}
           progress={modelDownload.progress}
+        />
+        <RecordingTypeDialog
+          visible={recordingTypeDialogVisible}
+          onDismiss={() => setRecordingTypeDialogVisible(false)}
+          onConfirm={onRecordingTypeConfirm}
         />
         <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
       </Portal>

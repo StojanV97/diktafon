@@ -37,7 +37,7 @@ async function getKeyOrThrow() {
   throw new Error("ASSEMBLYAI_KEY_MISSING");
 }
 
-export async function submitAndGetId(fileUri) {
+export async function submitAndGetId(fileUri, options = {}) {
   const apiKey = await getKeyOrThrow();
 
   // Step 1: Upload audio to AssemblyAI
@@ -74,7 +74,7 @@ export async function submitAndGetId(fileUri) {
         audio_url: upload_url,
         speech_models: ["universal-2", "universal-3-pro"],
         language_code: "sr",
-        speaker_labels: true,
+        speaker_labels: options.speakerLabels ?? true,
       }),
       signal: controller.signal,
     });

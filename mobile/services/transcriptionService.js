@@ -25,7 +25,8 @@ export async function transcribeSingle(entryId, engine, { onStatusChange, onErro
 
   try {
     if (engine === "assemblyai") {
-      const { assemblyai_id } = await assemblyAIService.submitAndGetId(audioUri)
+      const speakerLabels = (entry.recording_type || "beleshka") === "razgovor"
+      const { assemblyai_id } = await assemblyAIService.submitAndGetId(audioUri, { speakerLabels })
       const updated = await updateEntryToProcessing(entryId, assemblyai_id)
       onStatusChange?.(entryId, updated)
     } else {

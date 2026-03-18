@@ -202,7 +202,7 @@ export async function deleteFolder(id) {
 
 // ── Entries ─────────────────────────────────────────────
 
-export async function createEntry(folderId, filename, audioSourceUri, durationSeconds = 0) {
+export async function createEntry(folderId, filename, audioSourceUri, durationSeconds = 0, recordingType = "beleshka") {
   ensureDirs();
   const id = generateUUID();
 
@@ -220,6 +220,7 @@ export async function createEntry(folderId, filename, audioSourceUri, durationSe
     duration_seconds: durationSeconds,
     status: "recorded",
     audio_file: `${id}.wav`,
+    recording_type: recordingType,
   };
 
   const entries = await readJSON(entriesFile);
@@ -371,6 +372,7 @@ export async function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
     status: "recorded",
     audio_file: `${id}.wav`,
     recorded_date: now.toISOString().slice(0, 10),
+    recording_type: "beleshka",
   };
 
   const entries = await readJSON(entriesFile);
