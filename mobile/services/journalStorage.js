@@ -459,6 +459,79 @@ export async function getDailyCombinedTranscripts(dates) {
   return results;
 }
 
+// ── Consolidation ───────────────────────────────────────
+
+export async function consolidateDailyLogEntries(date) {
+  const folder = await getOrCreateDailyLogFolder();
+  const allEntries = await readJSON(entriesFile);
+
+  const dayDone = allEntries
+    .filter(
+      (e) =>
+        e.folder_id === folder.id &&
+        (e.recorded_date || e.created_at.slice(0, 10)) === date &&
+        e.status === "done"
+    )
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  if (dayDone.length === 0) return null;
+
+  // Build combined text with timestamps
+  const parts = [];
+  let totalDuration = 0;
+  for (const entry of dayDone) {
+    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+    let fullText = entry.text || "";
+    if (textFile.exists) {
+      try {
+        fullText = await textFile.text();
+      } catch {
+        // fall back to truncated text from JSON
+      }
+    }
+    const time = new Date(entry.created_at);
+    const h = time.getHours().toString().padStart(2, "0");
+    const m = time.getMinutes().toString().padStart(2, "0");
+    parts.push(`[${h}:${m}]\n${fullText}`);
+    totalDuration += entry.duration_seconds || 0;
+  }
+  const combinedText = parts.join("\n\n");
+
+  // Create new combined entry
+  ensureDirs();
+  const id = generateUUID();
+  const combinedTextFile = new File(textsDir, `journal_${id}.txt`);
+  combinedTextFile.write(combinedText);
+
+  const combinedEntry = {
+    id,
+    folder_id: folder.id,
+    filename: `kombinovano_${date}.txt`,
+    text: truncateText(combinedText),
+    created_at: dayDone[0].created_at,
+    duration_seconds: totalDuration,
+    status: "done",
+    audio_file: null,
+    recorded_date: date,
+  };
+
+  // Delete originals (audio + text files)
+  const doneIds = new Set(dayDone.map((e) => e.id));
+  for (const entry of dayDone) {
+    const audioFile = new File(audioDir, `${entry.id}.wav`);
+    if (audioFile.exists) audioFile.delete();
+    const textFile = new File(textsDir, `journal_${entry.id}.txt`);
+    if (textFile.exists) textFile.delete();
+  }
+
+  // Update entries.json: remove originals, add combined
+  const remaining = allEntries.filter((e) => !doneIds.has(e.id));
+  remaining.unshift(combinedEntry);
+  writeJSON(entriesFile, remaining);
+
+  return { ...combinedEntry, text: combinedText };
+}
+
 // ── Bulk Import/Export ──────────────────────────────────
 
 export async function exportAllData() {

@@ -28,6 +28,7 @@ import {
   moveEntryToFolder,
   createDailyLogEntry,
   getDailyCombinedTranscripts,
+  consolidateDailyLogEntries,
 } from "../services/journalStorage";
 import { useRecorder } from "../hooks/useRecorder";
 import { useTranscription } from "../hooks/useTranscription";
@@ -102,6 +103,9 @@ export default function DailyLogScreen({ navigation, route }) {
   const [combinedTexts, setCombinedTexts] = useState({});
   const [expandedTranscripts, setExpandedTranscripts] = useState(new Set());
 
+  // Track batch transcription entry IDs for post-transcription consolidation
+  const [batchEntryIds, setBatchEntryIds] = useState(new Set());
+
   const [snackbar, setSnackbar] = useState("");
 
   const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
@@ -160,6 +164,24 @@ export default function DailyLogScreen({ navigation, route }) {
     }
   }, [route.params?.action]);
 
+  // After AssemblyAI polling resolves all batch entries, consolidate
+  useEffect(() => {
+    if (batchEntryIds.size === 0) return;
+    const batchEntries = entries.filter((e) => batchEntryIds.has(e.id));
+    const allResolved = batchEntries.every(
+      (e) => e.status === "done" || e.status === "error"
+    );
+    if (!allResolved) return;
+
+    const dates = [...new Set(
+      batchEntries
+        .filter((e) => e.status === "done")
+        .map((e) => e.recorded_date || e.created_at.slice(0, 10))
+    )];
+    setBatchEntryIds(new Set());
+    if (dates.length > 0) consolidateAndReload(dates);
+  }, [entries, batchEntryIds]);
+
   const grouped = useMemo(() => groupByDate(entries), [entries]);
 
   // Load combined transcripts for dates where at least one entry is done
@@ -204,6 +226,15 @@ export default function DailyLogScreen({ navigation, route }) {
     setEngineDialogVisible(true);
   };
 
+  const consolidateAndReload = async (dates) => {
+    for (const date of dates) {
+      await consolidateDailyLogEntries(date);
+    }
+    const data = await fetchDailyLogEntries();
+    setEntries(data);
+    syncWidgetData();
+  };
+
   const onTranscribeConfirm = async () => {
     setEngineDialogVisible(false);
     let result;
@@ -213,7 +244,20 @@ export default function DailyLogScreen({ navigation, route }) {
             (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && e.status === "recorded"
           )
         : entries.filter((e) => e.status === "recorded");
-      result = await startBatchTranscription(toTranscribe.map((e) => e.id), engineChoice);
+      const ids = toTranscribe.map((e) => e.id);
+      const dates = [...new Set(toTranscribe.map((e) => e.recorded_date || e.created_at.slice(0, 10)))];
+
+      if (engineChoice === "assemblyai") {
+        // AssemblyAI: track IDs for consolidation after polling completes
+        setBatchEntryIds(new Set(ids));
+      }
+
+      result = await startBatchTranscription(ids, engineChoice);
+
+      if (result.started && engineChoice === "local") {
+        // Local engine: all done synchronously, consolidate now
+        await consolidateAndReload(dates);
+      }
     } else {
       result = await startTranscription(engineTargetId, engineChoice);
     }
