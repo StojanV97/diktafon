@@ -59,8 +59,8 @@ export function useTranscription({ entries, setEntries, onComplete }) {
       }
     }
 
-    if (check.reason === "API_KEY_MISSING") {
-      return { ready: false, message: "Potreban je API kljuc. Podesi ga u Podesavanjima." }
+    if (check.reason === "PREMIUM_REQUIRED") {
+      return { ready: false, reason: "PREMIUM_REQUIRED", message: "Potrebna je Premium pretplata za AssemblyAI transkripciju." }
     }
 
     return { ready: false, message: "Nepoznata greska" }

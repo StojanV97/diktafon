@@ -458,6 +458,7 @@ export default function DirectoryScreen({ route, navigation }) {
           onConfirm={onTranscribeConfirm}
           engineChoice={engineChoice}
           onEngineChange={setEngineChoice}
+          navigation={navigation}
         />
         <ModelDownloadDialog
           visible={modelDownload.visible}

@@ -1,14 +1,28 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Platform, StyleSheet, View } from "react-native"
 import { Button, Text } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as AppleAuthentication from "expo-apple-authentication"
 import { signInWithApple } from "../services/authService"
 import { colors, spacing, radii, elevation, typography } from "../theme"
 
+function navigateToHome(navigation) {
+  AsyncStorage.setItem("hasSeenAuth", "true")
+  navigation.reset({ index: 0, routes: [{ name: "Home" }] })
+}
+
 export default function AuthScreen({ navigation }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false)
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAuthAvailable)
+      .catch(() => setAppleAuthAvailable(false))
+  }, [])
 
   const handleAppleSignIn = async () => {
     setLoading(true)
@@ -16,7 +30,7 @@ export default function AuthScreen({ navigation }) {
     try {
       await signInWithApple()
       // RevenueCat linking is handled by App.js onAuthStateChange listener
-      navigation.goBack()
+      navigateToHome(navigation)
     } catch (e) {
       if (e.code === "ERR_REQUEST_CANCELED") {
         // User cancelled — not an error
@@ -29,7 +43,7 @@ export default function AuthScreen({ navigation }) {
   }
 
   const handleSkip = () => {
-    navigation.goBack()
+    navigateToHome(navigation)
   }
 
   return (
@@ -51,7 +65,7 @@ export default function AuthScreen({ navigation }) {
           </View>
         )}
 
-        {Platform.OS === "ios" && (
+        {appleAuthAvailable && (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
             buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
@@ -75,7 +89,7 @@ export default function AuthScreen({ navigation }) {
       <View style={styles.footer}>
         <Text style={[typography.caption, styles.footerText]}>
           Aplikacija radi potpuno i bez naloga.{"\n"}
-          Nalog je potreban samo za cloud backup i AssemblyAI transkripciju.
+          Nalog je potreban samo za cloud backup i premium transkripciju.
         </Text>
       </View>
     </View>

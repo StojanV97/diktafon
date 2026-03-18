@@ -1,6 +1,6 @@
 /**
- * Tests for assemblyAI unified submit() and check() wrappers.
- * Verifies they route to direct vs proxy mode based on session state.
+ * Tests for assemblyAI proxy-only submit() and check().
+ * Verifies they route through Supabase edge functions.
  */
 
 // Mock supabaseClient
@@ -13,27 +13,11 @@ jest.mock("../supabaseClient", () => ({
   },
 }))
 
-// Mock expo-secure-store
-jest.mock("expo-secure-store", () => ({
-  getItemAsync: jest.fn().mockResolvedValue("test-api-key"),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-}))
-
 // Mock expo-file-system/legacy
 jest.mock("expo-file-system/legacy", () => ({
-  uploadAsync: jest.fn().mockResolvedValue({
-    status: 200,
-    body: JSON.stringify({ upload_url: "https://example.com/upload" }),
-  }),
   readAsStringAsync: jest.fn().mockResolvedValue("base64data"),
   EncodingType: { Base64: "base64" },
-  FileSystemUploadType: { BINARY_CONTENT: 0 },
 }))
-
-// Mock fetch for direct API calls
-const mockFetch = jest.fn()
-global.fetch = mockFetch
 
 const assemblyAI = require("../assemblyAIService")
 
@@ -42,19 +26,13 @@ beforeEach(() => {
 })
 
 describe("submit()", () => {
-  test("routes to direct API when no session (not logged in)", async () => {
+  test("throws AUTH_REQUIRED when no session", async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } })
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "transcript-123" }),
-    })
 
-    const result = await assemblyAI.submit("file:///audio.wav")
-    expect(result).toEqual({ assemblyai_id: "transcript-123" })
-    // Should have called fetch for upload + transcript creation
+    await expect(assemblyAI.submit("file:///audio.wav")).rejects.toThrow("AUTH_REQUIRED")
   })
 
-  test("routes to proxy when session exists (logged in)", async () => {
+  test("submits via proxy when session exists", async () => {
     const mockSupabase = require("../supabaseClient").supabase
     mockGetSession.mockResolvedValue({
       data: { session: { user: { id: "user-1" } } },
@@ -74,22 +52,8 @@ describe("submit()", () => {
 })
 
 describe("check()", () => {
-  test("routes to direct API when no session", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } })
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ status: "completed", text: "hello", audio_duration: 30 }),
-    })
-
-    const result = await assemblyAI.check("transcript-123")
-    expect(result).toEqual({ status: "done", text: "hello", duration_seconds: 30 })
-  })
-
-  test("routes to proxy when session exists", async () => {
+  test("checks via proxy", async () => {
     const mockSupabase = require("../supabaseClient").supabase
-    mockGetSession.mockResolvedValue({
-      data: { session: { user: { id: "user-1" } } },
-    })
     mockSupabase.functions.invoke.mockResolvedValue({
       data: { status: "done", text: "proxy hello", duration_seconds: 45 },
       error: null,

@@ -634,6 +634,7 @@ export default function DailyLogScreen({ navigation, route }) {
           engineChoice={engineChoice}
           onEngineChange={setEngineChoice}
           title={batchDate ? "Batch transkripcija" : undefined}
+          navigation={navigation}
         />
         <ModelDownloadDialog
           visible={modelDownload.visible}

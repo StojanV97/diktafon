@@ -1,22 +1,28 @@
 import React, { useEffect, useState } from "react"
-import { View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import { Divider, RadioButton, Text, TouchableRipple } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { getSettings, updateSettings } from "../../services/settingsService"
-import { colors, spacing, typography } from "../../theme"
+import { isPremium } from "../../services/subscriptionService"
+import { hasDevKey } from "../../services/assemblyAIService"
+import { colors, spacing, radii, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
 export default function EngineSection() {
   const [defaultEngine, setDefaultEngine] = useState("local")
+  const [premium, setPremium] = useState(false)
 
   useEffect(() => {
     ;(async () => {
       const settings = await getSettings()
       setDefaultEngine(settings.defaultEngine)
+      const hasPremium = await isPremium() || hasDevKey()
+      setPremium(hasPremium)
     })()
   }, [])
 
   const handleEngineChange = async (value) => {
+    if (value === "assemblyai" && !premium) return
     setDefaultEngine(value)
     await updateSettings({ defaultEngine: value })
   }
@@ -41,13 +47,22 @@ export default function EngineSection() {
               </View>
             </View>
           </TouchableRipple>
-          <TouchableRipple onPress={() => handleEngineChange("assemblyai")}>
-            <View style={radioStyles.radioRow}>
-              <RadioButton value="assemblyai" color={colors.primary} />
+          <TouchableRipple onPress={() => handleEngineChange("assemblyai")} disabled={!premium}>
+            <View style={[radioStyles.radioRow, !premium && { opacity: 0.5 }]}>
+              <RadioButton value="assemblyai" color={colors.primary} disabled={!premium} />
               <View style={radioStyles.radioInfo}>
-                <Text style={typography.body}>AssemblyAI (oblak)</Text>
+                <View style={radioStyles.labelRow}>
+                  <Text style={typography.body}>AssemblyAI (oblak)</Text>
+                  {!premium && (
+                    <View style={radioStyles.premiumBadge}>
+                      <Text style={radioStyles.premiumBadgeText}>Premium</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[typography.caption, { marginTop: 2 }]}>
-                  Visa tacnost, prepoznavanje govornika
+                  {premium
+                    ? "Visa tacnost, prepoznavanje govornika"
+                    : "Dostupno za Premium korisnike"}
                 </Text>
               </View>
             </View>
@@ -58,7 +73,6 @@ export default function EngineSection() {
   )
 }
 
-const { StyleSheet } = require("react-native")
 const radioStyles = StyleSheet.create({
   radioRow: {
     flexDirection: "row",
@@ -66,4 +80,20 @@ const radioStyles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   radioInfo: { flex: 1, paddingLeft: spacing.xs },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  premiumBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  premiumBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: colors.primary,
+  },
 })

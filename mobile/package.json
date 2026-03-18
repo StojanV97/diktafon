@@ -40,6 +40,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "jszip": "^3.10.1",
+    "promise": "^8.3.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-cloud-store": "^0.12.0",

@@ -17,6 +17,8 @@ export async function initPurchases(platform = "ios") {
     ? REVENUECAT_API_KEY_ANDROID
     : REVENUECAT_API_KEY_IOS
 
+  if (!apiKey || apiKey.startsWith("YOUR_")) return
+
   Purchases.configure({ apiKey })
   _initialized = true
 }

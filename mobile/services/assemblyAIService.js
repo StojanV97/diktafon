@@ -1,148 +1,90 @@
-import * as SecureStore from "expo-secure-store";
-import * as FileSystem from "expo-file-system/legacy";
-import { supabase } from "./supabaseClient";
+import * as FileSystem from "expo-file-system/legacy"
+import { supabase } from "./supabaseClient"
 
-const API_BASE = "https://api.assemblyai.com/v2";
-const STORE_KEY = "assemblyai_api_key";
-const USE_PROXY_KEY = "assemblyai_use_proxy";
+const DEV_API_KEY = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY
 
-const STATUS_TIMEOUT_MS = 30_000;
+const AAI_BASE = "https://api.assemblyai.com/v2"
 
-// ── API Key Management ──────────────────────────────────
+// ── Dev key check ──────────────────────────────────────
 
-export async function getApiKey() {
-  return SecureStore.getItemAsync(STORE_KEY);
+export function hasDevKey() {
+  return !!DEV_API_KEY
 }
 
-export async function setApiKey(key) {
-  await SecureStore.setItemAsync(STORE_KEY, key);
-}
+// ── Direct AssemblyAI API (dev mode) ───────────────────
 
-export async function removeApiKey() {
-  await SecureStore.deleteItemAsync(STORE_KEY);
-}
+async function submitDirect(fileUri, options = {}) {
+  // 1. Upload audio file
+  const uploadRes = await FileSystem.uploadAsync(`${AAI_BASE}/upload`, fileUri, {
+    httpMethod: "POST",
+    headers: { authorization: DEV_API_KEY },
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+  })
+  const { upload_url } = JSON.parse(uploadRes.body)
 
-export async function hasApiKey() {
-  const key = await getApiKey();
-  return !!(key && key.trim().length > 0);
-}
-
-// ── Transcription ───────────────────────────────────────
-
-async function getKeyOrThrow() {
-  const key = await getApiKey();
-  if (key && key.trim()) return key.trim();
-  throw new Error("ASSEMBLYAI_KEY_MISSING");
-}
-
-export async function submitAndGetId(fileUri, options = {}) {
-  const apiKey = await getKeyOrThrow();
-
-  // Step 1: Upload audio to AssemblyAI
-  const uploadResult = await FileSystem.uploadAsync(
-    `${API_BASE}/upload`,
-    fileUri,
-    {
-      httpMethod: "POST",
-      headers: {
-        authorization: apiKey,
-        "content-type": "application/octet-stream",
-      },
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    }
-  );
-
-  if (uploadResult.status !== 200) {
-    throw new Error(`Upload failed (${uploadResult.status}): ${uploadResult.body}`);
+  // 2. Create transcript job
+  const body = {
+    audio_url: upload_url,
+    language_code: "sr",
+    speech_models: ["universal-3-pro", "universal-2"],
+    speaker_labels: options.speakerLabels ?? true,
   }
+  const res = await fetch(`${AAI_BASE}/transcript`, {
+    method: "POST",
+    headers: {
+      authorization: DEV_API_KEY,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "AssemblyAI submit failed")
+  return { assemblyai_id: data.id }
+}
 
-  const { upload_url } = JSON.parse(uploadResult.body);
+async function checkDirect(transcriptId) {
+  const res = await fetch(`${AAI_BASE}/transcript/${transcriptId}`, {
+    headers: { authorization: DEV_API_KEY },
+  })
+  const data = await res.json()
 
-  // Step 2: Create transcription job
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${API_BASE}/transcript`, {
-      method: "POST",
-      headers: {
-        authorization: apiKey,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        audio_url: upload_url,
-        speech_models: ["universal-2", "universal-3-pro"],
-        language_code: "sr",
-        speaker_labels: options.speakerLabels ?? true,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Transcript creation failed (${res.status}): ${body}`);
+  if (data.status === "completed") {
+    const text = data.utterances
+      ? formatUtterances(data)
+      : data.text || ""
+    return {
+      status: "done",
+      text,
+      duration_seconds: data.audio_duration ? Math.round(data.audio_duration) : null,
     }
-
-    const data = await res.json();
-    return { assemblyai_id: data.id };
-  } catch (e) {
-    if (e.name === "AbortError") throw new Error("Request timed out");
-    throw e;
-  } finally {
-    clearTimeout(timer);
   }
-}
-
-export async function checkTranscript(transcriptId) {
-  const apiKey = await getKeyOrThrow();
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${API_BASE}/transcript/${transcriptId}`, {
-      headers: { authorization: apiKey },
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Status check failed (${res.status}): ${body}`);
-    }
-
-    const data = await res.json();
-
-    if (data.status === "completed") {
-      const text = formatUtterances(data);
-      const duration_seconds = Math.round(data.audio_duration || 0);
-      return { status: "done", text, duration_seconds };
-    }
-
-    if (data.status === "error") {
-      return { status: "error", error: data.error || "Unknown AssemblyAI error" };
-    }
-
-    // queued or processing
-    return { status: "processing" };
-  } catch (e) {
-    if (e.name === "AbortError") throw new Error("Request timed out");
-    throw e;
-  } finally {
-    clearTimeout(timer);
+  if (data.status === "error") {
+    return { status: "error", error: data.error || "Transcription failed" }
   }
+  return { status: "processing" }
 }
 
-// ── Proxy Mode (Supabase Edge Functions) ────────────────
-
-export async function isProxyMode() {
-  const { data: { session } } = await supabase.auth.getSession()
-  return !!session
+function formatUtterances(data) {
+  const lines = []
+  let currentSpeaker = null
+  for (const u of data.utterances) {
+    if (u.speaker !== currentSpeaker) {
+      currentSpeaker = u.speaker
+      const totalSec = Math.floor(u.start / 1000)
+      const m = Math.floor(totalSec / 60)
+      const s = String(totalSec % 60).padStart(2, "0")
+      lines.push(`\n[Govornik ${u.speaker} – ${m}:${s}]`)
+    }
+    lines.push(u.text)
+  }
+  return lines.join("\n").trim()
 }
 
-/**
- * Submit transcription via Supabase edge function proxy.
- * Audio is uploaded to Supabase Storage, then the edge function
- * sends it to AssemblyAI with the server-side API key.
- */
-export async function submitViaProxy(fileUri, options = {}) {
+// ── Public API ─────────────────────────────────────────
+
+export async function submit(fileUri, options = {}) {
+  if (DEV_API_KEY) return submitDirect(fileUri, options)
+
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error("AUTH_REQUIRED")
 
@@ -173,7 +115,9 @@ export async function submitViaProxy(fileUri, options = {}) {
   return { assemblyai_id: data.assemblyai_id }
 }
 
-export async function checkViaProxy(transcriptId) {
+export async function check(transcriptId) {
+  if (DEV_API_KEY) return checkDirect(transcriptId)
+
   const { data, error } = await supabase.functions.invoke("transcribe/status", {
     body: { id: transcriptId },
   })
@@ -190,41 +134,4 @@ function decode(base64) {
     bytes[i] = binaryString.charCodeAt(i)
   }
   return bytes
-}
-
-// ── Unified Entry Points ───────────────────────────────
-// Auto-select direct vs proxy mode based on auth session.
-
-export async function submit(fileUri, options = {}) {
-  if (await isProxyMode()) {
-    return submitViaProxy(fileUri, options)
-  }
-  return submitAndGetId(fileUri, options)
-}
-
-export async function check(transcriptId) {
-  if (await isProxyMode()) {
-    return checkViaProxy(transcriptId)
-  }
-  return checkTranscript(transcriptId)
-}
-
-// ── Speaker Formatting ──────────────────────────────────
-// NOTE: formatUtterances is also duplicated in supabase/functions/transcribe/index.ts
-// (separate Deno runtime, no shared code path — intentional duplication)
-
-function formatUtterances(data) {
-  if (!data.utterances || data.utterances.length === 0) {
-    return data.text || "";
-  }
-
-  return data.utterances
-    .map((u) => {
-      const startSec = (u.start || 0) / 1000;
-      const m = Math.floor(startSec / 60);
-      const s = Math.floor(startSec % 60);
-      const timestamp = `${m}:${s.toString().padStart(2, "0")}`;
-      return `[Govornik ${u.speaker} – ${timestamp}] ${u.text}`;
-    })
-    .join("\n");
 }

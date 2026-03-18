@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
@@ -23,11 +24,10 @@ import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
 
-Sentry.init({
-  // TODO: Replace with your Sentry DSN
-  dsn: "YOUR_SENTRY_DSN",
-  tracesSampleRate: 0.2,
-});
+const SENTRY_DSN = "YOUR_SENTRY_DSN"
+if (SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")) {
+  Sentry.init({ dsn: SENTRY_DSN, tracesSampleRate: 0.2 })
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -94,6 +94,7 @@ const errorStyles = StyleSheet.create({
 
 function App() {
   const [ready, setReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState("Home");
 
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -106,6 +107,12 @@ function App() {
   useEffect(() => {
     async function init() {
       await migrateData();
+
+      // Check if user has seen the auth screen
+      const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");
+      if (!hasSeenAuth) {
+        setInitialRoute("Auth");
+      }
 
       // Init RevenueCat
       try {
@@ -190,7 +197,7 @@ function App() {
         <View style={loadingStyles.flex1} onLayout={onLayoutRootView}>
           <NavigationContainer linking={linking}>
             <StatusBar style="dark" />
-            <Stack.Navigator screenOptions={stackScreenOptions}>
+            <Stack.Navigator initialRouteName={initialRoute} screenOptions={stackScreenOptions}>
               <Stack.Screen
                 name="Home"
                 component={DirectoryHomeScreen}

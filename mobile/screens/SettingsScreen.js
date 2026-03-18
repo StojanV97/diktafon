@@ -2,7 +2,6 @@ import React, { useState } from "react"
 import { ScrollView, StyleSheet, View } from "react-native"
 import { Snackbar } from "react-native-paper"
 import WhisperModelSection from "../components/settings/WhisperModelSection"
-import AssemblyAISection from "../components/settings/AssemblyAISection"
 import EngineSection from "../components/settings/EngineSection"
 import AutoMoveSection from "../components/settings/AutoMoveSection"
 import BackupSection from "../components/settings/BackupSection"
@@ -19,7 +18,6 @@ export default function SettingsScreen({ navigation }) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <WhisperModelSection setSnackbar={setSnackbar} />
-        <AssemblyAISection setSnackbar={setSnackbar} />
         <EngineSection />
         <AutoMoveSection setSnackbar={setSnackbar} />
         <BackupSection setSnackbar={setSnackbar} />

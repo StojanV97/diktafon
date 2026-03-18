@@ -1,17 +1,84 @@
-import React from "react";
-import { TouchableOpacity, View, StyleSheet } from "react-native";
-import { Button, Dialog, RadioButton, Text } from "react-native-paper";
-import { colors, spacing, radii, typography } from "../theme";
+import React, { useEffect, useState } from "react"
+import { TouchableOpacity, View, StyleSheet } from "react-native"
+import { ActivityIndicator, Button, Dialog, RadioButton, Text } from "react-native-paper"
+import { colors, spacing, radii, typography } from "../theme"
+import { isPremium, getOfferings, purchasePackage } from "../services/subscriptionService"
+import { hasDevKey } from "../services/assemblyAIService"
+import { getSession } from "../services/authService"
 
-export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engineChoice, onEngineChange, title }) {
+export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engineChoice, onEngineChange, title, navigation }) {
+  const [premium, setPremium] = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [offerings, setOfferings] = useState(null)
+  const [purchaseLoading, setPurchaseLoading] = useState(false)
+  const [loadingOfferings, setLoadingOfferings] = useState(false)
+
+  useEffect(() => {
+    if (!visible) {
+      setShowUpgrade(false)
+      return
+    }
+    ;(async () => {
+      const hasPremium = await isPremium() || hasDevKey()
+      setPremium(hasPremium)
+    })()
+  }, [visible])
+
+  const handleEngineChange = (value) => {
+    if (value === "assemblyai" && !premium) {
+      onEngineChange(value)
+      setShowUpgrade(true)
+      loadOfferingsIfNeeded()
+      return
+    }
+    setShowUpgrade(false)
+    onEngineChange(value)
+  }
+
+  const loadOfferingsIfNeeded = async () => {
+    if (offerings) return
+    setLoadingOfferings(true)
+    const off = await getOfferings()
+    setOfferings(off)
+    setLoadingOfferings(false)
+  }
+
+  const handleConfirm = () => {
+    if (engineChoice === "assemblyai" && !premium) return
+    onConfirm()
+  }
+
+  const handlePurchase = async (pkg) => {
+    setPurchaseLoading(true)
+    try {
+      const result = await purchasePackage(pkg)
+      if (result) {
+        setPremium(true)
+        setShowUpgrade(false)
+        onConfirm()
+      }
+    } catch (e) {
+      if (!e.userCancelled) {
+        // Purchase failed silently — user can retry
+      }
+    } finally {
+      setPurchaseLoading(false)
+    }
+  }
+
+  const handleSignIn = () => {
+    onDismiss()
+    navigation?.navigate("Auth")
+  }
+
   return (
     <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
       <Dialog.Title style={typography.heading}>
         {title || "Izaberi tip transkripcije"}
       </Dialog.Title>
       <Dialog.Content>
-        <RadioButton.Group onValueChange={onEngineChange} value={engineChoice}>
-          <TouchableOpacity style={styles.engineRow} onPress={() => onEngineChange("local")}>
+        <RadioButton.Group onValueChange={handleEngineChange} value={engineChoice}>
+          <TouchableOpacity style={styles.engineRow} onPress={() => handleEngineChange("local")}>
             <RadioButton value="local" color={colors.primary} />
             <View style={styles.engineInfo}>
               <Text style={[typography.heading, { fontSize: 15 }]}>Na uredjaju — Besplatno</Text>
@@ -20,28 +87,126 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
               </Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.engineRow} onPress={() => onEngineChange("assemblyai")}>
+          <TouchableOpacity style={styles.engineRow} onPress={() => handleEngineChange("assemblyai")}>
             <RadioButton value="assemblyai" color={colors.primary} />
             <View style={styles.engineInfo}>
-              <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
+              <View style={styles.labelRow}>
+                <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
+                {!premium && (
+                  <View style={styles.premiumBadge}>
+                    <Text style={styles.premiumBadgeText}>Premium</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
                 Prepoznavanje govornika (ko je govorio sta), visa tacnost, podrska za akcentovane govore, automatske interpunkcije i detekcija tema.
-                {"\n"}Potreban API kljuc (podesi u Podesavanjima).
+                {!premium && "\nDostupno za Premium korisnike."}
               </Text>
             </View>
           </TouchableOpacity>
         </RadioButton.Group>
+
+        {showUpgrade && !premium && (
+          <UpgradePrompt
+            offerings={offerings}
+            loading={loadingOfferings}
+            purchaseLoading={purchaseLoading}
+            onPurchase={handlePurchase}
+            onSignIn={handleSignIn}
+          />
+        )}
       </Dialog.Content>
       <Dialog.Actions>
         <Button onPress={onDismiss} textColor={colors.muted}>Otkazi</Button>
-        <Button onPress={onConfirm} textColor={colors.primary}>Pokreni</Button>
+        <Button
+          onPress={handleConfirm}
+          textColor={colors.primary}
+          disabled={engineChoice === "assemblyai" && !premium}
+        >
+          Pokreni
+        </Button>
       </Dialog.Actions>
     </Dialog>
-  );
+  )
+}
+
+function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSignIn }) {
+  const [authenticated, setAuthenticated] = useState(null)
+
+  useEffect(() => {
+    getSession().then((s) => setAuthenticated(!!s))
+  }, [])
+
+  if (authenticated === false) {
+    return (
+      <View style={styles.upgradeBox}>
+        <Text style={[typography.body, { marginBottom: spacing.md }]}>
+          Potrebna je prijava za premium funkcije.
+        </Text>
+        <Button mode="contained" onPress={onSignIn} buttonColor={colors.primary}>
+          Prijavi se
+        </Button>
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.upgradeBox}>
+      <Text style={[typography.body, { fontFamily: "Inter_600SemiBold", marginBottom: spacing.sm }]}>
+        Otključaj Premium
+      </Text>
+      <Text style={[typography.caption, { marginBottom: spacing.md }]}>
+        Cloud transkripcija sa prepoznavanjem govornika.
+      </Text>
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.primary} />
+      ) : offerings?.availablePackages?.length > 0 ? (
+        offerings.availablePackages.map((pkg) => (
+          <Button
+            key={pkg.identifier}
+            mode="contained"
+            onPress={() => onPurchase(pkg)}
+            loading={purchaseLoading}
+            disabled={purchaseLoading}
+            buttonColor={colors.primary}
+            style={{ marginBottom: spacing.sm }}
+          >
+            {pkg.product.title} — {pkg.product.priceString}
+          </Button>
+        ))
+      ) : (
+        <Text style={typography.caption}>
+          Pretplata trenutno nije dostupna.
+        </Text>
+      )}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
   dialog: { borderRadius: radii.lg, backgroundColor: colors.surface },
   engineRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: spacing.sm },
   engineInfo: { flex: 1, paddingLeft: spacing.xs },
-});
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  premiumBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  premiumBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: colors.primary,
+  },
+  upgradeBox: {
+    backgroundColor: colors.primaryLight,
+    padding: spacing.lg,
+    borderRadius: radii.md,
+    marginTop: spacing.lg,
+  },
+})

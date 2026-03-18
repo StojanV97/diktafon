@@ -1,5 +1,6 @@
 import * as whisperService from "./whisperService"
 import * as assemblyAIService from "./assemblyAIService"
+import { isPremium } from "./subscriptionService"
 import {
   fetchEntry,
   entryAudioUri,
@@ -14,8 +15,10 @@ export async function preflight(engine) {
     if (!status.downloaded) return { ready: false, reason: "MODEL_NOT_DOWNLOADED" }
     return { ready: true }
   }
-  const hasKey = await assemblyAIService.hasApiKey()
-  if (!hasKey) return { ready: false, reason: "API_KEY_MISSING" }
+  // Dev mode: skip premium check if .env key is present
+  if (assemblyAIService.hasDevKey()) return { ready: true }
+  const premium = await isPremium()
+  if (!premium) return { ready: false, reason: "PREMIUM_REQUIRED" }
   return { ready: true }
 }
 
