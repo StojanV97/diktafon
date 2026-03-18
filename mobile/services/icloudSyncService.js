@@ -1,4 +1,4 @@
-import { Platform } from "react-native"
+import { NativeModules, Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 import { getSettings, updateSettings } from "./settingsService"
 
@@ -7,6 +7,7 @@ let CloudStore = null
 function getCloudStore() {
   if (CloudStore) return CloudStore
   if (Platform.OS !== "ios") return null
+  if (!NativeModules.CloudStoreModule) return null
   try {
     CloudStore = require("react-native-cloud-store")
     return CloudStore
