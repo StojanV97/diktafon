@@ -241,9 +241,9 @@ export default function DailyLogScreen({ navigation, route }) {
     if (!engineTargetId) {
       const toTranscribe = batchDate
         ? entries.filter(
-            (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && e.status === "recorded"
+            (e) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && (e.status === "recorded" || e.status === "error")
           )
-        : entries.filter((e) => e.status === "recorded");
+        : entries.filter((e) => e.status === "recorded" || e.status === "error");
       const ids = toTranscribe.map((e) => e.id);
       const dates = [...new Set(toTranscribe.map((e) => e.recorded_date || e.created_at.slice(0, 10)))];
 
@@ -463,7 +463,7 @@ export default function DailyLogScreen({ navigation, route }) {
 
   const renderItem = useCallback(({ item }) => {
     const status = item.status ?? "done";
-    const isRecorded = status === "recorded";
+    const isRecorded = status === "recorded" || status === "error";
     const isProcessing = status === "processing";
     const isDone = !isRecorded && !isProcessing;
     const sc = statusConfig(status);
@@ -605,7 +605,7 @@ export default function DailyLogScreen({ navigation, route }) {
           centerIcon="text-recognition"
           centerLabel="Sve u tekst"
           onCenterPress={() => openBatchEngineDialog(null)}
-          centerDisabled={!entries.some((e) => e.status === "recorded")}
+          centerDisabled={!entries.some((e) => e.status === "recorded" || e.status === "error")}
           onRightPress={handleStartRecording}
           isRecording={false}
         />

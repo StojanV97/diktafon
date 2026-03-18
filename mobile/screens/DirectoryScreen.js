@@ -281,7 +281,7 @@ export default function DirectoryScreen({ route, navigation }) {
 
   const renderItem = useCallback(({ item }) => {
     const status = item.status ?? "done";
-    const isRecorded = status === "recorded";
+    const isRecorded = status === "recorded" || status === "error";
     const isProcessing = status === "processing";
     const isError = status === "error";
     const isDone = !isRecorded && !isProcessing;
