@@ -1,4 +1,5 @@
 import { File, Directory, Paths } from "expo-file-system";
+import * as Sentry from "@sentry/react-native";
 
 function generateUUID() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -17,6 +18,11 @@ const entriesFile = new File(journalDir, "entries.json");
 // In-memory cache — avoids re-reading + JSON-parsing on every read (esp. 5s polling)
 let _foldersCache = null;
 let _entriesCache = null;
+
+// Corruption detection — set when both main + .bak files are unreadable
+let _corruptionDetected = null;
+// Last write error — for surfacing disk-full / permission errors to the UI
+let _lastWriteError = null;
 
 function ensureDirs() {
   journalDir.create({ idempotent: true });
@@ -47,10 +53,14 @@ async function readJSON(file) {
         file.write(bakRaw);
       } catch {
         console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
+        _corruptionDetected = file.name;
+        Sentry.captureMessage(`Data corruption: ${file.name} and .bak both unreadable`, "error");
         result = [];
       }
     } else {
       console.warn(`readJSON: ${file.name} corrupted, no .bak available`);
+      _corruptionDetected = file.name;
+      Sentry.captureMessage(`Data corruption: ${file.name} corrupted, no .bak`, "error");
       result = [];
     }
   }
@@ -61,24 +71,41 @@ async function readJSON(file) {
 }
 
 function writeJSON(file, data) {
-  ensureDirs();
-  const json = JSON.stringify(data);
-  // Write to temp file first, then back up old file, then move temp into place
-  const tmpFile = new File(file.parentDirectory, file.name + ".tmp");
-  tmpFile.write(json);
-  // Back up the current file before replacing
-  if (file.exists) {
-    const bakFile = new File(file.parentDirectory, file.name + ".bak");
-    if (bakFile.exists) bakFile.delete();
-    file.copy(bakFile);
-  }
-  // Move temp file to real path (atomic on most filesystems)
-  if (file.exists) file.delete();
-  tmpFile.move(file);
+  try {
+    ensureDirs();
+    const json = JSON.stringify(data);
+    // Write to temp file first, then back up old file, then move temp into place
+    const tmpFile = new File(file.parentDirectory, file.name + ".tmp");
+    tmpFile.write(json);
+    // Back up the current file before replacing
+    if (file.exists) {
+      const bakFile = new File(file.parentDirectory, file.name + ".bak");
+      if (bakFile.exists) bakFile.delete();
+      file.copy(bakFile);
+    }
+    // Move temp file to real path (atomic on most filesystems)
+    if (file.exists) file.delete();
+    tmpFile.move(file);
 
-  // Update cache with written data
-  if (file === foldersFile) _foldersCache = data;
-  else if (file === entriesFile) _entriesCache = data;
+    // Update cache with written data
+    if (file === foldersFile) _foldersCache = data;
+    else if (file === entriesFile) _entriesCache = data;
+  } catch (e) {
+    console.warn(`writeJSON: failed to write ${file.name}:`, e);
+    Sentry.captureException(e);
+    _lastWriteError = e;
+    throw e;
+  }
+}
+
+export function getCorruptionStatus() {
+  return _corruptionDetected;
+}
+
+export function getLastWriteError() {
+  const err = _lastWriteError;
+  _lastWriteError = null;
+  return err;
 }
 
 function truncateText(text, max = 200) {

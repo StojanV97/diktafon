@@ -22,9 +22,7 @@ export async function removeApiKey() {
 
 export async function hasApiKey() {
   const key = await getApiKey();
-  if (key && key.trim().length > 0) return true;
-  const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY;
-  return !!envKey && envKey.trim().length > 0;
+  return !!(key && key.trim().length > 0);
 }
 
 // ── Transcription ───────────────────────────────────────
@@ -32,8 +30,6 @@ export async function hasApiKey() {
 async function getKeyOrThrow() {
   const key = await getApiKey();
   if (key && key.trim()) return key.trim();
-  const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY;
-  if (envKey && envKey.trim()) return envKey.trim();
   throw new Error("ASSEMBLYAI_KEY_MISSING");
 }
 

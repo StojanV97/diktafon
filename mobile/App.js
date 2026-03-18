@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
+import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -8,7 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
-import { migrateData } from "./services/journalStorage";
+import { migrateData, getCorruptionStatus } from "./services/journalStorage";
 import { releaseContext } from "./services/whisperService";
 import { syncWidgetData } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
@@ -18,12 +19,18 @@ import EntryScreen from "./screens/EntryScreen";
 import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
+Sentry.init({
+  // TODO: Replace with your Sentry DSN
+  dsn: "YOUR_SENTRY_DSN",
+  tracesSampleRate: 0.2,
+});
+
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
 const linking = {
-  prefixes: ["com.local.diktafon://"],
+  prefixes: ["com.diktafon.app://"],
   config: {
     screens: {
       DailyLog: { path: "dailylog" },
@@ -45,6 +52,10 @@ class ErrorBoundary extends React.Component {
 
   static getDerivedStateFromError() {
     return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    Sentry.captureException(error, { extra: errorInfo });
   }
 
   render() {
@@ -77,7 +88,7 @@ const errorStyles = StyleSheet.create({
   buttonText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
 });
 
-export default function App() {
+function App() {
   const [ready, setReady] = useState(false);
 
   const [fontsLoaded] = useFonts({
@@ -93,6 +104,15 @@ export default function App() {
       setReady(true);
       syncWidgetData();
       runAutoMove();
+
+      const corrupted = getCorruptionStatus();
+      if (corrupted) {
+        Alert.alert(
+          "Upozorenje",
+          "Podaci su mozda osteceni. Preporucujemo vracanje iz rezervne kopije.",
+          [{ text: "U redu" }]
+        );
+      }
     });
   }, []);
 
@@ -163,3 +183,5 @@ export default function App() {
     </PaperProvider>
   );
 }
+
+export default Sentry.wrap(App);

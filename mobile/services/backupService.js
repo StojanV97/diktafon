@@ -70,5 +70,12 @@ export async function restoreFromBackup(fileUri) {
     await Promise.all(promises);
   }
 
+  // Create a safety backup before overwriting current data
+  try {
+    await createBackup();
+  } catch (e) {
+    console.warn("Pre-restore backup failed:", e);
+  }
+
   return importAllData({ folders, entries, audioFiles, textFiles });
 }
