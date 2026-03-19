@@ -68,6 +68,8 @@ export default function DirectoryHomeScreen({ navigation }) {
   // Delete dialog
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [dialogLoading, setDialogLoading] = useState(false);
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(null);
@@ -158,12 +160,13 @@ export default function DirectoryHomeScreen({ navigation }) {
 
   const onDialogConfirm = async () => {
     const name = dialogName.trim();
-    if (!name) return;
+    if (!name || dialogLoading) return;
     if (name.length > 100) {
       setSnackbar("Naziv ne moze biti duzi od 100 karaktera.");
       return;
     }
 
+    setDialogLoading(true);
     try {
       if (dialogMode === "create") {
         const folder = await createFolder(name, dialogColor, dialogTags);
@@ -179,6 +182,8 @@ export default function DirectoryHomeScreen({ navigation }) {
       setDialogVisible(false);
     } catch (e) {
       setSnackbar(e.message);
+    } finally {
+      setDialogLoading(false);
     }
   };
 
@@ -189,12 +194,15 @@ export default function DirectoryHomeScreen({ navigation }) {
   };
 
   const onDeleteConfirm = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteLoading) return;
+    setDeleteLoading(true);
     try {
       await deleteFolder(deleteTarget.id);
       setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
     } catch (e) {
       setSnackbar(e.message);
+    } finally {
+      setDeleteLoading(false);
     }
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
@@ -445,7 +453,7 @@ export default function DirectoryHomeScreen({ navigation }) {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
-            <Button onPress={onDialogConfirm} textColor={colors.primary}>
+            <Button onPress={onDialogConfirm} textColor={colors.primary} disabled={dialogLoading} loading={dialogLoading}>
               {dialogMode === "create" ? "Kreiraj" : "Sacuvaj"}
             </Button>
           </Dialog.Actions>
@@ -457,6 +465,7 @@ export default function DirectoryHomeScreen({ navigation }) {
           onConfirm={onDeleteConfirm}
           title="Obrisi direktorijum"
           message={`Obrisati "${deleteTarget?.name}" i sve zapise u njemu?`}
+          loading={deleteLoading}
         />
       </Portal>
 

@@ -54,19 +54,22 @@ export default function EntryScreen({ route, navigation }) {
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
 
   useEffect(() => {
+    let ignore = false;
     (async () => {
       try {
         const data = await fetchEntry(id);
+        if (ignore) return;
         setRecord(data);
         if (data?.status === "done" && data.text) {
           init(data.text);
         }
       } catch (e) {
-        setSnackbar(e.message);
+        if (!ignore) setSnackbar(e.message);
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     })();
+    return () => { ignore = true; };
   }, [id]);
 
   useEffect(() => {

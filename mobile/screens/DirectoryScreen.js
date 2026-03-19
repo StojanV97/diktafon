@@ -73,6 +73,7 @@ export default function DirectoryScreen({ route, navigation }) {
   // Delete dialog
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Engine choice dialog
   const [engineDialogVisible, setEngineDialogVisible] = useState(false);
@@ -297,12 +298,15 @@ export default function DirectoryScreen({ route, navigation }) {
   };
 
   const onDeleteConfirm = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteLoading) return;
+    setDeleteLoading(true);
     try {
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     } catch (e) {
       setSnackbar("Brisanje nije uspelo: " + e.message);
+    } finally {
+      setDeleteLoading(false);
     }
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
@@ -480,6 +484,7 @@ export default function DirectoryScreen({ route, navigation }) {
           onConfirm={onDeleteConfirm}
           title="Obrisi zapis"
           message={`Obrisati "${deleteTarget?.filename}"?`}
+          loading={deleteLoading}
         />
         <EngineChoiceDialog
           visible={engineDialogVisible}

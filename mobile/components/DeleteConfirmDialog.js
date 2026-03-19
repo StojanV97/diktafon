@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 import { Button, Dialog, Text } from "react-native-paper";
 import { colors, radii, typography } from "../theme";
 
-export default function DeleteConfirmDialog({ visible, onDismiss, onConfirm, title, message, confirmLabel }) {
+export default function DeleteConfirmDialog({ visible, onDismiss, onConfirm, title, message, confirmLabel, loading }) {
   return (
     <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
       <Dialog.Title style={typography.heading}>{title}</Dialog.Title>
@@ -11,8 +11,8 @@ export default function DeleteConfirmDialog({ visible, onDismiss, onConfirm, tit
         <Text style={typography.body}>{message}</Text>
       </Dialog.Content>
       <Dialog.Actions>
-        <Button onPress={onDismiss} textColor={colors.muted}>Otkazi</Button>
-        <Button onPress={onConfirm} textColor={colors.danger}>{confirmLabel || "Obrisi"}</Button>
+        <Button onPress={onDismiss} textColor={colors.muted} disabled={loading}>Otkazi</Button>
+        <Button onPress={onConfirm} textColor={colors.danger} disabled={loading} loading={loading}>{confirmLabel || "Obrisi"}</Button>
       </Dialog.Actions>
     </Dialog>
   );

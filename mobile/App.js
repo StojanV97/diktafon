@@ -96,6 +96,8 @@ function App() {
   const [ready, setReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Home");
 
+  const [fontTimeout, setFontTimeout] = useState(false);
+
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_600SemiBold,
@@ -105,20 +107,33 @@ function App() {
   });
 
   useEffect(() => {
+    const timer = setTimeout(() => setFontTimeout(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     async function init() {
-      await migrateData();
-
-      // Check if user has seen the auth screen
-      const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");
-      if (!hasSeenAuth) {
-        setInitialRoute("Auth");
-      }
-
-      // Init RevenueCat
       try {
-        await initPurchases("ios");
+        await migrateData();
+
+        const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");
+        if (!hasSeenAuth) {
+          setInitialRoute("Auth");
+        }
+
+        try {
+          await initPurchases("ios");
+        } catch (e) {
+          if (__DEV__) console.warn("RevenueCat init failed:", e.message);
+        }
       } catch (e) {
-        if (__DEV__) console.warn("RevenueCat init failed:", e.message);
+        Sentry.captureException(e);
+        if (__DEV__) console.warn("App init failed:", e.message);
+        Alert.alert(
+          "Greska pri pokretanju",
+          "Aplikacija se pokrenula sa mogucim greskama u podacima. Preporucujemo vracanje iz rezervne kopije.",
+          [{ text: "U redu" }]
+        );
       }
 
       setReady(true);
@@ -134,7 +149,6 @@ function App() {
         );
       }
 
-      // iCloud sync on launch
       try {
         const syncEnabled = await isSyncEnabled();
         if (syncEnabled) {
@@ -176,12 +190,12 @@ function App() {
   }, []);
 
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded && ready) {
+    if ((fontsLoaded || fontTimeout) && ready) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, ready]);
+  }, [fontsLoaded, fontTimeout, ready]);
 
-  if (!fontsLoaded || !ready) {
+  if ((!fontsLoaded && !fontTimeout) || !ready) {
     return (
       <PaperProvider theme={theme}>
         <View style={loadingStyles.container}>

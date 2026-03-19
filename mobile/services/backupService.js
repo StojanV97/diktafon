@@ -35,8 +35,13 @@ export async function restoreFromBackup(fileUri) {
 
   const foldersJSON = await zip.file("folders.json").async("string");
   const entriesJSON = await zip.file("entries.json").async("string");
-  const folders = JSON.parse(foldersJSON);
-  const entries = JSON.parse(entriesJSON);
+  let folders, entries;
+  try {
+    folders = JSON.parse(foldersJSON);
+    entries = JSON.parse(entriesJSON);
+  } catch {
+    throw new Error("Backup fajl je ostecen — podaci nisu citljivi.");
+  }
 
   const audioFiles = [];
   const audioFolder = zip.folder("audio");

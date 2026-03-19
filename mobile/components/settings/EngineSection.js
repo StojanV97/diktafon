@@ -13,12 +13,20 @@ export default function EngineSection() {
   const [premium, setPremium] = useState(false)
 
   useEffect(() => {
+    let ignore = false
     ;(async () => {
-      const settings = await getSettings()
-      setDefaultEngine(settings.defaultEngine)
-      const hasPremium = await isPremium() || hasDevKey()
-      setPremium(hasPremium)
+      try {
+        const settings = await getSettings()
+        if (ignore) return
+        setDefaultEngine(settings.defaultEngine)
+        const hasPremium = await isPremium() || hasDevKey()
+        if (ignore) return
+        setPremium(hasPremium)
+      } catch (e) {
+        if (__DEV__) console.warn("EngineSection init failed:", e.message)
+      }
     })()
+    return () => { ignore = true }
   }, [])
 
   const handleEngineChange = async (value) => {

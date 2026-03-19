@@ -87,6 +87,7 @@ export default function DailyLogScreen({ navigation, route }) {
   // Delete dialog (single + all)
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteAllDialogVisible, setDeleteAllDialogVisible] = useState(false);
 
   // Engine dialog (single or batch)
@@ -304,13 +305,16 @@ export default function DailyLogScreen({ navigation, route }) {
   };
 
   const onDeleteConfirm = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteLoading) return;
+    setDeleteLoading(true);
     try {
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       syncWidgetData();
     } catch (e) {
       setSnackbar("Brisanje nije uspelo: " + e.message);
+    } finally {
+      setDeleteLoading(false);
     }
     setDeleteDialogVisible(false);
     setDeleteTarget(null);
@@ -674,6 +678,7 @@ export default function DailyLogScreen({ navigation, route }) {
           onConfirm={onDeleteConfirm}
           title="Obrisi zapis"
           message="Obrisati ovaj snimak?"
+          loading={deleteLoading}
         />
         <EngineChoiceDialog
           visible={engineDialogVisible}

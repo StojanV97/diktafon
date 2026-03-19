@@ -14,21 +14,26 @@ export default function SubscriptionSection({ setSnackbar, user }) {
   const [purchaseLoading, setPurchaseLoading] = useState(false)
 
   useEffect(() => {
+    let ignore = false
     ;(async () => {
       try {
         const hasPremium = await isPremium()
+        if (ignore) return
         setPremium(hasPremium)
         if (user) {
           const profile = await getProfile()
+          if (ignore) return
           setUsageInfo(getUsageFromProfile(profile))
         }
       } catch { /* ignore */ }
 
       try {
         const off = await getOfferings()
+        if (ignore) return
         setOfferings(off)
       } catch { /* ignore */ }
     })()
+    return () => { ignore = true }
   }, [user])
 
   const handlePurchase = async (pkg) => {
