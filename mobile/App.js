@@ -137,8 +137,8 @@ function App() {
       }
 
       setReady(true);
-      syncWidgetData();
-      runAutoMove();
+      syncWidgetData().catch(() => {});
+      runAutoMove().catch(() => {});
 
       const corrupted = getCorruptionStatus();
       if (corrupted) {
@@ -156,8 +156,8 @@ function App() {
           const localEntries = await getRawEntries();
           const result = await pullAndMerge(localFolders, localEntries);
           if (result.changed) {
-            overwriteFolders(result.folders);
-            overwriteEntries(result.entries);
+            await overwriteFolders(result.folders);
+            await overwriteEntries(result.entries);
           }
         }
       } catch (e) {

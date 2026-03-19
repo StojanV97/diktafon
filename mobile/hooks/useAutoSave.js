@@ -41,8 +41,11 @@ export default function useAutoSave(saveFn, delay = 1500) {
   }, [])
 
   useEffect(() => {
-    return clearTimer
-  }, [clearTimer])
+    return () => {
+      clearTimer()
+      doSave(editableTextRef.current)
+    }
+  }, [clearTimer, doSave])
 
   return { editableText, handleTextChange, flush, init }
 }

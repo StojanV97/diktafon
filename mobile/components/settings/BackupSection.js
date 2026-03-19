@@ -48,8 +48,11 @@ export default function BackupSection({ setSnackbar }) {
               setBackupLoading(true)
               try {
                 const stats = await backupService.restoreFromBackup(fileUri)
+                const msg = `Oporavak zavrsen: ${stats.folders} fascikli, ${stats.entries} unosa, ${stats.audioFiles} snimaka, ${stats.textFiles} transkripata.`
                 setSnackbar(
-                  `Oporavak zavrsen: ${stats.folders} fascikli, ${stats.entries} unosa, ${stats.audioFiles} snimaka, ${stats.textFiles} transkripata.`
+                  stats.skippedFiles > 0
+                    ? `${msg} Upozorenje: ${stats.skippedFiles} fajlova nije moglo biti ucitano.`
+                    : msg
                 )
               } catch (e) {
                 setSnackbar("Oporavak nije uspeo: " + e.message)

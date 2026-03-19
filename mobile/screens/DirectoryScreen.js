@@ -278,8 +278,12 @@ export default function DirectoryScreen({ route, navigation }) {
   const openEngineDialog = async (entryId) => {
     setMenuVisible(null);
     setEngineTargetId(entryId);
-    const { defaultEngine } = await getSettings();
-    setEngineChoice(defaultEngine);
+    try {
+      const { defaultEngine } = await getSettings();
+      setEngineChoice(defaultEngine);
+    } catch {
+      setEngineChoice("local");
+    }
     setEngineDialogVisible(true);
   };
 

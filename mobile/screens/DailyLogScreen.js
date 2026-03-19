@@ -72,6 +72,9 @@ function formatSectionDate(dateStr) {
 const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
 
 export default function DailyLogScreen({ navigation, route }) {
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,6 +102,7 @@ export default function DailyLogScreen({ navigation, route }) {
   // Move dialog
   const [moveDialogVisible, setMoveDialogVisible] = useState(false);
   const [moveTargetEntryId, setMoveTargetEntryId] = useState(null);
+  const [moveLoading, setMoveLoading] = useState(false);
   const [regularFolders, setRegularFolders] = useState([]);
 
   // Combined transcript per date
@@ -216,6 +220,7 @@ export default function DailyLogScreen({ navigation, route }) {
 
   // Load combined transcripts for dates where at least one entry is done
   useEffect(() => {
+    let ignore = false;
     const datesWithDone = grouped
       .filter(({ data }) => data.some((e) => e.status === "done"))
       .map(({ date }) => date);
@@ -226,8 +231,9 @@ export default function DailyLogScreen({ navigation, route }) {
     }
 
     getDailyCombinedTranscripts(datesWithDone)
-      .then((results) => setCombinedTexts(results))
+      .then((results) => { if (!ignore) setCombinedTexts(results); })
       .catch(() => {});
+    return () => { ignore = true; };
   }, [grouped]);
 
   const toggleSection = (date) => {
@@ -243,16 +249,24 @@ export default function DailyLogScreen({ navigation, route }) {
     setMenuVisible(null);
     setEngineTargetId(entryId);
     setBatchDate(null);
-    const { defaultEngine } = await getSettings();
-    setEngineChoice(defaultEngine);
+    try {
+      const { defaultEngine } = await getSettings();
+      setEngineChoice(defaultEngine);
+    } catch {
+      setEngineChoice("local");
+    }
     setEngineDialogVisible(true);
   };
 
   const openBatchEngineDialog = async (date = null) => {
     setBatchDate(date);
     setEngineTargetId(null);
-    const { defaultEngine } = await getSettings();
-    setEngineChoice(defaultEngine);
+    try {
+      const { defaultEngine } = await getSettings();
+      setEngineChoice(defaultEngine);
+    } catch {
+      setEngineChoice("local");
+    }
     setEngineDialogVisible(true);
   };
 
@@ -261,8 +275,8 @@ export default function DailyLogScreen({ navigation, route }) {
       await consolidateDailyLogEntries(date);
     }
     const data = await fetchDailyLogEntries();
-    setEntries(data);
-    syncWidgetData();
+    if (mountedRef.current) setEntries(data);
+    syncWidgetData().catch(() => {});
   };
 
   const onTranscribeConfirm = async () => {
@@ -353,13 +367,18 @@ export default function DailyLogScreen({ navigation, route }) {
   };
 
   const onMoveConfirm = async (folderId, folderName) => {
-    setMoveDialogVisible(false);
+    if (moveLoading) return;
+    setMoveLoading(true);
     try {
       await moveEntryToFolder(moveTargetEntryId, folderId);
       setEntries((prev) => prev.filter((e) => e.id !== moveTargetEntryId));
       setSnackbar(`Premesteno u "${folderName}"`);
+      setMoveDialogVisible(false);
     } catch (e) {
       setSnackbar(e.message);
+    } finally {
+      setMoveLoading(false);
+      setMoveTargetEntryId(null);
     }
   };
 
@@ -696,7 +715,7 @@ export default function DailyLogScreen({ navigation, route }) {
         <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
 
         {/* Move to folder dialog */}
-        <Dialog visible={moveDialogVisible} onDismiss={() => setMoveDialogVisible(false)} style={styles.dialog}>
+        <Dialog visible={moveDialogVisible} onDismiss={() => !moveLoading && setMoveDialogVisible(false)} style={styles.dialog}>
           <Dialog.Title style={typography.heading}>Premesti u folder</Dialog.Title>
           <Dialog.Content>
             {regularFolders.length === 0 ? (
@@ -705,18 +724,23 @@ export default function DailyLogScreen({ navigation, route }) {
               regularFolders.map((folder) => (
                 <TouchableOpacity
                   key={folder.id}
-                  style={styles.folderRow}
+                  style={[styles.folderRow, moveLoading && { opacity: 0.5 }]}
                   onPress={() => onMoveConfirm(folder.id, folder.name)}
+                  disabled={moveLoading}
                 >
                   <View style={[styles.folderDot, { backgroundColor: folder.color || colors.primary }]} />
                   <Text style={[typography.body, { flex: 1 }]}>{folder.name}</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.muted} />
+                  {moveLoading ? (
+                    <ActivityIndicator size={16} color={colors.muted} />
+                  ) : (
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={colors.muted} />
+                  )}
                 </TouchableOpacity>
               ))
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setMoveDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={() => setMoveDialogVisible(false)} textColor={colors.muted} disabled={moveLoading}>Otkazi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

@@ -762,11 +762,15 @@ export async function getRawEntries() {
 }
 
 export function overwriteFolders(folders) {
-  writeJSON(foldersFile, folders)
+  return withWriteLock(() => {
+    writeJSON(foldersFile, folders)
+  })
 }
 
 export function overwriteEntries(entries) {
-  writeJSON(entriesFile, entries)
+  return withWriteLock(() => {
+    writeJSON(entriesFile, entries)
+  })
 }
 
 export function moveEntryToFolder(entryId, targetFolderId) {

@@ -44,6 +44,7 @@ export async function restoreFromBackup(fileUri) {
   }
 
   const audioFiles = [];
+  let skippedFiles = 0;
   const audioFolder = zip.folder("audio");
   if (audioFolder) {
     const promises = [];
@@ -53,7 +54,7 @@ export async function restoreFromBackup(fileUri) {
         zipEntry.async("uint8array").then((audioData) => {
           const id = relativePath.replace(".wav", "");
           audioFiles.push({ id, data: audioData });
-        })
+        }).catch(() => { skippedFiles++; })
       );
     });
     await Promise.all(promises);
@@ -69,7 +70,7 @@ export async function restoreFromBackup(fileUri) {
         zipEntry.async("string").then((text) => {
           const id = relativePath.replace("journal_", "").replace(".txt", "");
           textFiles.push({ id, text });
-        })
+        }).catch(() => { skippedFiles++; })
       );
     });
     await Promise.all(promises);
@@ -82,5 +83,6 @@ export async function restoreFromBackup(fileUri) {
     if (__DEV__) console.warn("Pre-restore backup failed:", e);
   }
 
-  return importAllData({ folders, entries, audioFiles, textFiles });
+  const stats = importAllData({ folders, entries, audioFiles, textFiles });
+  return { ...stats, skippedFiles };
 }

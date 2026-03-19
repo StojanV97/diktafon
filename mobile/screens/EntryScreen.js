@@ -143,7 +143,7 @@ export default function EntryScreen({ route, navigation }) {
 
   const saveTranscriptToFiles = async () => {
     setShareMenuVisible(false);
-    if (!currentText) return;
+    if (!currentText || !record?.filename) return;
     try {
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
