@@ -137,75 +137,57 @@ function truncateText(text, max = 200) {
 
 // ── Migration ──────────────────────────────────────────
 
-export async function migrateData() {
-  const folders = await readJSON(foldersFile);
-  let changed = false;
-  for (const folder of folders) {
-    if (!folder.color) {
-      folder.color = "#4A9EFF";
-      changed = true;
+export function migrateData() {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile);
+    let foldersChanged = false;
+    for (const folder of folders) {
+      if (!folder.color) {
+        folder.color = "#4A9EFF";
+        foldersChanged = true;
+      }
+      if (!folder.tags) {
+        folder.tags = [];
+        foldersChanged = true;
+      }
+      if (folder.engine !== undefined) {
+        delete folder.engine;
+        foldersChanged = true;
+      }
+      if (!folder.updated_at) {
+        folder.updated_at = folder.created_at;
+        foldersChanged = true;
+      }
     }
-    if (!folder.tags) {
-      folder.tags = [];
-      changed = true;
-    }
-    if (folder.engine !== undefined) {
-      delete folder.engine;
-      changed = true;
-    }
-  }
-  if (changed) writeJSON(foldersFile, folders);
+    if (foldersChanged) writeJSON(foldersFile, folders);
 
-  // Reset entries stuck in "processing" for >24 hours back to "recorded"
-  const entries = await readJSON(entriesFile);
-  let entriesFixed = false;
-  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  for (const entry of entries) {
-    if (entry.status === "processing" && new Date(entry.created_at).getTime() < oneDayAgo) {
-      entry.status = "recorded";
-      delete entry.assemblyai_id;
-      entriesFixed = true;
-    }
-  }
-  if (entriesFixed) writeJSON(entriesFile, entries);
-
-  // Backfill updated_at from created_at for conflict resolution
-  const allEntries = await readJSON(entriesFile);
-  let updatedAtFixed = false;
-  for (const entry of allEntries) {
-    if (!entry.updated_at) {
-      entry.updated_at = entry.created_at;
-      updatedAtFixed = true;
-    }
-  }
-  if (updatedAtFixed) writeJSON(entriesFile, allEntries);
-
-  // Backfill updated_at on folders
-  const allFolders = await readJSON(foldersFile);
-  let foldersUpdatedAtFixed = false;
-  for (const folder of allFolders) {
-    if (!folder.updated_at) {
-      folder.updated_at = folder.created_at;
-      foldersUpdatedAtFixed = true;
-    }
-  }
-  if (foldersUpdatedAtFixed) writeJSON(foldersFile, allFolders);
-
-  // Backfill recorded_date for existing daily log entries
-  const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
-  if (dailyLogFolder) {
-    const dailyEntries = await readJSON(entriesFile);
+    const entries = await readJSON(entriesFile);
     let entriesChanged = false;
-    for (const entry of dailyEntries) {
-      if (entry.folder_id === dailyLogFolder.id && !entry.recorded_date) {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const dailyLogFolder = folders.find((f) => f.is_daily_log === true);
+
+    for (const entry of entries) {
+      // Reset entries stuck in "processing" for >24 hours back to "recorded"
+      if (entry.status === "processing" && new Date(entry.created_at).getTime() < oneDayAgo) {
+        entry.status = "recorded";
+        delete entry.assemblyai_id;
+        entriesChanged = true;
+      }
+      // Backfill updated_at from created_at
+      if (!entry.updated_at) {
+        entry.updated_at = entry.created_at;
+        entriesChanged = true;
+      }
+      // Backfill recorded_date for daily log entries
+      if (dailyLogFolder && entry.folder_id === dailyLogFolder.id && !entry.recorded_date) {
         entry.recorded_date = entry.created_at.slice(0, 10);
         entriesChanged = true;
       }
     }
-    if (entriesChanged) writeJSON(entriesFile, dailyEntries);
-  }
+    if (entriesChanged) writeJSON(entriesFile, entries);
 
-  await cleanOrphanedFiles();
+    await cleanOrphanedFiles();
+  })
 }
 
 async function cleanOrphanedFiles() {
@@ -411,13 +393,13 @@ export function completeEntry(entryId, text, durationSeconds) {
   return withWriteLock(async () => {
     ensureDirs();
 
-    // Write full text to file
-    const textFile = new File(textsDir, `journal_${entryId}.txt`);
-    textFile.write(text);
-
     const entries = await readJSON(entriesFile);
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return null;
+
+    // Write full text to file (after confirming entry exists — avoids orphans)
+    const textFile = new File(textsDir, `journal_${entryId}.txt`);
+    textFile.write(text);
     entry.status = "done";
     entry.text = truncateText(text);
     entry.duration_seconds = durationSeconds;
@@ -435,11 +417,12 @@ export function completeEntry(entryId, text, durationSeconds) {
 export function updateEntryText(entryId, newText) {
   return withWriteLock(async () => {
     ensureDirs()
-    const textFile = new File(textsDir, `journal_${entryId}.txt`)
-    textFile.write(newText)
     const entries = await readJSON(entriesFile)
     const entry = entries.find((e) => e.id === entryId)
     if (!entry) return null
+    // Write text file after confirming entry exists — avoids orphans
+    const textFile = new File(textsDir, `journal_${entryId}.txt`)
+    textFile.write(newText)
     entry.text = truncateText(newText)
     entry.updated_at = new Date().toISOString()
     writeJSON(entriesFile, entries)
@@ -470,6 +453,11 @@ export function failEntry(entryId, error) {
 export function entryAudioUri(entryId) {
   const file = new File(audioDir, `${entryId}.wav`);
   return file.uri;
+}
+
+export function entryAudioExists(entryId) {
+  const file = new File(audioDir, `${entryId}.wav`);
+  return file.exists;
 }
 
 export function deleteEntryAudio(entryId) {
@@ -724,31 +712,33 @@ export async function exportAllData() {
 }
 
 export function importAllData(data) {
-  ensureDirs();
-  writeJSON(foldersFile, data.folders);
-  writeJSON(entriesFile, data.entries);
+  return withWriteLock(() => {
+    ensureDirs();
+    writeJSON(foldersFile, data.folders);
+    writeJSON(entriesFile, data.entries);
 
-  let audioCount = 0;
-  let textCount = 0;
+    let audioCount = 0;
+    let textCount = 0;
 
-  for (const { id, data: audioData } of data.audioFiles) {
-    const dest = new File(audioDir, `${id}.wav`);
-    dest.write(audioData);
-    audioCount++;
-  }
+    for (const { id, data: audioData } of data.audioFiles) {
+      const dest = new File(audioDir, `${id}.wav`);
+      dest.write(audioData);
+      audioCount++;
+    }
 
-  for (const { id, text } of data.textFiles) {
-    const dest = new File(textsDir, `journal_${id}.txt`);
-    dest.write(text);
-    textCount++;
-  }
+    for (const { id, text } of data.textFiles) {
+      const dest = new File(textsDir, `journal_${id}.txt`);
+      dest.write(text);
+      textCount++;
+    }
 
-  return {
-    folders: data.folders.length,
-    entries: data.entries.length,
-    audioFiles: audioCount,
-    textFiles: textCount,
-  };
+    return {
+      folders: data.folders.length,
+      entries: data.entries.length,
+      audioFiles: audioCount,
+      textFiles: textCount,
+    };
+  })
 }
 
 // ── iCloud Sync Support ─────────────────────────────────

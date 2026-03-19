@@ -20,7 +20,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { fetchEntry, entryAudioUri, updateEntryText } from "../services/journalStorage";
+import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText } from "../services/journalStorage";
 import useAutoSave from "../hooks/useAutoSave";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
@@ -49,6 +49,7 @@ export default function EntryScreen({ route, navigation }) {
   const [snackbar, setSnackbar] = useState("");
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [audioMissing, setAudioMissing] = useState(false);
 
   const saveFn = useCallback((text) => updateEntryText(id, text), [id]);
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
@@ -60,6 +61,9 @@ export default function EntryScreen({ route, navigation }) {
         const data = await fetchEntry(id);
         if (ignore) return;
         setRecord(data);
+        if (data?.audio_file && !entryAudioExists(data.id)) {
+          setAudioMissing(true);
+        }
         if (data?.status === "done" && data.text) {
           init(data.text);
         }
@@ -82,7 +86,7 @@ export default function EntryScreen({ route, navigation }) {
     return navigation.addListener("beforeRemove", () => { flush(); });
   }, [navigation, flush]);
 
-  const audioSource = record?.audio_file ? { uri: entryAudioUri(record.id) } : null;
+  const audioSource = record?.audio_file && !audioMissing ? { uri: entryAudioUri(record.id) } : null;
   const player = useAudioPlayer(audioSource, 250);
   const status = useAudioPlayerStatus(player);
   const [barWidth, setBarWidth] = useState(1);
@@ -208,8 +212,16 @@ export default function EntryScreen({ route, navigation }) {
         }
       </ScrollView>
 
+      {/* Audio missing notice */}
+      {!keyboardVisible && audioMissing && (
+        <View style={[styles.playerCard, elevation.md, { alignItems: "center", paddingVertical: spacing.lg }]}>
+          <MaterialCommunityIcons name="file-music-outline" size={24} color={colors.muted} />
+          <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Audio fajl nije pronadjen</Text>
+        </View>
+      )}
+
       {/* Player card — pinned above bottom bar (hidden when keyboard is up) */}
-      {!keyboardVisible && record?.audio_file && (
+      {!keyboardVisible && record?.audio_file && !audioMissing && (
         <View style={[styles.playerCard, elevation.md]}>
           <Pressable
             style={styles.progressBarTrack}

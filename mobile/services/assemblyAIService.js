@@ -48,7 +48,16 @@ async function submitDirect(fileUri, options = {}) {
     }),
     UPLOAD_TIMEOUT_MS
   )
-  const { upload_url } = JSON.parse(uploadRes.body)
+  let uploadBody
+  try {
+    uploadBody = JSON.parse(uploadRes.body)
+  } catch {
+    throw new Error("Neispravan odgovor od servera pri uploadu. Pokusajte ponovo.")
+  }
+  const { upload_url } = uploadBody
+  if (!upload_url) {
+    throw new Error("Server nije vratio URL za upload. Pokusajte ponovo.")
+  }
 
   // 2. Create transcript job
   const body = {
@@ -67,6 +76,7 @@ async function submitDirect(fileUri, options = {}) {
   }, SUBMIT_TIMEOUT_MS)
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Greska pri slanju na AssemblyAI")
+  if (!data.id) throw new Error("Server nije vratio ID transkripcije. Pokusajte ponovo.")
   return { assemblyai_id: data.id }
 }
 
@@ -74,7 +84,12 @@ async function checkDirect(transcriptId) {
   const res = await fetchWithTimeout(`${AAI_BASE}/transcript/${transcriptId}`, {
     headers: { authorization: DEV_API_KEY },
   }, CHECK_TIMEOUT_MS)
-  const data = await res.json()
+  let data
+  try {
+    data = await res.json()
+  } catch {
+    throw new Error("Neispravan odgovor od servera pri proveri statusa.")
+  }
 
   if (data.status === "completed") {
     const text = data.utterances

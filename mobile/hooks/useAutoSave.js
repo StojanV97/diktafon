@@ -17,7 +17,16 @@ export default function useAutoSave(saveFn, delay = 1500) {
     if (!text || !text.trim()) return
     if (text === lastSavedRef.current) return
     lastSavedRef.current = text
-    saveFn(text)
+    try {
+      const result = saveFn(text)
+      // Handle async saveFn — reset lastSavedRef on failure so next save retries
+      if (result && typeof result.catch === "function") {
+        result.catch(() => { lastSavedRef.current = "" })
+      }
+    } catch {
+      // Sync failure (e.g. disk full) — reset so next save retries
+      lastSavedRef.current = ""
+    }
   }, [saveFn])
 
   const handleTextChange = useCallback((newText) => {

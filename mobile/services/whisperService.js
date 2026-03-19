@@ -25,8 +25,13 @@ export function getModelStatus() {
   };
 }
 
+const MIN_MODEL_SIZE = 140 * 1024 * 1024; // 140MB minimum for ggml-small
+
 export async function downloadModel(onProgress) {
   modelsDir.create({ idempotent: true });
+
+  // Delete any existing partial file before downloading
+  if (modelFile.exists) modelFile.delete();
 
   const downloadResumable = FileSystem.createDownloadResumable(
     MODEL_URL,
@@ -41,6 +46,13 @@ export async function downloadModel(onProgress) {
   );
 
   const result = await downloadResumable.downloadAsync();
+
+  // Size check — detect interrupted/partial downloads
+  if (modelFile.exists && modelFile.size < MIN_MODEL_SIZE) {
+    modelFile.delete();
+    throw new Error("Preuzimanje modela nije zavrseno. Pokusajte ponovo.");
+  }
+
   return result.uri;
 }
 

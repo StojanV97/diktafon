@@ -74,7 +74,7 @@ export function useRecorder({ onRecordingComplete }) {
           { text: "Otvori podesavanja", onPress: () => Linking.openSettings() },
         ]
       );
-      return;
+      return { started: false, reason: "permission_denied" };
     }
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
     await audioRecorder.prepareToRecordAsync();
@@ -84,6 +84,7 @@ export function useRecorder({ onRecordingComplete }) {
     }
     audioRecorder.record();
     setIsPaused(false);
+    return { started: true };
   };
 
   const pauseRecording = async () => {

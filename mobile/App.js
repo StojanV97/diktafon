@@ -107,7 +107,14 @@ function App() {
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => setFontTimeout(true), 10000);
+    const timer = setTimeout(() => {
+      setFontTimeout(true);
+      Sentry.addBreadcrumb({
+        category: "startup",
+        message: "Font loading timed out after 10s",
+        level: "warning",
+      });
+    }, 10000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -136,10 +143,6 @@ function App() {
         );
       }
 
-      setReady(true);
-      syncWidgetData().catch(() => {});
-      runAutoMove().catch(() => {});
-
       const corrupted = getCorruptionStatus();
       if (corrupted) {
         Alert.alert(
@@ -149,6 +152,7 @@ function App() {
         );
       }
 
+      // iCloud sync BEFORE setReady — prevents races with user operations
       try {
         const syncEnabled = await isSyncEnabled();
         if (syncEnabled) {
@@ -163,6 +167,10 @@ function App() {
       } catch (e) {
         if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
       }
+
+      setReady(true);
+      syncWidgetData().catch(() => {});
+      runAutoMove().catch(() => {});
     }
     init();
   }, []);

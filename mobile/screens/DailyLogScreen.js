@@ -232,7 +232,7 @@ export default function DailyLogScreen({ navigation, route }) {
 
     getDailyCombinedTranscripts(datesWithDone)
       .then((results) => { if (!ignore) setCombinedTexts(results); })
-      .catch(() => {});
+      .catch((e) => { if (!ignore) setSnackbar("Ucitavanje transkripata nije uspelo: " + e.message); });
     return () => { ignore = true; };
   }, [grouped]);
 

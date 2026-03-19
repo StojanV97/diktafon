@@ -81,8 +81,9 @@ export async function restoreFromBackup(fileUri) {
     await createBackup();
   } catch (e) {
     if (__DEV__) console.warn("Pre-restore backup failed:", e);
+    throw new Error("SAFETY_BACKUP_FAILED: " + e.message);
   }
 
-  const stats = importAllData({ folders, entries, audioFiles, textFiles });
+  const stats = await importAllData({ folders, entries, audioFiles, textFiles });
   return { ...stats, skippedFiles };
 }

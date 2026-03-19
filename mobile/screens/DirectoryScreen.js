@@ -267,6 +267,7 @@ export default function DirectoryScreen({ route, navigation }) {
         multiple: false,
       });
       if (result.canceled) return;
+      if (!result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
       const entry = await createEntry(folderId, asset.name, asset.uri, 0);
       setEntries((prev) => [entry, ...prev]);
