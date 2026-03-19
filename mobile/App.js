@@ -11,6 +11,7 @@ import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@e
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
 import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries } from "./services/journalStorage";
+import { initEncryption } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
 import { syncWidgetData } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
@@ -121,6 +122,7 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
+        await initEncryption();
         await migrateData();
 
         const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");

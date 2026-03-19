@@ -3,9 +3,12 @@ import * as Sentry from "@sentry/react-native";
 import {
   syncJSONToICloud,
   uploadFileToICloud,
-  writeFileToICloud,
-  isSyncEnabled,
 } from "./icloudSyncService";
+import {
+  getEncryptionKey,
+  encryptText,
+  decryptText,
+} from "./cryptoService";
 
 function generateUUID() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -135,6 +138,38 @@ function truncateText(text, max = 200) {
   return text.slice(0, max) + "...";
 }
 
+// ── Encryption helpers ─────────────────────────────────
+
+async function writeEncryptedText(textFile, plaintext) {
+  const key = await getEncryptionKey()
+  if (key) {
+    const encrypted = encryptText(plaintext, key)
+    textFile.write(encrypted)
+  } else {
+    textFile.write(plaintext)
+  }
+}
+
+async function readDecryptedText(textFile) {
+  const key = await getEncryptionKey()
+  if (!key) {
+    // No encryption key — read as plaintext
+    return await textFile.text()
+  }
+  try {
+    // Try decrypting as encrypted binary
+    const bytes = textFile.bytes()
+    return decryptText(bytes, key)
+  } catch {
+    // Likely a legacy plaintext file — read as UTF-8
+    try {
+      return await textFile.text()
+    } catch {
+      return ""
+    }
+  }
+}
+
 // ── Migration ──────────────────────────────────────────
 
 export function migrateData() {
@@ -185,6 +220,45 @@ export function migrateData() {
       }
     }
     if (entriesChanged) writeJSON(entriesFile, entries);
+
+    // ── Encrypt existing plaintext transcripts ──
+    // initEncryption() is already called by App.js before migrateData()
+    const key = await getEncryptionKey()
+    if (key) {
+      let encryptionMigrated = false
+      for (const entry of entries) {
+        if (entry.status === "done" && !entry.encrypted) {
+          const textFile = new File(textsDir, `journal_${entry.id}.txt`)
+          if (textFile.exists) {
+            try {
+              // Try decrypt first — file may already be encrypted from a previous interrupted migration
+              const bytes = textFile.bytes()
+              decryptText(bytes, key)
+              // Decrypt succeeded — file is already encrypted, just mark metadata
+              entry.text = ""
+              entry.encrypted = true
+              encryptionMigrated = true
+            } catch {
+              // Decrypt failed — file is plaintext, encrypt it
+              try {
+                const plaintext = await textFile.text()
+                const encrypted = encryptText(plaintext, key)
+                textFile.write(encrypted)
+                entry.text = ""
+                entry.encrypted = true
+                encryptionMigrated = true
+              } catch (encErr) {
+                Sentry.captureMessage(
+                  `Encryption migration failed for entry ${entry.id}: ${encErr.message}`,
+                  "warning"
+                )
+              }
+            }
+          }
+        }
+      }
+      if (encryptionMigrated) writeJSON(entriesFile, entries)
+    }
 
     await cleanOrphanedFiles();
   })
@@ -346,13 +420,13 @@ export async function fetchEntry(entryId) {
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return null;
 
-  // Load full text from file
+  // Load full text from file (decrypt if encrypted)
   const textFile = new File(textsDir, `journal_${entryId}.txt`);
   if (textFile.exists) {
     try {
-      entry.text = await textFile.text();
+      entry.text = await readDecryptedText(textFile);
     } catch {
-      // keep truncated text from JSON
+      // keep text from JSON
     }
   }
   return entry;
@@ -397,18 +471,21 @@ export function completeEntry(entryId, text, durationSeconds) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return null;
 
-    // Write full text to file (after confirming entry exists — avoids orphans)
-    const textFile = new File(textsDir, `journal_${entryId}.txt`);
-    textFile.write(text);
+    // Update metadata FIRST — if crash after this, fetchEntry() handles missing text file gracefully
     entry.status = "done";
-    entry.text = truncateText(text);
+    entry.text = "";
+    entry.encrypted = true;
     entry.duration_seconds = durationSeconds;
     entry.updated_at = new Date().toISOString();
     delete entry.assemblyai_id;
     writeJSON(entriesFile, entries);
 
-    // Sync transcript to iCloud
-    writeFileToICloud(`texts/journal_${entryId}.txt`, text).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    // Write encrypted text file AFTER metadata is consistent
+    const textFile = new File(textsDir, `journal_${entryId}.txt`);
+    await writeEncryptedText(textFile, text);
+
+    // Sync transcript to iCloud (encrypted file)
+    uploadFileToICloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
     return { ...entry, text };
   })
@@ -420,15 +497,18 @@ export function updateEntryText(entryId, newText) {
     const entries = await readJSON(entriesFile)
     const entry = entries.find((e) => e.id === entryId)
     if (!entry) return null
-    // Write text file after confirming entry exists — avoids orphans
-    const textFile = new File(textsDir, `journal_${entryId}.txt`)
-    textFile.write(newText)
-    entry.text = truncateText(newText)
+    // Update metadata FIRST — if crash after this, fetchEntry() handles missing text file gracefully
+    entry.text = ""
+    entry.encrypted = true
     entry.updated_at = new Date().toISOString()
     writeJSON(entriesFile, entries)
 
-    // Sync transcript to iCloud
-    writeFileToICloud(`texts/journal_${entryId}.txt`, newText).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
+    // Write encrypted text file AFTER metadata is consistent
+    const textFile = new File(textsDir, `journal_${entryId}.txt`)
+    await writeEncryptedText(textFile, newText)
+
+    // Sync transcript to iCloud (encrypted file)
+    uploadFileToICloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
     return { ...entry, text: newText }
   })
@@ -568,9 +648,9 @@ export async function getDailyCombinedTranscript(date) {
     let fullText = entry.text || "";
     if (textFile.exists) {
       try {
-        fullText = await textFile.text();
+        fullText = await readDecryptedText(textFile);
       } catch {
-        // fall back to truncated text from JSON
+        // fall back to text from JSON
       }
     }
     const time = new Date(entry.created_at);
@@ -597,9 +677,9 @@ export async function getDailyCombinedTranscripts(dates) {
       let fullText = entry.text || "";
       if (textFile.exists) {
         try {
-          fullText = await textFile.text();
+          fullText = await readDecryptedText(textFile);
         } catch {
-          // fall back to truncated text from JSON
+          // fall back to text from JSON
         }
       }
       const time = new Date(entry.created_at);
@@ -638,9 +718,9 @@ export function consolidateDailyLogEntries(date) {
       let fullText = entry.text || "";
       if (textFile.exists) {
         try {
-          fullText = await textFile.text();
+          fullText = await readDecryptedText(textFile);
         } catch {
-          // fall back to truncated text from JSON
+          // fall back to text from JSON
         }
       }
       const time = new Date(entry.created_at);
@@ -655,13 +735,14 @@ export function consolidateDailyLogEntries(date) {
     ensureDirs();
     const id = generateUUID();
     const combinedTextFile = new File(textsDir, `journal_${id}.txt`);
-    combinedTextFile.write(combinedText);
+    await writeEncryptedText(combinedTextFile, combinedText);
 
     const combinedEntry = {
       id,
       folder_id: folder.id,
       filename: `kombinovano_${date}.txt`,
-      text: truncateText(combinedText),
+      text: "",
+      encrypted: true,
       created_at: dayDone[0].created_at,
       updated_at: new Date().toISOString(),
       duration_seconds: totalDuration,
@@ -670,19 +751,19 @@ export function consolidateDailyLogEntries(date) {
       recorded_date: date,
     };
 
-    // Delete originals (audio + text files)
+    // Update entries.json first: remove originals, add combined
     const doneIds = new Set(dayDone.map((e) => e.id));
+    const remaining = allEntries.filter((e) => !doneIds.has(e.id));
+    remaining.unshift(combinedEntry);
+    writeJSON(entriesFile, remaining);
+
+    // Delete originals (audio + text files) — orphan cleanup handles stragglers on crash
     for (const entry of dayDone) {
       const audioFile = new File(audioDir, `${entry.id}.wav`);
       if (audioFile.exists) audioFile.delete();
       const textFile = new File(textsDir, `journal_${entry.id}.txt`);
       if (textFile.exists) textFile.delete();
     }
-
-    // Update entries.json: remove originals, add combined
-    const remaining = allEntries.filter((e) => !doneIds.has(e.id));
-    remaining.unshift(combinedEntry);
-    writeJSON(entriesFile, remaining);
 
     return { ...combinedEntry, text: combinedText };
   })
@@ -704,7 +785,12 @@ export async function exportAllData() {
     }
     const textFile = new File(textsDir, `journal_${entry.id}.txt`);
     if (textFile.exists) {
-      textFiles.push({ id: entry.id, text: await textFile.text() });
+      try {
+        const text = await readDecryptedText(textFile);
+        textFiles.push({ id: entry.id, text });
+      } catch {
+        // Skip unreadable files
+      }
     }
   }
 
@@ -712,9 +798,20 @@ export async function exportAllData() {
 }
 
 export function importAllData(data) {
-  return withWriteLock(() => {
+  return withWriteLock(async () => {
     ensureDirs();
     writeJSON(foldersFile, data.folders);
+
+    // Mark entries as encrypted before writing metadata (single write)
+    const key = await getEncryptionKey()
+    if (key) {
+      for (const entry of data.entries) {
+        if (entry.status === "done") {
+          entry.text = ""
+          entry.encrypted = true
+        }
+      }
+    }
     writeJSON(entriesFile, data.entries);
 
     let audioCount = 0;
@@ -728,7 +825,11 @@ export function importAllData(data) {
 
     for (const { id, text } of data.textFiles) {
       const dest = new File(textsDir, `journal_${id}.txt`);
-      dest.write(text);
+      if (key) {
+        dest.write(encryptText(text, key))
+      } else {
+        dest.write(text)
+      }
       textCount++;
     }
 

@@ -1,8 +1,9 @@
 import { File, Paths } from "expo-file-system";
 import JSZip from "jszip";
 import { exportAllData, importAllData } from "./journalStorage";
+import { encryptBlob, decryptBlob } from "./cryptoService";
 
-export async function createBackup() {
+export async function createBackup(password) {
   const zip = new JSZip();
   const data = await exportAllData();
 
@@ -18,15 +19,36 @@ export async function createBackup() {
 
   const zipData = await zip.generateAsync({ type: "uint8array" });
   const date = new Date().toISOString().slice(0, 10);
+
+  if (password) {
+    const encrypted = encryptBlob(zipData, password);
+    const backupFile = new File(Paths.cache, `diktafon-backup-${date}.enc`);
+    backupFile.write(encrypted);
+    return backupFile.uri;
+  }
+
   const backupFile = new File(Paths.cache, `diktafon-backup-${date}.zip`);
   backupFile.write(zipData);
-
   return backupFile.uri;
 }
 
-export async function restoreFromBackup(fileUri) {
+export async function restoreFromBackup(fileUri, password) {
   const sourceFile = new File(fileUri);
-  const zipData = sourceFile.bytes();
+  let zipData;
+
+  if (password) {
+    const encryptedData = sourceFile.bytes();
+    try {
+      const decrypted = decryptBlob(encryptedData, password);
+      zipData = decrypted;
+    } catch (e) {
+      if (e.message === "Pogresna lozinka") throw e;
+      throw new Error("Pogresna lozinka ili ostecen backup fajl");
+    }
+  } else {
+    zipData = sourceFile.bytes();
+  }
+
   const zip = await JSZip.loadAsync(zipData);
 
   if (!zip.file("folders.json") || !zip.file("entries.json")) {

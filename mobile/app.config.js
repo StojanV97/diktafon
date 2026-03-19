@@ -16,6 +16,7 @@ module.exports = {
       infoPlist: {
         NSMicrophoneUsageDescription:
           "Diktafon koristi mikrofon za snimanje glasovnih zapisa.",
+        NSFileProtectionKey: "NSFileProtectionCompleteUntilFirstUserAuthentication",
       },
     },
     android: {
