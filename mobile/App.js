@@ -66,7 +66,7 @@ const Stack = createNativeStackNavigator();
 const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
 
 const linking = {
-  prefixes: ["com.diktafon.app://"],
+  prefixes: ["com.diktafon.app://", "diktafon://"],
   config: {
     screens: {
       DailyLog: { path: "dailylog" },
@@ -74,6 +74,12 @@ const linking = {
   },
   getStateFromPath(path, config) {
     const { getStateFromPath: defaultGetState } = require("@react-navigation/native");
+    const normalized = path.replace(/^\/+/, "");
+    if (normalized === "record") {
+      return {
+        routes: [{ name: "DailyLog", params: { action: "record" } }],
+      };
+    }
     const state = defaultGetState(path, config);
     if (!state?.routes?.length) return undefined;
     const allValid = state.routes.every((r) => VALID_DEEP_LINK_SCREENS.has(r.name));

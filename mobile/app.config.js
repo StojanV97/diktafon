@@ -7,7 +7,7 @@ module.exports = {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    scheme: "com.diktafon.app",
+    scheme: ["com.diktafon.app", "diktafon"],
     userInterfaceStyle: "light",
     ios: {
       supportsTablet: false,

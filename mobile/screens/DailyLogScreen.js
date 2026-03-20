@@ -187,12 +187,24 @@ export default function DailyLogScreen({ navigation, route }) {
     navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
   }, [navigation, headerLeft, headerRight]);
 
-  // Auto-start recording when opened via widget deep link
+  // Refs for reading recording state without adding to effect dependencies
+  const isRecordingRef = useRef(false);
+  const isPausedRef = useRef(false);
+  isRecordingRef.current = isRecording;
+  isPausedRef.current = isPaused;
+
+  // Auto-start/stop recording when opened via deep link (widget or Action Button)
   const autoRecordTimerRef = useRef(null);
   useEffect(() => {
     if (route.params?.action === "record") {
-      navigation.setParams({ action: undefined });
-      autoRecordTimerRef.current = setTimeout(() => handleStartRecording(), 500);
+      autoRecordTimerRef.current = setTimeout(() => {
+        navigation.setParams({ action: undefined });
+        if (isRecordingRef.current || isPausedRef.current) {
+          handleStop();
+        } else {
+          handleStartRecording();
+        }
+      }, 500);
     }
     return () => {
       if (autoRecordTimerRef.current) clearTimeout(autoRecordTimerRef.current);
