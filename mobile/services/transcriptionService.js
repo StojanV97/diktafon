@@ -4,7 +4,7 @@ import * as assemblyAIService from "./assemblyAIService"
 import { isPremium } from "./subscriptionService"
 import {
   fetchEntry,
-  entryAudioUri,
+  getDecryptedAudioUri,
   updateEntryToProcessing,
   completeEntry,
   failEntry,
@@ -25,7 +25,7 @@ export async function preflight(engine) {
 
 export async function transcribeSingle(entryId, engine, { onStatusChange, onError }) {
   const entry = await fetchEntry(entryId)
-  const audioUri = entryAudioUri(entryId)
+  const audioUri = await getDecryptedAudioUri(entryId)
 
   try {
     if (engine === "assemblyai") {

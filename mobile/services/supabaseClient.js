@@ -2,14 +2,31 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as SecureStore from "expo-secure-store"
 import * as Sentry from "@sentry/react-native"
 import { createClient } from "@supabase/supabase-js"
+import { getEncryptionKey, encryptText, decryptText } from "./cryptoService"
 
 // TODO: Replace with your Supabase project URL and anon key
 const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
 const SUPABASE_ANON_KEY = "YOUR_ANON_KEY"
 
 // SecureStore has a ~2KB limit on iOS. Supabase tokens typically fit,
-// but if a value is too large we fall back to AsyncStorage for that key.
+// but if a value is too large we fall back to encrypted AsyncStorage.
 const SECURE_STORE_LIMIT = 2048
+const ENCRYPTED_PREFIX = "enc:v1:"
+
+async function encryptForStorage(value) {
+  const key = await getEncryptionKey()
+  if (!key) return value
+  const encrypted = encryptText(value, key)
+  return ENCRYPTED_PREFIX + Buffer.from(encrypted).toString("base64")
+}
+
+async function decryptFromStorage(stored) {
+  if (!stored || !stored.startsWith(ENCRYPTED_PREFIX)) return stored
+  const key = await getEncryptionKey()
+  if (!key) return stored
+  const raw = Buffer.from(stored.slice(ENCRYPTED_PREFIX.length), "base64")
+  return decryptText(raw, key)
+}
 
 const SecureStoreAdapter = {
   async getItem(key) {
@@ -20,32 +37,30 @@ const SecureStoreAdapter = {
       // Lazy migration: check AsyncStorage for pre-existing token
       const legacy = await AsyncStorage.getItem(key)
       if (legacy !== null) {
+        // Decrypt if it was stored encrypted
+        const plaintext = await decryptFromStorage(legacy)
         // Migrate to SecureStore, then remove from AsyncStorage
-        if (legacy.length <= SECURE_STORE_LIMIT) {
-          await SecureStore.setItemAsync(key, legacy)
-        } else {
-          if (__DEV__) console.warn(`SecureStoreAdapter: key "${key}" exceeds SecureStore limit, keeping in AsyncStorage`)
-          Sentry.captureMessage(`SecureStoreAdapter: migration skipped for "${key}" (${legacy.length}B > ${SECURE_STORE_LIMIT}B limit)`, "warning")
-          return legacy
+        if (plaintext.length <= SECURE_STORE_LIMIT) {
+          await SecureStore.setItemAsync(key, plaintext)
+          await AsyncStorage.removeItem(key)
         }
-        await AsyncStorage.removeItem(key)
-        return legacy
+        return plaintext
       }
 
       return null
     } catch (e) {
       if (__DEV__) console.warn("SecureStoreAdapter.getItem failed:", e.message)
       Sentry.captureMessage(`SecureStore.getItem fallback to AsyncStorage: ${e.message}`, "warning")
-      return AsyncStorage.getItem(key)
+      const stored = await AsyncStorage.getItem(key)
+      return decryptFromStorage(stored)
     }
   },
 
   async setItem(key, value) {
     try {
       if (value.length > SECURE_STORE_LIMIT) {
-        if (__DEV__) console.warn(`SecureStoreAdapter: key "${key}" exceeds SecureStore limit, using AsyncStorage`)
-        Sentry.captureMessage(`SecureStoreAdapter: setItem fallback to AsyncStorage for "${key}" (${value.length}B > ${SECURE_STORE_LIMIT}B limit)`, "warning")
-        await AsyncStorage.setItem(key, value)
+        const encrypted = await encryptForStorage(value)
+        await AsyncStorage.setItem(key, encrypted)
         return
       }
       await SecureStore.setItemAsync(key, value)
@@ -54,7 +69,8 @@ const SecureStoreAdapter = {
     } catch (e) {
       if (__DEV__) console.warn("SecureStoreAdapter.setItem failed:", e.message)
       Sentry.captureMessage(`SecureStore.setItem fallback to AsyncStorage: ${e.message}`, "warning")
-      await AsyncStorage.setItem(key, value)
+      const encrypted = await encryptForStorage(value)
+      await AsyncStorage.setItem(key, encrypted)
     }
   },
 

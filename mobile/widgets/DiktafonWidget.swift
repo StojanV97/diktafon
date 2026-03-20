@@ -29,7 +29,7 @@ struct DiktafonProvider: TimelineProvider {
     }
 
     private func loadData() -> WidgetData {
-        let defaults = UserDefaults(suiteName: "group.com.local.diktafon")
+        let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
         guard let jsonString = defaults?.string(forKey: "widgetData"),
               let jsonData = jsonString.data(using: .utf8),
               let data = try? JSONDecoder().decode(WidgetData.self, from: jsonData) else {
@@ -92,7 +92,7 @@ struct DiktafonWidgetView: View {
 
             Spacer()
 
-            Link(destination: URL(string: "com.local.diktafon://dailylog?action=record")!) {
+            Link(destination: URL(string: "com.diktafon.app://dailylog?action=record")!) {
                 HStack(spacing: 4) {
                     Image(systemName: "record.circle")
                         .font(.system(size: 13, weight: .semibold))
@@ -143,7 +143,7 @@ struct DiktafonWidgetView: View {
 
                 Spacer()
 
-                Link(destination: URL(string: "com.local.diktafon://dailylog?action=record")!) {
+                Link(destination: URL(string: "com.diktafon.app://dailylog?action=record")!) {
                     HStack(spacing: 4) {
                         Image(systemName: "record.circle")
                             .font(.system(size: 14, weight: .semibold))

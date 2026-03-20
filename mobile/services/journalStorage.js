@@ -1,5 +1,6 @@
 import { File, Directory, Paths } from "expo-file-system";
 import * as Sentry from "@sentry/react-native";
+import crypto from "react-native-quick-crypto";
 import {
   syncJSONToICloud,
   uploadFileToICloud,
@@ -8,14 +9,12 @@ import {
   getEncryptionKey,
   encryptText,
   decryptText,
+  encryptBytes,
+  decryptBytes,
 } from "./cryptoService";
 
 function generateUUID() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 const journalDir = new Directory(Paths.document, "journal");
@@ -170,6 +169,44 @@ async function readDecryptedText(textFile) {
   }
 }
 
+// ── Audio encryption helpers ───────────────────────────
+
+const tempAudioDir = new Directory(Paths.cache, "decrypted_audio");
+
+async function encryptAudioFile(audioFile) {
+  const key = await getEncryptionKey()
+  if (!key) return
+  const rawBytes = audioFile.bytes()
+  const encrypted = encryptBytes(rawBytes, key)
+  audioFile.write(encrypted)
+}
+
+export async function getDecryptedAudioUri(entryId) {
+  const audioFile = new File(audioDir, `${entryId}.wav`)
+  if (!audioFile.exists) return null
+
+  const key = await getEncryptionKey()
+  if (!key) return audioFile.uri
+
+  try {
+    const encBytes = audioFile.bytes()
+    const decrypted = decryptBytes(encBytes, key)
+    tempAudioDir.create({ idempotent: true })
+    const tempFile = new File(tempAudioDir, `${entryId}.wav`)
+    tempFile.write(decrypted)
+    return tempFile.uri
+  } catch {
+    // Likely unencrypted legacy file — return as-is
+    return audioFile.uri
+  }
+}
+
+export function cleanupDecryptedAudio() {
+  try {
+    if (tempAudioDir.exists) tempAudioDir.delete()
+  } catch {}
+}
+
 // ── Migration ──────────────────────────────────────────
 
 export function migrateData() {
@@ -258,6 +295,30 @@ export function migrateData() {
         }
       }
       if (encryptionMigrated) writeJSON(entriesFile, entries)
+
+      // ── Encrypt existing plaintext audio files ──
+      for (const entry of entries) {
+        if (!entry.audio_file) continue
+        const audioFile = new File(audioDir, entry.audio_file)
+        if (!audioFile.exists) continue
+        try {
+          const bytes = audioFile.bytes()
+          // Try decrypt — if it succeeds, file is already encrypted
+          decryptBytes(bytes, key)
+        } catch {
+          // Decrypt failed — file is plaintext, encrypt it
+          try {
+            const raw = audioFile.bytes()
+            const encrypted = encryptBytes(raw, key)
+            audioFile.write(encrypted)
+          } catch (encErr) {
+            Sentry.captureMessage(
+              `Audio encryption migration failed for ${entry.id}: ${encErr.message}`,
+              "warning"
+            )
+          }
+        }
+      }
     }
 
     await cleanOrphanedFiles();
@@ -385,6 +446,9 @@ export function createEntry(folderId, filename, audioSourceUri, durationSeconds 
     const dest = new File(audioDir, `${id}.wav`);
     source.copy(dest);
 
+    // Encrypt audio at rest
+    await encryptAudioFile(dest);
+
     const now = new Date().toISOString()
     const entry = {
       id,
@@ -403,7 +467,7 @@ export function createEntry(folderId, filename, audioSourceUri, durationSeconds 
     entries.unshift(entry);
     writeJSON(entriesFile, entries);
 
-    // Sync audio to iCloud (fire-and-forget)
+    // Sync audio to iCloud (fire-and-forget, already encrypted)
     uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
 
     return entry;
@@ -582,6 +646,9 @@ export function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
     const source = new File(audioSourceUri);
     const dest = new File(audioDir, `${id}.wav`);
     source.copy(dest);
+
+    // Encrypt audio at rest
+    await encryptAudioFile(dest);
 
     const now = new Date();
     const filename = `zapis_${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.wav`;
@@ -781,11 +848,17 @@ export async function exportAllData() {
 
   const audioFiles = [];
   const textFiles = [];
+  const key = await getEncryptionKey();
 
   for (const entry of entries) {
     const audioFile = new File(audioDir, `${entry.id}.wav`);
     if (audioFile.exists) {
-      audioFiles.push({ id: entry.id, data: audioFile.bytes() });
+      let audioData = audioFile.bytes()
+      // Decrypt audio for export (backups contain plaintext)
+      if (key) {
+        try { audioData = decryptBytes(audioData, key) } catch {}
+      }
+      audioFiles.push({ id: entry.id, data: audioData });
     }
     const textFile = new File(textsDir, `journal_${entry.id}.txt`);
     if (textFile.exists) {
@@ -823,7 +896,11 @@ export function importAllData(data) {
 
     for (const { id, data: audioData } of data.audioFiles) {
       const dest = new File(audioDir, `${id}.wav`);
-      dest.write(audioData);
+      if (key) {
+        dest.write(encryptBytes(audioData, key))
+      } else {
+        dest.write(audioData)
+      }
       audioCount++;
     }
 

@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy"
 import { supabase } from "./supabaseClient"
 
-const DEV_API_KEY = process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY
+const DEV_API_KEY = __DEV__ ? process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY : null
 
 const AAI_BASE = "https://api.assemblyai.com/v2"
 

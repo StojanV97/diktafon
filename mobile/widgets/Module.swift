@@ -7,7 +7,7 @@ public class ReactNativeWidgetExtensionModule: Module {
         Name("ReactNativeWidgetExtension")
 
         Function("setWidgetData") { (jsonString: String) in
-            let defaults = UserDefaults(suiteName: "group.com.local.diktafon")
+            let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
             defaults?.set(jsonString, forKey: "widgetData")
             defaults?.synchronize()
 

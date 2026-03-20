@@ -10,14 +10,18 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
-import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries } from "./services/journalStorage";
+import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries, cleanupDecryptedAudio } from "./services/journalStorage";
 import { initEncryption, clearCachedKey } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
+import * as ScreenCapture from "expo-screen-capture";
 import { syncWidgetData } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
 import { onAuthStateChange } from "./services/authService";
 import { initPurchases, loginUser } from "./services/subscriptionService";
 import { pullAndMerge, isSyncEnabled } from "./services/icloudSyncService";
+import { setupSslPinning } from "./services/sslPinningService";
+import { initRuntimeProtection } from "./services/runtimeProtectionService";
+import { isBiometricLockEnabled, authenticateWithBiometrics } from "./services/biometricService";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
@@ -105,6 +109,7 @@ const errorStyles = StyleSheet.create({
 function App() {
   const [ready, setReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Home");
+  const [locked, setLocked] = useState(false);
 
   const [fontTimeout, setFontTimeout] = useState(false);
 
@@ -131,6 +136,9 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
+        await setupSslPinning().catch((e) => {
+          if (__DEV__) console.warn("SSL pinning init failed:", e.message);
+        });
         await initEncryption();
         await migrateData();
 
@@ -143,6 +151,12 @@ function App() {
           await initPurchases("ios");
         } catch (e) {
           if (__DEV__) console.warn("RevenueCat init failed:", e.message);
+        }
+
+        try {
+          await initRuntimeProtection();
+        } catch (e) {
+          if (__DEV__) console.warn("freeRASP init failed:", e.message);
         }
       } catch (e) {
         Sentry.captureException(e);
@@ -186,18 +200,32 @@ function App() {
     init();
   }, []);
 
-  // Release whisper context when app goes to background
+  // Enable app-switcher blur protection (iOS)
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
+    ScreenCapture.enableAppSwitcherProtectionAsync().catch(() => {});
+    return () => { ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {}); };
+  }, []);
+
+  // Release whisper context when app goes to background, biometric check on foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", async (state) => {
       if (state === "background") {
         releaseContext();
         clearCachedKey();
+        cleanupDecryptedAudio();
+        // Mark as locked so biometric check runs on next foreground
+        const bioEnabled = await isBiometricLockEnabled();
+        if (bioEnabled) setLocked(true);
       } else if (state === "active") {
         runAutoMove();
+        if (locked) {
+          const success = await authenticateWithBiometrics();
+          if (success) setLocked(false);
+        }
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [locked]);
 
   // Auth state listener — link RevenueCat on sign-in
   useEffect(() => {
@@ -220,6 +248,25 @@ function App() {
       <PaperProvider theme={theme}>
         <View style={loadingStyles.container}>
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </PaperProvider>
+    );
+  }
+
+  if (locked) {
+    return (
+      <PaperProvider theme={theme}>
+        <View style={loadingStyles.container} onLayout={onLayoutRootView}>
+          <Text style={errorStyles.title}>Diktafon je zakljucan</Text>
+          <TouchableOpacity
+            style={errorStyles.button}
+            onPress={async () => {
+              const success = await authenticateWithBiometrics();
+              if (success) setLocked(false);
+            }}
+          >
+            <Text style={errorStyles.buttonText}>Otkljucaj</Text>
+          </TouchableOpacity>
         </View>
       </PaperProvider>
     );

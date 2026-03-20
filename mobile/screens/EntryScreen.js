@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import * as ExpoClipboard from "expo-clipboard";
+import { usePreventScreenCapture } from "expo-screen-capture";
 import {
   ActivityIndicator,
   Menu,
@@ -20,7 +21,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText } from "../services/journalStorage";
+import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio } from "../services/journalStorage";
 import useAutoSave from "../hooks/useAutoSave";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
@@ -43,6 +44,7 @@ function formatPlaybackTime(seconds) {
 }
 
 export default function EntryScreen({ route, navigation }) {
+  usePreventScreenCapture();
   const { id } = route.params;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,7 @@ export default function EntryScreen({ route, navigation }) {
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [audioMissing, setAudioMissing] = useState(false);
+  const [decryptedAudioUri, setDecryptedAudioUri] = useState(null);
 
   const saveFn = useCallback((text) => updateEntryText(id, text), [id]);
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
@@ -63,6 +66,9 @@ export default function EntryScreen({ route, navigation }) {
         setRecord(data);
         if (data?.audio_file && !entryAudioExists(data.id)) {
           setAudioMissing(true);
+        } else if (data?.audio_file) {
+          const uri = await getDecryptedAudioUri(data.id);
+          if (uri) setDecryptedAudioUri(uri);
         }
         if (data?.status === "done" && data.text) {
           init(data.text);
@@ -73,7 +79,10 @@ export default function EntryScreen({ route, navigation }) {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+      cleanupDecryptedAudio();
+    };
   }, [id]);
 
   useEffect(() => {
@@ -86,7 +95,7 @@ export default function EntryScreen({ route, navigation }) {
     return navigation.addListener("beforeRemove", () => { flush(); });
   }, [navigation, flush]);
 
-  const audioSource = record?.audio_file && !audioMissing ? { uri: entryAudioUri(record.id) } : null;
+  const audioSource = decryptedAudioUri && !audioMissing ? { uri: decryptedAudioUri } : null;
   const player = useAudioPlayer(audioSource, 250);
   const status = useAudioPlayerStatus(player);
   const [barWidth, setBarWidth] = useState(1);
@@ -142,7 +151,8 @@ export default function EntryScreen({ route, navigation }) {
         setSnackbar("Deljenje fajlova nije dostupno na ovom uredjaju.");
         return;
       }
-      await Sharing.shareAsync(entryAudioUri(record.id), {
+      const shareUri = decryptedAudioUri || entryAudioUri(record.id);
+      await Sharing.shareAsync(shareUri, {
         mimeType: "audio/wav",
         dialogTitle: "Sacuvaj snimak",
         UTI: "com.microsoft.waveform-audio",

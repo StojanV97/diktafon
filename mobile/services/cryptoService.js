@@ -20,7 +20,9 @@ export async function initEncryption() {
     return true
   }
   const key = crypto.randomBytes(KEY_LENGTH)
-  await SecureStore.setItemAsync(KEY_NAME, Buffer.from(key).toString("base64"))
+  await SecureStore.setItemAsync(KEY_NAME, Buffer.from(key).toString("base64"), {
+    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+  })
   _cachedKey = Buffer.from(key)
   return true
 }
@@ -61,7 +63,9 @@ export async function importRecoveryKey(base64Key) {
   if (keyBuf.length !== KEY_LENGTH) {
     throw new Error("Neispravan kljuc za oporavak")
   }
-  await SecureStore.setItemAsync(KEY_NAME, trimmed)
+  await SecureStore.setItemAsync(KEY_NAME, trimmed, {
+    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+  })
   _cachedKey = keyBuf
 }
 
@@ -89,6 +93,31 @@ export function decryptText(encryptedBuf, key) {
   decipher.setAuthTag(authTag)
   const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
   return decrypted.toString("utf8")
+}
+
+// ── Binary file encrypt/decrypt (for audio) ─────────────
+
+export function encryptBytes(data, key) {
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv)
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(data)), cipher.final()])
+  const authTag = cipher.getAuthTag()
+  // Same format as encryptText: [12-byte IV][ciphertext][16-byte auth tag]
+  return Buffer.concat([Buffer.from(iv), encrypted, authTag])
+}
+
+export function decryptBytes(encryptedBuf, key) {
+  const buf = Buffer.from(encryptedBuf)
+  if (buf.length < IV_LENGTH + TAG_LENGTH) {
+    throw new Error("Encrypted data too short")
+  }
+  const iv = buf.subarray(0, IV_LENGTH)
+  const authTag = buf.subarray(buf.length - TAG_LENGTH)
+  const ciphertext = buf.subarray(IV_LENGTH, buf.length - TAG_LENGTH)
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv)
+  decipher.setAuthTag(authTag)
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()])
 }
 
 // ── PBKDF2 Password-Based Encryption (for backups) ──────

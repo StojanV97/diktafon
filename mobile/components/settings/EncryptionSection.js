@@ -3,6 +3,7 @@ import { Alert, View } from "react-native"
 import { Button, Divider, Text, TextInput } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import * as Clipboard from "expo-clipboard"
+import { usePreventScreenCapture } from "expo-screen-capture"
 import {
   hasEncryptionKey,
   exportRecoveryKey,
@@ -12,6 +13,7 @@ import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
 export default function EncryptionSection({ setSnackbar }) {
+  usePreventScreenCapture();
   const [hasKey, setHasKey] = useState(false)
   const [recoveryKey, setRecoveryKey] = useState(null)
   const [importInput, setImportInput] = useState("")
@@ -45,9 +47,9 @@ export default function EncryptionSection({ setSnackbar }) {
   const handleCopyKey = async () => {
     if (recoveryKey) {
       await Clipboard.setStringAsync(recoveryKey)
-      setSnackbar("Kljuc je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.")
+      setSnackbar("Kljuc je kopiran. Bice obrisan iz clipboard-a za 20 sekundi.")
       if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current)
-      clipboardTimerRef.current = setTimeout(() => Clipboard.setStringAsync(""), 60000)
+      clipboardTimerRef.current = setTimeout(() => Clipboard.setStringAsync(""), 20000)
     }
   }
 
