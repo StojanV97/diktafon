@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { Alert, View } from "react-native"
 import { Button, Divider, Text, TextInput } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
@@ -16,9 +16,15 @@ export default function EncryptionSection({ setSnackbar }) {
   const [recoveryKey, setRecoveryKey] = useState(null)
   const [importInput, setImportInput] = useState("")
   const [showImport, setShowImport] = useState(false)
+  const clipboardTimerRef = useRef(null)
+  const autoHideTimerRef = useRef(null)
 
   useEffect(() => {
     hasEncryptionKey().then(setHasKey)
+    return () => {
+      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current)
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current)
+    }
   }, [])
 
   const handleShowKey = async () => {
@@ -26,6 +32,8 @@ export default function EncryptionSection({ setSnackbar }) {
       const key = await exportRecoveryKey()
       if (key) {
         setRecoveryKey(key)
+        if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current)
+        autoHideTimerRef.current = setTimeout(() => setRecoveryKey(null), 120000)
       } else {
         setSnackbar("Kljuc za oporavak nije dostupan.")
       }
@@ -37,7 +45,9 @@ export default function EncryptionSection({ setSnackbar }) {
   const handleCopyKey = async () => {
     if (recoveryKey) {
       await Clipboard.setStringAsync(recoveryKey)
-      setSnackbar("Kljuc je kopiran.")
+      setSnackbar("Kljuc je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.")
+      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current)
+      clipboardTimerRef.current = setTimeout(() => Clipboard.setStringAsync(""), 60000)
     }
   }
 
@@ -106,15 +116,26 @@ export default function EncryptionSection({ setSnackbar }) {
                 >
                   {recoveryKey}
                 </Text>
-                <Button
-                  mode="outlined"
-                  onPress={handleCopyKey}
-                  icon="content-copy"
-                  style={styles.btn}
-                  compact
-                >
-                  Kopiraj kljuc
-                </Button>
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  <Button
+                    mode="outlined"
+                    onPress={handleCopyKey}
+                    icon="content-copy"
+                    style={styles.btn}
+                    compact
+                  >
+                    Kopiraj kljuc
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setRecoveryKey(null)}
+                    icon="eye-off"
+                    style={styles.btn}
+                    compact
+                  >
+                    Sakrij kljuc
+                  </Button>
+                </View>
               </View>
             ) : (
               <Button

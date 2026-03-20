@@ -25,6 +25,7 @@ const SecureStoreAdapter = {
           await SecureStore.setItemAsync(key, legacy)
         } else {
           if (__DEV__) console.warn(`SecureStoreAdapter: key "${key}" exceeds SecureStore limit, keeping in AsyncStorage`)
+          Sentry.captureMessage(`SecureStoreAdapter: migration skipped for "${key}" (${legacy.length}B > ${SECURE_STORE_LIMIT}B limit)`, "warning")
           return legacy
         }
         await AsyncStorage.removeItem(key)
@@ -43,6 +44,7 @@ const SecureStoreAdapter = {
     try {
       if (value.length > SECURE_STORE_LIMIT) {
         if (__DEV__) console.warn(`SecureStoreAdapter: key "${key}" exceeds SecureStore limit, using AsyncStorage`)
+        Sentry.captureMessage(`SecureStoreAdapter: setItem fallback to AsyncStorage for "${key}" (${value.length}B > ${SECURE_STORE_LIMIT}B limit)`, "warning")
         await AsyncStorage.setItem(key, value)
         return
       }

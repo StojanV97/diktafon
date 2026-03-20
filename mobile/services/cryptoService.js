@@ -33,6 +33,13 @@ export async function getEncryptionKey() {
   return _cachedKey
 }
 
+export function clearCachedKey() {
+  if (_cachedKey) {
+    _cachedKey.fill(0)
+    _cachedKey = null
+  }
+}
+
 export async function hasEncryptionKey() {
   if (_cachedKey) return true
   const stored = await SecureStore.getItemAsync(KEY_NAME)

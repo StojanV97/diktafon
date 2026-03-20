@@ -11,7 +11,7 @@ import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@e
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
 import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries } from "./services/journalStorage";
-import { initEncryption } from "./services/cryptoService";
+import { initEncryption, clearCachedKey } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
 import { syncWidgetData } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
@@ -34,12 +34,21 @@ SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
+const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
+
 const linking = {
   prefixes: ["com.diktafon.app://"],
   config: {
     screens: {
       DailyLog: { path: "dailylog" },
     },
+  },
+  getStateFromPath(path, config) {
+    const { getStateFromPath: defaultGetState } = require("@react-navigation/native");
+    const state = defaultGetState(path, config);
+    if (!state?.routes?.length) return undefined;
+    const allValid = state.routes.every((r) => VALID_DEEP_LINK_SCREENS.has(r.name));
+    return allValid ? state : undefined;
   },
 };
 
@@ -182,6 +191,7 @@ function App() {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "background") {
         releaseContext();
+        clearCachedKey();
       } else if (state === "active") {
         runAutoMove();
       }

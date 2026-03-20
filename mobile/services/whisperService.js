@@ -1,6 +1,7 @@
 import { initWhisper } from "whisper.rn";
 import { File, Directory, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
+import crypto from "react-native-quick-crypto";
 
 const MODEL_URL =
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
@@ -9,6 +10,9 @@ const SERBIAN_PROMPT =
   "Ovo je transkript na srpskom jeziku. " +
   "Koristi pravilnu srpsku gramatiku, interpunkciju i dijakritičke znakove: č, ć, š, ž, đ. " +
   "Rečenice završavaj tačkom. Imena piši velikim slovom.";
+
+// SHA256 of official ggml-small.bin from huggingface.co/ggerganov/whisper.cpp
+const MODEL_SHA256 = "be8ef2d6de21e69e5e7a5534c68be79ece36ed3367a0950f4ebac7ea1d577735";
 
 const modelsDir = new Directory(Paths.document, "whisper-models");
 const modelFile = new File(modelsDir, "ggml-small.bin");
@@ -52,6 +56,14 @@ export async function downloadModel(onProgress) {
   if (!tempFile.exists || tempFile.size < MIN_MODEL_SIZE) {
     if (tempFile.exists) tempFile.delete()
     throw new Error("Preuzimanje modela nije zavrseno. Pokusajte ponovo.");
+  }
+
+  // Verify integrity — reject tampered or corrupted downloads
+  const fileBytes = tempFile.bytes();
+  const hash = crypto.createHash("sha256").update(Buffer.from(fileBytes)).digest("hex");
+  if (hash !== MODEL_SHA256) {
+    tempFile.delete();
+    throw new Error("Model fajl nije prosao proveru integriteta. Pokusajte ponovo.");
   }
 
   // Atomic swap: delete old model only after successful download

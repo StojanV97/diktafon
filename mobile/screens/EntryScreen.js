@@ -110,10 +110,17 @@ export default function EntryScreen({ route, navigation }) {
 
   const currentText = record?.status === "done" ? editableText : record?.text;
 
+  const clipboardTimerRef = React.useRef(null);
+  React.useEffect(() => () => {
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+  }, []);
+
   const copyText = () => {
     if (!currentText) return;
     ExpoClipboard.setStringAsync(currentText);
-    setSnackbar("Tekst je kopiran u clipboard.");
+    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.");
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 60000);
   };
 
   const shareText = async () => {

@@ -461,11 +461,18 @@ export default function DailyLogScreen({ navigation, route }) {
     );
   }, [collapsedDates]);
 
+  const clipboardTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+  }, []);
+
   const copyCombinedText = useCallback((date) => {
     const text = combinedTexts[date];
     if (!text) return;
     ExpoClipboard.setStringAsync(text);
-    setSnackbar("Tekst je kopiran.");
+    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.");
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 60000);
   }, [combinedTexts]);
 
   const shareCombinedText = async (date) => {

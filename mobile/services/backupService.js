@@ -3,6 +3,13 @@ import JSZip from "jszip";
 import { exportAllData, importAllData } from "./journalStorage";
 import { encryptBlob, decryptBlob } from "./cryptoService";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function sanitizeBackupPath(relativePath) {
+  if (relativePath.includes("..") || relativePath.startsWith("/")) return null;
+  return relativePath;
+}
+
 export async function createBackup(password) {
   const zip = new JSZip();
   const data = await exportAllData();
@@ -72,9 +79,12 @@ export async function restoreFromBackup(fileUri, password) {
     const promises = [];
     audioFolder.forEach((relativePath, zipEntry) => {
       if (zipEntry.dir) return;
+      const safe = sanitizeBackupPath(relativePath);
+      if (!safe) { skippedFiles++; return; }
+      const id = safe.replace(".wav", "");
+      if (!UUID_RE.test(id)) { skippedFiles++; return; }
       promises.push(
         zipEntry.async("uint8array").then((audioData) => {
-          const id = relativePath.replace(".wav", "");
           audioFiles.push({ id, data: audioData });
         }).catch(() => { skippedFiles++; })
       );
@@ -88,9 +98,12 @@ export async function restoreFromBackup(fileUri, password) {
     const promises = [];
     textFolder.forEach((relativePath, zipEntry) => {
       if (zipEntry.dir) return;
+      const safe = sanitizeBackupPath(relativePath);
+      if (!safe) { skippedFiles++; return; }
+      const id = safe.replace("journal_", "").replace(".txt", "");
+      if (!UUID_RE.test(id)) { skippedFiles++; return; }
       promises.push(
         zipEntry.async("string").then((text) => {
-          const id = relativePath.replace("journal_", "").replace(".txt", "");
           textFiles.push({ id, text });
         }).catch(() => { skippedFiles++; })
       );

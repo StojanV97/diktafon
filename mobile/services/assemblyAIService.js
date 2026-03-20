@@ -30,6 +30,16 @@ function fetchWithTimeout(url, options, timeoutMs) {
     .finally(() => clearTimeout(timer))
 }
 
+function validateTranscriptResponse(data) {
+  if (!data || typeof data !== "object") return false
+  if (typeof data.status !== "string") return false
+  if (data.status === "completed") {
+    if (data.utterances != null && !Array.isArray(data.utterances)) return false
+    if (data.text != null && typeof data.text !== "string") return false
+  }
+  return true
+}
+
 // ── Dev key check ──────────────────────────────────────
 
 export function hasDevKey() {
@@ -75,7 +85,10 @@ async function submitDirect(fileUri, options = {}) {
     body: JSON.stringify(body),
   }, SUBMIT_TIMEOUT_MS)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Greska pri slanju na AssemblyAI")
+  if (!res.ok) {
+    if (__DEV__) console.warn("AssemblyAI submit error:", data.error)
+    throw new Error("Greska pri slanju na AssemblyAI. Pokusajte ponovo.")
+  }
   if (!data.id) throw new Error("Server nije vratio ID transkripcije. Pokusajte ponovo.")
   return { assemblyai_id: data.id }
 }
@@ -92,7 +105,13 @@ async function checkDirect(transcriptId) {
   }
 
   if (!res.ok) {
-    return { status: "error", error: data.error || "Greska pri proveri statusa transkripcije." }
+    if (__DEV__) console.warn("AssemblyAI check error:", data.error)
+    return { status: "error", error: "Greska pri proveri statusa transkripcije." }
+  }
+
+  if (!validateTranscriptResponse(data)) {
+    if (__DEV__) console.warn("AssemblyAI invalid response shape:", JSON.stringify(data).slice(0, 200))
+    return { status: "error", error: "Neispravan odgovor od servera." }
   }
 
   if (data.status === "completed") {
@@ -106,7 +125,8 @@ async function checkDirect(transcriptId) {
     }
   }
   if (data.status === "error") {
-    return { status: "error", error: data.error || "Transcription failed" }
+    if (__DEV__) console.warn("AssemblyAI transcription error:", data.error)
+    return { status: "error", error: "Transkripcija nije uspela. Pokusajte ponovo." }
   }
   return { status: "processing" }
 }
@@ -148,7 +168,10 @@ export async function submit(fileUri, options = {}) {
       upsert: true,
     })
 
-  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
+  if (uploadError) {
+    if (__DEV__) console.warn("Supabase upload error:", uploadError.message)
+    throw new Error("Upload snimka nije uspeo. Pokusajte ponovo.")
+  }
 
   // Call edge function to submit to AssemblyAI
   const { data, error } = await supabase.functions.invoke("transcribe/submit", {
