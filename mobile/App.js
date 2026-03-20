@@ -1,3 +1,6 @@
+import { Buffer } from "@craftzdog/react-native-buffer"
+global.Buffer = global.Buffer || Buffer
+
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,7 +33,8 @@ import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
 
 const SENTRY_DSN = "YOUR_SENTRY_DSN"
-if (SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")) {
+const sentryEnabled = SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")
+if (sentryEnabled) {
   Sentry.init({
     dsn: SENTRY_DSN,
     tracesSampleRate: 0.2,
@@ -177,9 +181,8 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
-        await setupSslPinning().catch((e) => {
-          if (__DEV__) console.warn("SSL pinning init failed:", e.message);
-        });
+        cleanupDecryptedAudio(); // Clear leftover decrypted audio from crash/force-kill
+        await setupSslPinning().catch(() => {});
         await initEncryption();
         await migrateData();
 
@@ -360,4 +363,4 @@ function App() {
   );
 }
 
-export default Sentry.wrap(App);
+export default sentryEnabled ? Sentry.wrap(App) : App;

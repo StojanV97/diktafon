@@ -129,7 +129,9 @@ export async function syncJSONToICloud(relativePath, data) {
     const encrypted = encryptText(json, key)
     await writeFileToICloud(relativePath, Buffer.from(encrypted).toString("base64"))
   } else {
-    await writeFileToICloud(relativePath, json)
+    // Never sync plaintext to iCloud — encryption key required
+    if (__DEV__) console.warn("icloudSyncService: skipping sync, no encryption key")
+    return
   }
 }
 

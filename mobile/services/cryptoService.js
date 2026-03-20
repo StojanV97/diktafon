@@ -5,7 +5,8 @@ const KEY_NAME = "diktafon_encryption_key_v1"
 const KEY_LENGTH = 32 // AES-256
 const IV_LENGTH = 12 // GCM standard
 const TAG_LENGTH = 16 // GCM auth tag
-const PBKDF2_ITERATIONS = 100000
+const PBKDF2_ITERATIONS = 600000
+const LEGACY_PBKDF2_ITERATIONS = 100000
 const PBKDF2_SALT_LENGTH = 16
 
 // In-memory cache — avoid SecureStore round-trip on every encrypt/decrypt
@@ -151,13 +152,15 @@ export function decryptBlob(encryptedBuf, password) {
   const authTag = buf.subarray(buf.length - TAG_LENGTH)
   const ciphertext = buf.subarray(PBKDF2_SALT_LENGTH + IV_LENGTH, buf.length - TAG_LENGTH)
 
-  const key = deriveKeyFromPassword(password, salt)
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv)
-  decipher.setAuthTag(authTag)
-
-  try {
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()])
-  } catch {
-    throw new Error("Pogresna lozinka")
+  // Try current iteration count first, fall back to legacy for old backups
+  for (const iterations of [PBKDF2_ITERATIONS, LEGACY_PBKDF2_ITERATIONS]) {
+    try {
+      const key = crypto.pbkdf2Sync(password, salt, iterations, KEY_LENGTH, "sha256")
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv)
+      decipher.setAuthTag(authTag)
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    } catch {
+      if (iterations === LEGACY_PBKDF2_ITERATIONS) throw new Error("Pogresna lozinka")
+    }
   }
 }

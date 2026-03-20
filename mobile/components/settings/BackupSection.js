@@ -24,15 +24,42 @@ export default function BackupSection({ setSnackbar }) {
   }
 
   const doCreateBackup = async (usePassword) => {
+    if (!usePassword) {
+      // Warn about unencrypted export
+      Alert.alert(
+        "Backup bez sifre",
+        "Backup ce sadrzati sve snimke i transkripte bez ikakve zastite. Da li ste sigurni?",
+        [
+          { text: "Otkazi", style: "cancel", onPress: () => { setShowPasswordCreate(false); setPassword(""); setConfirmPassword("") } },
+          {
+            text: "Nastavi",
+            style: "destructive",
+            onPress: async () => {
+              setShowPasswordCreate(false)
+              setBackupLoading(true)
+              try {
+                const uri = await backupService.createBackup(null)
+                await Sharing.shareAsync(uri, { mimeType: "application/zip", UTI: "public.zip-archive" })
+                setSnackbar("Backup je kreiran.")
+              } catch (e) {
+                setSnackbar(safeErrorMessage(e, "Backup nije uspeo."))
+              } finally {
+                setBackupLoading(false)
+                setPassword("")
+                setConfirmPassword("")
+              }
+            },
+          },
+        ]
+      )
+      return
+    }
     setShowPasswordCreate(false)
     setBackupLoading(true)
     try {
-      const pw = usePassword ? password : null
-      const uri = await backupService.createBackup(pw)
-      const mimeType = pw ? "application/octet-stream" : "application/zip"
-      const UTI = pw ? "public.data" : "public.zip-archive"
-      await Sharing.shareAsync(uri, { mimeType, UTI })
-      setSnackbar(pw ? "Sifrovan backup je kreiran." : "Backup je kreiran.")
+      const uri = await backupService.createBackup(password)
+      await Sharing.shareAsync(uri, { mimeType: "application/octet-stream", UTI: "public.data" })
+      setSnackbar("Sifrovan backup je kreiran.")
     } catch (e) {
       setSnackbar(safeErrorMessage(e, "Backup nije uspeo."))
     } finally {
