@@ -19,6 +19,24 @@ module.exports = function withWidgetFix(config) {
       }
     }
 
+    // Link AppIntents.framework to the widget extension target
+    const nativeTargets = project.pbxNativeTargetSection();
+    let widgetTargetUuid;
+    for (const key in nativeTargets) {
+      const t = nativeTargets[key];
+      if (typeof t === "object" && t.name && t.name.replace(/"/g, "") === targetName) {
+        widgetTargetUuid = key;
+        break;
+      }
+    }
+
+    if (widgetTargetUuid) {
+      project.addFramework("AppIntents.framework", {
+        target: widgetTargetUuid,
+        link: true,
+      });
+    }
+
     return config;
   });
 };

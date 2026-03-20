@@ -3,7 +3,7 @@ import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, Style
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,7 +14,7 @@ import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwri
 import { initEncryption, clearCachedKey } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
 import * as ScreenCapture from "expo-screen-capture";
-import { syncWidgetData } from "./services/widgetDataService";
+import { syncWidgetData, getPendingAction } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
 import { onAuthStateChange } from "./services/authService";
 import { initPurchases, loginUser } from "./services/subscriptionService";
@@ -62,6 +62,7 @@ if (SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")) {
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
 
 const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
 
@@ -141,6 +142,15 @@ function App() {
   const [ready, setReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Home");
   const [locked, setLocked] = useState(false);
+
+  const checkPendingControlAction = useCallback(async () => {
+    try {
+      const action = await getPendingAction()
+      if (action === "record" && navigationRef.current) {
+        navigationRef.current.navigate("DailyLog", { action: "record" })
+      }
+    } catch {}
+  }, [])
 
   const [fontTimeout, setFontTimeout] = useState(false);
 
@@ -252,11 +262,13 @@ function App() {
         if (locked) {
           const success = await authenticateWithBiometrics();
           if (success) setLocked(false);
+        } else {
+          checkPendingControlAction();
         }
       }
     });
     return () => subscription.remove();
-  }, [locked]);
+  }, [locked, checkPendingControlAction]);
 
   // Auth state listener — link RevenueCat on sign-in
   useEffect(() => {
@@ -307,7 +319,7 @@ function App() {
     <PaperProvider theme={theme}>
       <ErrorBoundary>
         <View style={loadingStyles.flex1} onLayout={onLayoutRootView}>
-          <NavigationContainer linking={linking}>
+          <NavigationContainer linking={linking} ref={navigationRef} onReady={checkPendingControlAction}>
             <StatusBar style="dark" />
             <Stack.Navigator initialRouteName={initialRoute} screenOptions={stackScreenOptions}>
               <Stack.Screen

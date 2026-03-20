@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 // MARK: - Data Model
 
@@ -177,10 +178,9 @@ extension Color {
     }
 }
 
-// MARK: - Widget Entry Point
+// MARK: - Home Widget
 
-@main
-struct DiktafonWidgetBundle: Widget {
+struct DiktafonHomeWidget: Widget {
     let kind: String = "DiktafonWidget"
 
     var body: some WidgetConfiguration {
@@ -196,5 +196,46 @@ struct DiktafonWidgetBundle: Widget {
         .configurationDisplayName("Diktafon")
         .description("Brzi pristup snimanju")
         .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+// MARK: - Control Widget (iOS 18+)
+
+@available(iOS 18.0, *)
+struct RecordIntent: AppIntent {
+    static var title: LocalizedStringResource = "Snimi"
+    static var description: IntentDescription = "Pokreni snimanje u Diktafonu"
+    static var openAppWhenRun: Bool = true
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
+        defaults?.set(true, forKey: "pendingRecordAction")
+        defaults?.synchronize()
+        return .result()
+    }
+}
+
+@available(iOS 18.0, *)
+struct DiktafonRecordControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.diktafon.app.record") {
+            ControlWidgetButton(action: RecordIntent()) {
+                Label("Snimi", systemImage: "mic.fill")
+            }
+        }
+        .displayName("Diktafon")
+        .description("Pokreni snimanje")
+    }
+}
+
+// MARK: - Widget Bundle Entry Point
+
+@main
+struct DiktafonWidgets: WidgetBundle {
+    var body: some Widget {
+        DiktafonHomeWidget()
+        if #available(iOS 18.0, *) {
+            DiktafonRecordControl()
+        }
     }
 }

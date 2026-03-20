@@ -11,6 +11,15 @@ try {
   // Widget module not available (Android or missing native build)
 }
 
+export async function getPendingAction() {
+  if (Platform.OS !== "ios" || !WidgetModule) return null
+  try {
+    return await WidgetModule.getPendingAction()
+  } catch {
+    return null
+  }
+}
+
 export async function syncWidgetData() {
   if (!WidgetModule) return;
 

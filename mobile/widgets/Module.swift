@@ -22,5 +22,16 @@ public class ReactNativeWidgetExtensionModule: Module {
             }
             return false
         }
+
+        Function("getPendingAction") { () -> String? in
+            let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
+            let pending = defaults?.bool(forKey: "pendingRecordAction") ?? false
+            if pending {
+                defaults?.removeObject(forKey: "pendingRecordAction")
+                defaults?.synchronize()
+                return "record"
+            }
+            return nil
+        }
     }
 }
