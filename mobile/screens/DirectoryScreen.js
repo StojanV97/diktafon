@@ -35,6 +35,7 @@ import RecordingTypeDialog from "../components/RecordingTypeDialog";
 import ModelDownloadDialog from "../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../utils/entryUtils";
+import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
@@ -96,7 +97,7 @@ export default function DirectoryScreen({ route, navigation }) {
         const entry = await createEntry(folderId, filename, uri, durationSeconds, pendingRecordingTypeRef.current);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
-        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
       }
     },
   });
@@ -125,7 +126,7 @@ export default function DirectoryScreen({ route, navigation }) {
       const data = await fetchEntries(folderId);
       setEntries(data);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -223,7 +224,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await startRecording();
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
@@ -231,7 +232,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await pauseRecording();
     } catch (e) {
-      setSnackbar("Pauza nije uspela: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Pauza nije uspela."));
     }
   };
 
@@ -239,7 +240,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await resumeRecording();
     } catch (e) {
-      setSnackbar("Nastavak nije uspeo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Nastavak nije uspeo."));
     }
   };
 
@@ -247,7 +248,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await stopRecording();
     } catch (e) {
-      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Zaustavljanje nije uspelo."));
     }
   };
 
@@ -255,7 +256,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await cancelRecording();
     } catch (e) {
-      setSnackbar("Otkazivanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Otkazivanje nije uspelo."));
     }
   };
 
@@ -272,7 +273,7 @@ export default function DirectoryScreen({ route, navigation }) {
       const entry = await createEntry(folderId, asset.name, asset.uri, 0);
       setEntries((prev) => [entry, ...prev]);
     } catch (e) {
-      setSnackbar("Uvoz nije uspeo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Uvoz nije uspeo."));
     }
   };
 
@@ -309,7 +310,7 @@ export default function DirectoryScreen({ route, navigation }) {
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     } catch (e) {
-      setSnackbar("Brisanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
     } finally {
       setDeleteLoading(false);
     }

@@ -41,6 +41,7 @@ import EngineChoiceDialog from "../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../utils/entryUtils";
+import { safeErrorMessage } from "../utils/errorHelpers";
 import { syncWidgetData } from "../services/widgetDataService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
@@ -121,7 +122,7 @@ export default function DailyLogScreen({ navigation, route }) {
         setEntries((prev) => [entry, ...prev]);
         syncWidgetData();
       } catch (e) {
-        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
       }
     },
   });
@@ -137,7 +138,7 @@ export default function DailyLogScreen({ navigation, route }) {
       const data = await fetchDailyLogEntries();
       setEntries(data);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -232,7 +233,7 @@ export default function DailyLogScreen({ navigation, route }) {
 
     getDailyCombinedTranscripts(datesWithDone)
       .then((results) => { if (!ignore) setCombinedTexts(results); })
-      .catch((e) => { if (!ignore) setSnackbar("Ucitavanje transkripata nije uspelo: " + e.message); });
+      .catch((e) => { if (!ignore) setSnackbar(safeErrorMessage(e, "Ucitavanje transkripata nije uspelo.")); });
     return () => { ignore = true; };
   }, [grouped]);
 
@@ -326,7 +327,7 @@ export default function DailyLogScreen({ navigation, route }) {
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       syncWidgetData();
     } catch (e) {
-      setSnackbar("Brisanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
     } finally {
       setDeleteLoading(false);
     }
@@ -362,7 +363,7 @@ export default function DailyLogScreen({ navigation, route }) {
       setMoveTargetEntryId(entryId);
       setMoveDialogVisible(true);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
@@ -375,7 +376,7 @@ export default function DailyLogScreen({ navigation, route }) {
       setSnackbar(`Premesteno u "${folderName}"`);
       setMoveDialogVisible(false);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setMoveLoading(false);
       setMoveTargetEntryId(null);
@@ -394,7 +395,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await startRecording();
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
@@ -402,7 +403,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await pauseRecording();
     } catch (e) {
-      setSnackbar("Pauza nije uspela: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Pauza nije uspela."));
     }
   };
 
@@ -410,7 +411,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await resumeRecording();
     } catch (e) {
-      setSnackbar("Nastavak nije uspeo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Nastavak nije uspeo."));
     }
   };
 
@@ -418,7 +419,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await stopRecording();
     } catch (e) {
-      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Zaustavljanje nije uspelo."));
     }
   };
 
@@ -426,7 +427,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await cancelRecording();
     } catch (e) {
-      setSnackbar("Otkazivanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Otkazivanje nije uspelo."));
     }
   };
 
@@ -470,9 +471,9 @@ export default function DailyLogScreen({ navigation, route }) {
     const text = combinedTexts[date];
     if (!text) return;
     ExpoClipboard.setStringAsync(text);
-    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.");
+    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 20 sekundi.");
     if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
-    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 60000);
+    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 20000);
   }, [combinedTexts]);
 
   const shareCombinedText = async (date) => {

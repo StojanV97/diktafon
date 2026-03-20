@@ -23,6 +23,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio } from "../services/journalStorage";
 import useAutoSave from "../hooks/useAutoSave";
+import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
 function formatDate(iso) {
@@ -74,7 +75,7 @@ export default function EntryScreen({ route, navigation }) {
           init(data.text);
         }
       } catch (e) {
-        if (!ignore) setSnackbar(e.message);
+        if (!ignore) setSnackbar(safeErrorMessage(e));
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -127,9 +128,9 @@ export default function EntryScreen({ route, navigation }) {
   const copyText = () => {
     if (!currentText) return;
     ExpoClipboard.setStringAsync(currentText);
-    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 60 sekundi.");
+    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 20 sekundi.");
     if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
-    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 60000);
+    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 20000);
   };
 
   const shareText = async () => {
@@ -158,7 +159,7 @@ export default function EntryScreen({ route, navigation }) {
         UTI: "com.microsoft.waveform-audio",
       });
     } catch (e) {
-      setSnackbar("Nije moguce sacuvati snimak: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Nije moguce sacuvati snimak."));
     }
   };
 
@@ -182,7 +183,7 @@ export default function EntryScreen({ route, navigation }) {
         UTI: "public.plain-text",
       });
     } catch (e) {
-      setSnackbar("Nije moguce sacuvati transkript: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Nije moguce sacuvati transkript."));
     }
   };
 

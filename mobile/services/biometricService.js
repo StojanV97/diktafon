@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage"
+import * as SecureStore from "expo-secure-store"
 import * as LocalAuthentication from "expo-local-authentication"
 
 const BIOMETRIC_LOCK_KEY = "biometric_lock_enabled"
@@ -10,12 +10,12 @@ export async function isBiometricAvailable() {
 }
 
 export async function isBiometricLockEnabled() {
-  const value = await AsyncStorage.getItem(BIOMETRIC_LOCK_KEY)
+  const value = await SecureStore.getItemAsync(BIOMETRIC_LOCK_KEY)
   return value === "true"
 }
 
 export async function setBiometricLockEnabled(enabled) {
-  await AsyncStorage.setItem(BIOMETRIC_LOCK_KEY, enabled ? "true" : "false")
+  await SecureStore.setItemAsync(BIOMETRIC_LOCK_KEY, enabled ? "true" : "false")
 }
 
 export async function authenticateWithBiometrics() {

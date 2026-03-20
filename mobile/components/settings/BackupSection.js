@@ -5,6 +5,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import * as Sharing from "expo-sharing"
 import * as DocumentPicker from "expo-document-picker"
 import * as backupService from "../../services/backupService"
+import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
@@ -33,7 +34,7 @@ export default function BackupSection({ setSnackbar }) {
       await Sharing.shareAsync(uri, { mimeType, UTI })
       setSnackbar(pw ? "Sifrovan backup je kreiran." : "Backup je kreiran.")
     } catch (e) {
-      setSnackbar("Backup nije uspeo: " + e.message)
+      setSnackbar(safeErrorMessage(e, "Backup nije uspeo."))
     } finally {
       setBackupLoading(false)
       setPassword("")
@@ -59,7 +60,7 @@ export default function BackupSection({ setSnackbar }) {
         confirmRestore(fileUri, null)
       }
     } catch (e) {
-      setSnackbar("Oporavak nije uspeo: " + e.message)
+      setSnackbar(safeErrorMessage(e, "Oporavak nije uspeo."))
     }
   }
 
@@ -89,7 +90,7 @@ export default function BackupSection({ setSnackbar }) {
                   : msg
               )
             } catch (e) {
-              setSnackbar("Oporavak nije uspeo: " + e.message)
+              setSnackbar(safeErrorMessage(e, "Oporavak nije uspeo."))
             } finally {
               setBackupLoading(false)
             }

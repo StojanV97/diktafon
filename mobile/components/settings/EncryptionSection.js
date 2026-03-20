@@ -9,6 +9,7 @@ import {
   exportRecoveryKey,
   importRecoveryKey,
 } from "../../services/cryptoService"
+import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
@@ -40,7 +41,7 @@ export default function EncryptionSection({ setSnackbar }) {
         setSnackbar("Kljuc za oporavak nije dostupan.")
       }
     } catch (e) {
-      setSnackbar("Greska: " + e.message)
+      setSnackbar(safeErrorMessage(e))
     }
   }
 
@@ -76,7 +77,7 @@ export default function EncryptionSection({ setSnackbar }) {
               setRecoveryKey(null)
               setSnackbar("Kljuc za oporavak je uspesno unet.")
             } catch (e) {
-              setSnackbar("Greska: " + e.message)
+              setSnackbar(safeErrorMessage(e))
             }
           },
         },

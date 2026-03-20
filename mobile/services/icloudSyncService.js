@@ -1,6 +1,7 @@
 import { NativeModules, Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 import { getSettings, updateSettings } from "./settingsService"
+import { getEncryptionKey, encryptText, decryptText } from "./cryptoService"
 
 // Lazy import — react-native-cloud-store is iOS-only native module
 let CloudStore = null
@@ -122,12 +123,31 @@ export async function downloadFileFromICloud(relativePath, localUri) {
 // ── JSON Sync Helpers ──────────────────────────────────
 
 export async function syncJSONToICloud(relativePath, data) {
-  await writeFileToICloud(relativePath, JSON.stringify(data))
+  const json = JSON.stringify(data)
+  const key = await getEncryptionKey()
+  if (key) {
+    const encrypted = encryptText(json, key)
+    await writeFileToICloud(relativePath, Buffer.from(encrypted).toString("base64"))
+  } else {
+    await writeFileToICloud(relativePath, json)
+  }
 }
 
 export async function readJSONFromICloud(relativePath) {
   const content = await readFileFromICloud(relativePath)
   if (!content) return null
+
+  // Try decryption first, fall back to plaintext for backward compat
+  const key = await getEncryptionKey()
+  if (key) {
+    try {
+      const decrypted = decryptText(Buffer.from(content, "base64"), key)
+      return JSON.parse(decrypted)
+    } catch {
+      // Fall through to plaintext parse (pre-encryption data)
+    }
+  }
+
   try {
     return JSON.parse(content)
   } catch {

@@ -31,7 +31,32 @@ import AuthScreen from "./screens/AuthScreen";
 
 const SENTRY_DSN = "YOUR_SENTRY_DSN"
 if (SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")) {
-  Sentry.init({ dsn: SENTRY_DSN, tracesSampleRate: 0.2 })
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.2,
+    beforeSend(event) {
+      // Strip file paths from exception values and messages
+      const scrub = (str) => str?.replace(/\/Users\/[^\s:]+/g, "[path]")
+        .replace(/\/var\/mobile\/[^\s:]+/g, "[path]")
+        .replace(/\/data\/data\/[^\s:]+/g, "[path]")
+
+      if (event.message) event.message = scrub(event.message)
+      if (event.exception?.values) {
+        for (const ex of event.exception.values) {
+          if (ex.value) ex.value = scrub(ex.value)
+        }
+      }
+
+      // Remove breadcrumb data that could contain sensitive info
+      if (event.breadcrumbs) {
+        for (const bc of event.breadcrumbs) {
+          if (bc.data?.url) bc.data.url = bc.data.url.replace(/key=[^&]+/, "key=[REDACTED]")
+        }
+      }
+
+      return event
+    },
+  })
 }
 
 SplashScreen.preventAutoHideAsync();
