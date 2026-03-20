@@ -21,7 +21,8 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio } from "../services/journalStorage";
+import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, downloadAudioFromICloud } from "../services/journalStorage";
+import { fileExistsOnICloud } from "../services/icloudSyncService";
 import useAutoSave from "../hooks/useAutoSave";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
@@ -53,6 +54,8 @@ export default function EntryScreen({ route, navigation }) {
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [audioMissing, setAudioMissing] = useState(false);
+  const [audioOnICloud, setAudioOnICloud] = useState(false);
+  const [audioDownloading, setAudioDownloading] = useState(false);
   const [decryptedAudioUri, setDecryptedAudioUri] = useState(null);
 
   const saveFn = useCallback((text) => updateEntryText(id, text), [id]);
@@ -67,6 +70,15 @@ export default function EntryScreen({ route, navigation }) {
         setRecord(data);
         if (data?.audio_file && !entryAudioExists(data.id)) {
           setAudioMissing(true);
+          // Check if audio is available on iCloud for lazy download
+          if (data.audio_on_icloud) {
+            setAudioOnICloud(true);
+          } else {
+            try {
+              const onCloud = await fileExistsOnICloud(`audio/${data.id}.wav`);
+              if (onCloud) setAudioOnICloud(true);
+            } catch {}
+          }
         } else if (data?.audio_file) {
           const uri = await getDecryptedAudioUri(data.id);
           if (uri) setDecryptedAudioUri(uri);
@@ -187,6 +199,27 @@ export default function EntryScreen({ route, navigation }) {
     }
   };
 
+  const handleDownloadAudio = async () => {
+    setAudioDownloading(true);
+    try {
+      const success = await downloadAudioFromICloud(id);
+      if (success) {
+        const uri = await getDecryptedAudioUri(id);
+        if (uri) {
+          setDecryptedAudioUri(uri);
+          setAudioMissing(false);
+          setAudioOnICloud(false);
+        }
+      } else {
+        setSnackbar("Preuzimanje audio fajla nije uspelo.");
+      }
+    } catch {
+      setSnackbar("Preuzimanje audio fajla nije uspelo.");
+    } finally {
+      setAudioDownloading(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -230,11 +263,25 @@ export default function EntryScreen({ route, navigation }) {
         }
       </ScrollView>
 
-      {/* Audio missing notice */}
+      {/* Audio missing / iCloud download notice */}
       {!keyboardVisible && audioMissing && (
         <View style={[styles.playerCard, elevation.md, { alignItems: "center", paddingVertical: spacing.lg }]}>
-          <MaterialCommunityIcons name="file-music-outline" size={24} color={colors.muted} />
-          <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Audio fajl nije pronadjen</Text>
+          {audioOnICloud && !audioDownloading ? (
+            <TouchableOpacity onPress={handleDownloadAudio} style={{ alignItems: "center" }}>
+              <MaterialCommunityIcons name="cloud-download-outline" size={28} color={colors.primary} />
+              <Text style={[typography.caption, { color: colors.primary, marginTop: spacing.xs }]}>Preuzmi sa iCloud-a</Text>
+            </TouchableOpacity>
+          ) : audioOnICloud && audioDownloading ? (
+            <>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Preuzimanje sa iCloud-a...</Text>
+            </>
+          ) : (
+            <>
+              <MaterialCommunityIcons name="file-music-outline" size={24} color={colors.muted} />
+              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Audio fajl nije pronadjen</Text>
+            </>
+          )}
         </View>
       )}
 

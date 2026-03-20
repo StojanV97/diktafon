@@ -1,5 +1,6 @@
 import crypto from "react-native-quick-crypto"
 import * as SecureStore from "expo-secure-store"
+import * as Keychain from "react-native-keychain"
 
 const KEY_NAME = "diktafon_encryption_key_v1"
 const KEY_LENGTH = 32 // AES-256
@@ -9,27 +10,100 @@ const PBKDF2_ITERATIONS = 600000
 const LEGACY_PBKDF2_ITERATIONS = 100000
 const PBKDF2_SALT_LENGTH = 16
 
-// In-memory cache — avoid SecureStore round-trip on every encrypt/decrypt
+// iCloud Keychain constants (v2)
+const KEYCHAIN_SERVICE = "com.diktafon.app.encryption"
+const KEYCHAIN_USERNAME = "encryption_key_v2"
+
+// In-memory cache — avoid Keychain/SecureStore round-trip on every encrypt/decrypt
 let _cachedKey = null
+
+// ── Keychain Helpers (iCloud-synced) ────────────────────
+
+async function readKeyFromKeychain() {
+  try {
+    const result = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE })
+    if (!result || !result.password) return null
+    return Buffer.from(result.password, "base64")
+  } catch {
+    return null
+  }
+}
+
+async function writeKeyToKeychain(base64Key) {
+  await Keychain.setGenericPassword(KEYCHAIN_USERNAME, base64Key, {
+    service: KEYCHAIN_SERVICE,
+    accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK,
+    synchronizable: true,
+  })
+}
+
+// ── v1 → v2 Migration ──────────────────────────────────
+
+async function migrateKeyToKeychain() {
+  // 1. Already in Keychain? Done — just clean up SecureStore if leftover
+  const keychainKey = await readKeyFromKeychain()
+  if (keychainKey) {
+    _cachedKey = keychainKey
+    try { await SecureStore.deleteItemAsync(KEY_NAME) } catch {}
+    return
+  }
+
+  // 2. Read v1 key from SecureStore
+  const v1Key = await SecureStore.getItemAsync(KEY_NAME)
+  if (!v1Key) return // Fresh install — initEncryption will generate
+
+  // 3. Write to Keychain, verify round-trip, delete from SecureStore
+  await writeKeyToKeychain(v1Key)
+  const verify = await readKeyFromKeychain()
+  if (!verify || Buffer.from(verify).toString("base64") !== v1Key) {
+    throw new Error("Keychain migration round-trip verification failed")
+  }
+  await SecureStore.deleteItemAsync(KEY_NAME)
+  _cachedKey = verify
+}
 
 // ── Key Management ──────────────────────────────────────
 
 export async function initEncryption() {
-  const existing = await SecureStore.getItemAsync(KEY_NAME)
-  if (existing) {
-    _cachedKey = Buffer.from(existing, "base64")
+  // Try migration first (non-fatal if it fails)
+  try {
+    await migrateKeyToKeychain()
+  } catch (e) {
+    if (__DEV__) console.warn("Key migration to Keychain failed:", e.message)
+  }
+
+  // Check Keychain
+  const keychainKey = await readKeyFromKeychain()
+  if (keychainKey) {
+    _cachedKey = keychainKey
     return true
   }
+
+  // Fallback: check SecureStore (migration may have failed)
+  const secureStoreKey = await SecureStore.getItemAsync(KEY_NAME)
+  if (secureStoreKey) {
+    _cachedKey = Buffer.from(secureStoreKey, "base64")
+    return true
+  }
+
+  // Generate new key → write to Keychain (not SecureStore)
   const key = crypto.randomBytes(KEY_LENGTH)
-  await SecureStore.setItemAsync(KEY_NAME, Buffer.from(key).toString("base64"), {
-    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
-  })
+  const base64 = Buffer.from(key).toString("base64")
+  await writeKeyToKeychain(base64)
   _cachedKey = Buffer.from(key)
   return true
 }
 
 export async function getEncryptionKey() {
   if (_cachedKey) return _cachedKey
+
+  const keychainKey = await readKeyFromKeychain()
+  if (keychainKey) {
+    _cachedKey = keychainKey
+    return _cachedKey
+  }
+
+  // Fallback: SecureStore (pre-migration devices)
   const stored = await SecureStore.getItemAsync(KEY_NAME)
   if (!stored) return null
   _cachedKey = Buffer.from(stored, "base64")
@@ -45,29 +119,10 @@ export function clearCachedKey() {
 
 export async function hasEncryptionKey() {
   if (_cachedKey) return true
+  const keychainKey = await readKeyFromKeychain()
+  if (keychainKey) return true
   const stored = await SecureStore.getItemAsync(KEY_NAME)
   return stored !== null
-}
-
-export async function exportRecoveryKey() {
-  const stored = await SecureStore.getItemAsync(KEY_NAME)
-  return stored || null
-}
-
-export async function importRecoveryKey(base64Key) {
-  const trimmed = base64Key.trim()
-  // Validate base64 format: decode then re-encode and compare
-  const keyBuf = Buffer.from(trimmed, "base64")
-  if (keyBuf.length === 0 || Buffer.from(keyBuf).toString("base64") !== trimmed) {
-    throw new Error("Neispravan format kljuca")
-  }
-  if (keyBuf.length !== KEY_LENGTH) {
-    throw new Error("Neispravan kljuc za oporavak")
-  }
-  await SecureStore.setItemAsync(KEY_NAME, trimmed, {
-    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
-  })
-  _cachedKey = keyBuf
 }
 
 // ── AES-256-GCM Encrypt/Decrypt ─────────────────────────

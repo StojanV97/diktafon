@@ -30,7 +30,10 @@ import {
   createDailyLogEntry,
   getDailyCombinedTranscripts,
   consolidateDailyLogEntries,
+  tombstoneEntry,
+  deleteEntryWithICloud,
 } from "../services/journalStorage";
+import { isSyncEnabled } from "../services/icloudSyncService";
 import { useRecorder } from "../hooks/useRecorder";
 import { useTranscription } from "../hooks/useTranscription";
 import RecordingOverlay from "../components/RecordingOverlay";
@@ -335,6 +338,46 @@ export default function DailyLogScreen({ navigation, route }) {
     if (!deleteTarget || deleteLoading) return;
     setDeleteLoading(true);
     try {
+      const syncOn = await isSyncEnabled();
+      if (syncOn) {
+        setDeleteDialogVisible(false);
+        Alert.alert(
+          "Obrisi i sa iCloud-a?",
+          "Ovaj snimak ce biti obrisan lokalno.",
+          [
+            {
+              text: "Ne, samo lokalno",
+              onPress: async () => {
+                try {
+                  await tombstoneEntry(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                  syncWidgetData();
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+            {
+              text: "Obrisi svuda",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteEntryWithICloud(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                  syncWidgetData();
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+          ]
+        );
+        return;
+      }
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       syncWidgetData();
@@ -350,21 +393,51 @@ export default function DailyLogScreen({ navigation, route }) {
   const onDeleteAllConfirm = async () => {
     setDeleteAllDialogVisible(false);
     const total = entries.length;
+    const syncOn = await isSyncEnabled();
+    if (syncOn) {
+      Alert.alert(
+        "Obrisi i sa iCloud-a?",
+        `Svih ${total} zapisa ce biti obrisano lokalno.`,
+        [
+          {
+            text: "Ne, samo lokalno",
+            onPress: async () => {
+              let failures = 0;
+              for (const entry of entries) {
+                try { await tombstoneEntry(entry.id); } catch { failures++; }
+              }
+              await load();
+              syncWidgetData();
+              if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+              else setSnackbar(`Obrisano ${total} zapisa.`);
+            },
+          },
+          {
+            text: "Obrisi svuda",
+            style: "destructive",
+            onPress: async () => {
+              let failures = 0;
+              for (const entry of entries) {
+                try { await deleteEntryWithICloud(entry.id); } catch { failures++; }
+              }
+              await load();
+              syncWidgetData();
+              if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+              else setSnackbar(`Obrisano ${total} zapisa.`);
+            },
+          },
+        ]
+      );
+      return;
+    }
     let failures = 0;
     for (const entry of entries) {
-      try {
-        await deleteEntry(entry.id);
-      } catch {
-        failures++;
-      }
+      try { await deleteEntry(entry.id); } catch { failures++; }
     }
     await load();
     syncWidgetData();
-    if (failures > 0) {
-      setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
-    } else {
-      setSnackbar(`Obrisano ${total} zapisa.`);
-    }
+    if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+    else setSnackbar(`Obrisano ${total} zapisa.`);
   };
 
   const onMovePress = async (entryId) => {

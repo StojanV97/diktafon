@@ -13,7 +13,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
-import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries, cleanupDecryptedAudio } from "./services/journalStorage";
+import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries, cleanupDecryptedAudio, importFromICloudRestore } from "./services/journalStorage";
 import { initEncryption, clearCachedKey } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
 import * as ScreenCapture from "expo-screen-capture";
@@ -21,7 +21,7 @@ import { syncWidgetData, getPendingAction } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
 import { onAuthStateChange } from "./services/authService";
 import { initPurchases, loginUser } from "./services/subscriptionService";
-import { pullAndMerge, isSyncEnabled } from "./services/icloudSyncService";
+import { pullAndMerge, isSyncEnabled, checkICloudDataExists, restoreFromICloud, enableSync } from "./services/icloudSyncService";
 import { setupSslPinning } from "./services/sslPinningService";
 import { initRuntimeProtection } from "./services/runtimeProtectionService";
 import { isBiometricLockEnabled, authenticateWithBiometrics } from "./services/biometricService";
@@ -235,6 +235,41 @@ function App() {
         }
       } catch (e) {
         if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
+      }
+
+      // Fresh install restore: detect empty local + iCloud data exists
+      try {
+        const localFolders = await getRawFolders();
+        const localEntries = await getRawEntries();
+        if (localFolders.length === 0 && localEntries.length === 0) {
+          const hasICloudData = await checkICloudDataExists();
+          if (hasICloudData) {
+            await new Promise((resolve) => {
+              Alert.alert(
+                "iCloud podaci",
+                "Pronadjeni su podaci na iCloud-u. Zelite li da ih vratite?",
+                [
+                  { text: "Ne", onPress: resolve },
+                  {
+                    text: "Vrati podatke",
+                    onPress: async () => {
+                      try {
+                        const data = await restoreFromICloud();
+                        await importFromICloudRestore(data);
+                        await enableSync();
+                      } catch (e) {
+                        if (__DEV__) console.warn("iCloud restore failed:", e.message);
+                      }
+                      resolve();
+                    },
+                  },
+                ]
+              );
+            });
+          }
+        }
+      } catch (e) {
+        if (__DEV__) console.warn("iCloud restore check failed:", e.message);
       }
 
       setReady(true);

@@ -4,6 +4,7 @@ import crypto from "react-native-quick-crypto";
 import {
   syncJSONToICloud,
   uploadFileToICloud,
+  deleteEntryFilesFromICloud,
 } from "./icloudSyncService";
 import {
   getEncryptionKey,
@@ -354,6 +355,140 @@ async function cleanOrphanedFiles() {
   }
 }
 
+// ── Tombstone Operations ────────────────────────────────
+
+export function tombstoneEntry(entryId) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile)
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry) return false
+    entry.deleted_locally = true
+    entry.updated_at = new Date().toISOString()
+    writeJSON(entriesFile, entries)
+
+    // Delete local files
+    const audioFile = new File(audioDir, `${entryId}.wav`)
+    if (audioFile.exists) audioFile.delete()
+    const textFile = new File(textsDir, `journal_${entryId}.txt`)
+    if (textFile.exists) textFile.delete()
+    return true
+  })
+}
+
+export function tombstoneFolder(folderId) {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile)
+    const folder = folders.find(f => f.id === folderId)
+    if (!folder) return []
+
+    const entries = await readJSON(entriesFile)
+    const tombstonedIds = []
+
+    // Tombstone all entries in this folder
+    for (const entry of entries) {
+      if (entry.folder_id === folderId && !entry.deleted_locally) {
+        entry.deleted_locally = true
+        entry.updated_at = new Date().toISOString()
+        tombstonedIds.push(entry.id)
+        const audioFile = new File(audioDir, `${entry.id}.wav`)
+        if (audioFile.exists) audioFile.delete()
+        const textFile = new File(textsDir, `journal_${entry.id}.txt`)
+        if (textFile.exists) textFile.delete()
+      }
+    }
+    writeJSON(entriesFile, entries)
+
+    // Tombstone the folder itself
+    folder.deleted_locally = true
+    folder.updated_at = new Date().toISOString()
+    writeJSON(foldersFile, folders)
+
+    return tombstonedIds
+  })
+}
+
+export function deleteEntryWithICloud(entryId) {
+  return withWriteLock(async () => {
+    const entries = await readJSON(entriesFile)
+    const idx = entries.findIndex(e => e.id === entryId)
+    if (idx === -1) return false
+    entries.splice(idx, 1)
+    writeJSON(entriesFile, entries)
+
+    const audioFile = new File(audioDir, `${entryId}.wav`)
+    if (audioFile.exists) audioFile.delete()
+    const textFile = new File(textsDir, `journal_${entryId}.txt`)
+    if (textFile.exists) textFile.delete()
+
+    // Fire-and-forget iCloud delete
+    deleteEntryFilesFromICloud(entryId).catch(() => {})
+    return true
+  })
+}
+
+export function deleteFolderWithICloud(folderId) {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile)
+    const idx = folders.findIndex(f => f.id === folderId)
+    if (idx === -1) return false
+
+    const entries = await readJSON(entriesFile)
+    const toDelete = entries.filter(e => e.folder_id === folderId)
+    writeJSON(entriesFile, entries.filter(e => e.folder_id !== folderId))
+
+    for (const e of toDelete) {
+      try {
+        const audioFile = new File(audioDir, `${e.id}.wav`)
+        if (audioFile.exists) audioFile.delete()
+        const textFile = new File(textsDir, `journal_${e.id}.txt`)
+        if (textFile.exists) textFile.delete()
+      } catch {}
+      // Fire-and-forget iCloud delete
+      deleteEntryFilesFromICloud(e.id).catch(() => {})
+    }
+
+    folders.splice(idx, 1)
+    writeJSON(foldersFile, folders)
+    return true
+  })
+}
+
+export async function getTombstonedEntries() {
+  const entries = await readJSON(entriesFile)
+  return entries.filter(e => e.deleted_locally === true)
+}
+
+export async function getTombstonedFolders() {
+  const folders = await readJSON(foldersFile)
+  return folders.filter(f => f.deleted_locally === true)
+}
+
+export function reviveTombstonedRecords() {
+  return withWriteLock(async () => {
+    const folders = await readJSON(foldersFile)
+    let foldersChanged = false
+    for (const f of folders) {
+      if (f.deleted_locally) {
+        delete f.deleted_locally
+        f.updated_at = new Date().toISOString()
+        foldersChanged = true
+      }
+    }
+    if (foldersChanged) writeJSON(foldersFile, folders)
+
+    const entries = await readJSON(entriesFile)
+    let entriesChanged = false
+    for (const e of entries) {
+      if (e.deleted_locally) {
+        delete e.deleted_locally
+        e.updated_at = new Date().toISOString()
+        entriesChanged = true
+      }
+    }
+    if (entriesChanged) writeJSON(entriesFile, entries)
+  })
+}
+
 // ── Folders ─────────────────────────────────────────────
 
 export function createFolder(name, color = "#4A9EFF", tags = []) {
@@ -375,7 +510,8 @@ export function createFolder(name, color = "#4A9EFF", tags = []) {
 }
 
 export async function fetchFolders() {
-  return readJSON(foldersFile);
+  const folders = await readJSON(foldersFile);
+  return folders.filter(f => !f.deleted_locally);
 }
 
 export async function getFolder(id) {
@@ -476,7 +612,7 @@ export function createEntry(folderId, filename, audioSourceUri, durationSeconds 
 
 export async function fetchEntries(folderId) {
   const entries = await readJSON(entriesFile);
-  return entries.filter((e) => e.folder_id === folderId);
+  return entries.filter((e) => e.folder_id === folderId && !e.deleted_locally);
 }
 
 export async function fetchEntry(entryId) {
@@ -685,7 +821,7 @@ export async function fetchDailyLogEntries() {
   if (!folder) return [];
   const entries = await readJSON(entriesFile);
   return entries
-    .filter((e) => e.folder_id === folder.id)
+    .filter((e) => e.folder_id === folder.id && !e.deleted_locally)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
@@ -920,6 +1056,37 @@ export function importAllData(data) {
       audioFiles: audioCount,
       textFiles: textCount,
     };
+  })
+}
+
+// ── iCloud Audio Download ────────────────────────────────
+
+export async function downloadAudioFromICloud(entryId) {
+  const { downloadFileFromICloud, fileExistsOnICloud } = require("./icloudSyncService")
+
+  const icloudRelPath = `audio/${entryId}.wav`
+  const exists = await fileExistsOnICloud(icloudRelPath)
+  if (!exists) return false
+
+  ensureDirs()
+  const localFile = new File(audioDir, `${entryId}.wav`)
+  const success = await downloadFileFromICloud(icloudRelPath, localFile.uri)
+  return success && localFile.exists
+}
+
+// ── iCloud Restore Support ───────────────────────────────
+
+export function importFromICloudRestore(data) {
+  return withWriteLock(async () => {
+    ensureDirs()
+    writeJSON(foldersFile, data.folders)
+    writeJSON(entriesFile, data.entries)
+
+    // Write downloaded text file contents (already encrypted from iCloud)
+    for (const [entryId, content] of Object.entries(data.texts)) {
+      const textFile = new File(textsDir, `journal_${entryId}.txt`)
+      textFile.write(content)
+    }
   })
 }
 

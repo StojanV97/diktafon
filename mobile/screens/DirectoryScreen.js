@@ -22,7 +22,10 @@ import {
   createEntry,
   fetchEntries,
   deleteEntry,
+  tombstoneEntry,
+  deleteEntryWithICloud,
 } from "../services/journalStorage";
+import { isSyncEnabled } from "../services/icloudSyncService";
 import { useRecorder } from "../hooks/useRecorder";
 import { useTranscription } from "../hooks/useTranscription";
 import RecordingOverlay from "../components/RecordingOverlay";
@@ -307,6 +310,44 @@ export default function DirectoryScreen({ route, navigation }) {
     if (!deleteTarget || deleteLoading) return;
     setDeleteLoading(true);
     try {
+      const syncOn = await isSyncEnabled();
+      if (syncOn) {
+        setDeleteDialogVisible(false);
+        Alert.alert(
+          "Obrisi i sa iCloud-a?",
+          `"${deleteTarget.filename}" ce biti obrisan lokalno.`,
+          [
+            {
+              text: "Ne, samo lokalno",
+              onPress: async () => {
+                try {
+                  await tombstoneEntry(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+            {
+              text: "Obrisi svuda",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteEntryWithICloud(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+          ]
+        );
+        return;
+      }
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     } catch (e) {

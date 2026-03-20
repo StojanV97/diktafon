@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -28,7 +29,10 @@ import {
   getAllTags,
   fetchDailyLogStats,
   createDailyLogEntry,
+  tombstoneFolder,
+  deleteFolderWithICloud,
 } from "../services/journalStorage";
+import { isSyncEnabled } from "../services/icloudSyncService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
@@ -198,6 +202,44 @@ export default function DirectoryHomeScreen({ navigation }) {
     if (!deleteTarget || deleteLoading) return;
     setDeleteLoading(true);
     try {
+      const syncOn = await isSyncEnabled();
+      if (syncOn) {
+        setDeleteDialogVisible(false);
+        Alert.alert(
+          "Obrisi i sa iCloud-a?",
+          `"${deleteTarget.name}" i svi zapisi u njemu ce biti obrisani lokalno.`,
+          [
+            {
+              text: "Ne, samo lokalno",
+              onPress: async () => {
+                try {
+                  await tombstoneFolder(deleteTarget.id);
+                  setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+            {
+              text: "Obrisi svuda",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteFolderWithICloud(deleteTarget.id);
+                  setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+          ]
+        );
+        return;
+      }
       await deleteFolder(deleteTarget.id);
       setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
     } catch (e) {
