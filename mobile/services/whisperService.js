@@ -30,12 +30,13 @@ const MIN_MODEL_SIZE = 140 * 1024 * 1024; // 140MB minimum for ggml-small
 export async function downloadModel(onProgress) {
   modelsDir.create({ idempotent: true });
 
-  // Delete any existing partial file before downloading
-  if (modelFile.exists) modelFile.delete();
+  // Download to temp file — keeps existing model intact if download fails
+  const tempFile = new File(modelsDir, "ggml-small.bin.tmp")
+  if (tempFile.exists) tempFile.delete()
 
   const downloadResumable = FileSystem.createDownloadResumable(
     MODEL_URL,
-    modelFile.uri,
+    tempFile.uri,
     {},
     (downloadProgress) => {
       const progress =
@@ -45,15 +46,19 @@ export async function downloadModel(onProgress) {
     }
   );
 
-  const result = await downloadResumable.downloadAsync();
+  await downloadResumable.downloadAsync();
 
-  // Size check — detect interrupted/partial downloads
-  if (modelFile.exists && modelFile.size < MIN_MODEL_SIZE) {
-    modelFile.delete();
+  // Validate — detect interrupted/partial downloads
+  if (!tempFile.exists || tempFile.size < MIN_MODEL_SIZE) {
+    if (tempFile.exists) tempFile.delete()
     throw new Error("Preuzimanje modela nije zavrseno. Pokusajte ponovo.");
   }
 
-  return result.uri;
+  // Atomic swap: delete old model only after successful download
+  if (modelFile.exists) modelFile.delete()
+  tempFile.move(modelFile)
+
+  return modelFile.uri;
 }
 
 export function deleteModel() {

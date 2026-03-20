@@ -84,22 +84,27 @@ export async function pollProcessingEntries(entries) {
       const state = _pollState[e.id] || { consecutive: 0, total: 0 }
 
       // Simple backoff: skip every other poll after BACKOFF_AFTER consecutive failures
-      if (state.consecutive >= BACKOFF_AFTER && state.total % 2 !== 0) {
-        state.total++
-        _pollState[e.id] = state
-        return
+      if (state.consecutive >= BACKOFF_AFTER) {
+        state.skipped = (state.skipped || 0) + 1
+        if (state.skipped % 2 !== 0) {
+          _pollState[e.id] = state
+          return
+        }
       }
 
       try {
         const result = await assemblyAIService.check(e.assemblyai_id)
-        // Reset on success
-        delete _pollState[e.id]
         if (result.status === "done") {
+          delete _pollState[e.id]
           const updated = await completeEntry(e.id, result.text, result.duration_seconds)
           if (updated) changed.push({ entryId: e.id, entry: updated })
         } else if (result.status === "error") {
+          delete _pollState[e.id]
           const updated = await failEntry(e.id, result.error)
           if (updated) changed.push({ entryId: e.id, entry: updated })
+        } else {
+          // "processing" — reset consecutive failures (server responded OK) but keep total
+          if (_pollState[e.id]) _pollState[e.id].consecutive = 0
         }
       } catch (err) {
         state.consecutive++

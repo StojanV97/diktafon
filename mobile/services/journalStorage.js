@@ -737,6 +737,10 @@ export function consolidateDailyLogEntries(date) {
     const combinedTextFile = new File(textsDir, `journal_${id}.txt`);
     await writeEncryptedText(combinedTextFile, combinedText);
 
+    // Sync combined transcript to iCloud
+    uploadFileToICloud(combinedTextFile.uri, `texts/journal_${id}.txt`)
+      .catch((e) => Sentry.captureMessage("iCloud sync failed for combined text: " + e.message, "warning"))
+
     const combinedEntry = {
       id,
       folder_id: folder.id,

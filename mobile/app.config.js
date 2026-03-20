@@ -17,6 +17,8 @@ module.exports = {
         NSMicrophoneUsageDescription:
           "Diktafon koristi mikrofon za snimanje glasovnih zapisa.",
         NSFileProtectionKey: "NSFileProtectionCompleteUntilFirstUserAuthentication",
+        ITSAppUsesNonExemptEncryption: false,
+        NSFaceIDUsageDescription: "Diktafon koristi Face ID za zastitu vasih podataka.",
       },
     },
     android: {

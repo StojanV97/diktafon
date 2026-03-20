@@ -91,6 +91,10 @@ async function checkDirect(transcriptId) {
     throw new Error("Neispravan odgovor od servera pri proveri statusa.")
   }
 
+  if (!res.ok) {
+    return { status: "error", error: data.error || "Greska pri proveri statusa transkripcije." }
+  }
+
   if (data.status === "completed") {
     const text = data.utterances
       ? formatUtterances(data)
