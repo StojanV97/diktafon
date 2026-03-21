@@ -112,10 +112,9 @@ export async function restoreFromBackup(fileUri, password) {
     await Promise.all(promises);
   }
 
-  // Create a safety backup before overwriting current data (encrypted with throwaway password)
+  // Create a safety backup before overwriting current data
   try {
-    const tempPassword = Buffer.from(crypto.randomBytes(32)).toString("hex")
-    await createBackup(tempPassword);
+    await createBackup(null);
   } catch (e) {
     if (__DEV__) console.warn("Pre-restore backup failed:", e);
     throw new Error("SAFETY_BACKUP_FAILED: " + e.message);

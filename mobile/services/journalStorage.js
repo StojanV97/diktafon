@@ -57,18 +57,43 @@ async function readJSON(file) {
   try {
     if (!file.exists) { result = []; }
     else {
-      const raw = await file.text();
-      result = JSON.parse(raw);
+      const key = await getEncryptionKey();
+      if (key) {
+        try {
+          const bytes = file.bytes();
+          const decrypted = decryptText(bytes, key);
+          result = JSON.parse(decrypted);
+        } catch {
+          // Fall through to plaintext (migration from pre-encryption)
+          const raw = await file.text();
+          result = JSON.parse(raw);
+        }
+      } else {
+        const raw = await file.text();
+        result = JSON.parse(raw);
+      }
     }
   } catch (e) {
     // Main file is corrupted — try the backup
     const bakFile = new File(file.parentDirectory, file.name + ".bak");
     if (bakFile.exists) {
       try {
-        const bakRaw = await bakFile.text();
-        result = JSON.parse(bakRaw);
+        const key = await getEncryptionKey();
+        if (key) {
+          try {
+            const bytes = bakFile.bytes();
+            const decrypted = decryptText(bytes, key);
+            result = JSON.parse(decrypted);
+          } catch {
+            const bakRaw = await bakFile.text();
+            result = JSON.parse(bakRaw);
+          }
+        } else {
+          const bakRaw = await bakFile.text();
+          result = JSON.parse(bakRaw);
+        }
         if (__DEV__) console.warn(`readJSON: ${file.name} corrupted, recovered from .bak`);
-        file.write(bakRaw);
+        await writeJSON(file, result);
       } catch {
         if (__DEV__) console.warn(`readJSON: both ${file.name} and .bak are corrupted`);
         _corruptionDetected = file.name;
@@ -88,13 +113,18 @@ async function readJSON(file) {
   return result;
 }
 
-function writeJSON(file, data) {
+async function writeJSON(file, data) {
   try {
     ensureDirs();
     const json = JSON.stringify(data);
+    const key = await getEncryptionKey();
     // Write to temp file first, then back up old file, then move temp into place
     const tmpFile = new File(file.parentDirectory, file.name + ".tmp");
-    tmpFile.write(json);
+    if (key) {
+      tmpFile.write(encryptText(json, key));
+    } else {
+      tmpFile.write(json);
+    }
     // Back up the current file before replacing
     if (file.exists) {
       const bakFile = new File(file.parentDirectory, file.name + ".bak");
@@ -232,7 +262,7 @@ export function migrateData() {
         foldersChanged = true;
       }
     }
-    if (foldersChanged) writeJSON(foldersFile, folders);
+    if (foldersChanged) await writeJSON(foldersFile, folders);
 
     const entries = await readJSON(entriesFile);
     let entriesChanged = false;
@@ -257,7 +287,7 @@ export function migrateData() {
         entriesChanged = true;
       }
     }
-    if (entriesChanged) writeJSON(entriesFile, entries);
+    if (entriesChanged) await writeJSON(entriesFile, entries);
 
     // ── Encrypt existing plaintext transcripts ──
     // initEncryption() is already called by App.js before migrateData()
@@ -295,7 +325,7 @@ export function migrateData() {
           }
         }
       }
-      if (encryptionMigrated) writeJSON(entriesFile, entries)
+      if (encryptionMigrated) await writeJSON(entriesFile, entries)
 
       // ── Encrypt existing plaintext audio files ──
       for (const entry of entries) {
@@ -364,7 +394,7 @@ export function tombstoneEntry(entryId) {
     if (!entry) return false
     entry.deleted_locally = true
     entry.updated_at = new Date().toISOString()
-    writeJSON(entriesFile, entries)
+    await writeJSON(entriesFile, entries)
 
     // Delete local files
     const audioFile = new File(audioDir, `${entryId}.wav`)
@@ -396,12 +426,12 @@ export function tombstoneFolder(folderId) {
         if (textFile.exists) textFile.delete()
       }
     }
-    writeJSON(entriesFile, entries)
+    await writeJSON(entriesFile, entries)
 
     // Tombstone the folder itself
     folder.deleted_locally = true
     folder.updated_at = new Date().toISOString()
-    writeJSON(foldersFile, folders)
+    await writeJSON(foldersFile, folders)
 
     return tombstonedIds
   })
@@ -413,7 +443,7 @@ export function deleteEntryWithICloud(entryId) {
     const idx = entries.findIndex(e => e.id === entryId)
     if (idx === -1) return false
     entries.splice(idx, 1)
-    writeJSON(entriesFile, entries)
+    await writeJSON(entriesFile, entries)
 
     const audioFile = new File(audioDir, `${entryId}.wav`)
     if (audioFile.exists) audioFile.delete()
@@ -434,7 +464,7 @@ export function deleteFolderWithICloud(folderId) {
 
     const entries = await readJSON(entriesFile)
     const toDelete = entries.filter(e => e.folder_id === folderId)
-    writeJSON(entriesFile, entries.filter(e => e.folder_id !== folderId))
+    await writeJSON(entriesFile, entries.filter(e => e.folder_id !== folderId))
 
     for (const e of toDelete) {
       try {
@@ -448,7 +478,7 @@ export function deleteFolderWithICloud(folderId) {
     }
 
     folders.splice(idx, 1)
-    writeJSON(foldersFile, folders)
+    await writeJSON(foldersFile, folders)
     return true
   })
 }
@@ -474,7 +504,7 @@ export function reviveTombstonedRecords() {
         foldersChanged = true
       }
     }
-    if (foldersChanged) writeJSON(foldersFile, folders)
+    if (foldersChanged) await writeJSON(foldersFile, folders)
 
     const entries = await readJSON(entriesFile)
     let entriesChanged = false
@@ -485,7 +515,7 @@ export function reviveTombstonedRecords() {
         entriesChanged = true
       }
     }
-    if (entriesChanged) writeJSON(entriesFile, entries)
+    if (entriesChanged) await writeJSON(entriesFile, entries)
   })
 }
 
@@ -504,7 +534,7 @@ export function createFolder(name, color = "#4A9EFF", tags = []) {
       updated_at: now,
     };
     folders.unshift(folder);
-    writeJSON(foldersFile, folders);
+    await writeJSON(foldersFile, folders);
     return folder;
   })
 }
@@ -528,7 +558,7 @@ export function updateFolder(id, updates) {
     if (updates.color !== undefined) folder.color = updates.color;
     if (updates.tags !== undefined) folder.tags = updates.tags;
     folder.updated_at = new Date().toISOString();
-    writeJSON(foldersFile, folders);
+    await writeJSON(foldersFile, folders);
     return folder;
   })
 }
@@ -551,7 +581,7 @@ export function deleteFolder(id) {
     // Step 1: Remove entries first (safest — folder still visible if crash)
     const entries = await readJSON(entriesFile)
     const toDelete = entries.filter((e) => e.folder_id === id)
-    writeJSON(entriesFile, entries.filter((e) => e.folder_id !== id))
+    await writeJSON(entriesFile, entries.filter((e) => e.folder_id !== id))
 
     // Step 2: Clean up files (best-effort)
     for (const e of toDelete) {
@@ -565,7 +595,7 @@ export function deleteFolder(id) {
 
     // Step 3: Remove folder last
     folders.splice(idx, 1)
-    writeJSON(foldersFile, folders)
+    await writeJSON(foldersFile, folders)
     return true
   })
 }
@@ -601,7 +631,7 @@ export function createEntry(folderId, filename, audioSourceUri, durationSeconds 
 
     const entries = await readJSON(entriesFile);
     entries.unshift(entry);
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
 
     // Sync audio to iCloud (fire-and-forget, already encrypted)
     uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
@@ -638,7 +668,7 @@ export function deleteEntry(entryId) {
     const idx = entries.findIndex((e) => e.id === entryId);
     if (idx === -1) return false;
     entries.splice(idx, 1);
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
 
     const audioFile = new File(audioDir, `${entryId}.wav`);
     if (audioFile.exists) audioFile.delete();
@@ -658,7 +688,7 @@ export function updateEntryToProcessing(entryId, assemblyaiId) {
     entry.status = "processing";
     entry.assemblyai_id = assemblyaiId;
     entry.updated_at = new Date().toISOString();
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
     return { ...entry };
   })
 }
@@ -678,7 +708,7 @@ export function completeEntry(entryId, text, durationSeconds) {
     entry.duration_seconds = durationSeconds;
     entry.updated_at = new Date().toISOString();
     delete entry.assemblyai_id;
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
 
     // Write encrypted text file AFTER metadata is consistent
     const textFile = new File(textsDir, `journal_${entryId}.txt`);
@@ -701,7 +731,7 @@ export function updateEntryText(entryId, newText) {
     entry.text = ""
     entry.encrypted = true
     entry.updated_at = new Date().toISOString()
-    writeJSON(entriesFile, entries)
+    await writeJSON(entriesFile, entries)
 
     // Write encrypted text file AFTER metadata is consistent
     const textFile = new File(textsDir, `journal_${entryId}.txt`)
@@ -723,7 +753,7 @@ export function failEntry(entryId, error) {
     entry.text = "Transkribovanje nije uspelo";
     entry.updated_at = new Date().toISOString();
     delete entry.assemblyai_id;
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
     return { ...entry };
   })
 }
@@ -764,7 +794,7 @@ async function _getOrCreateDailyLogFolder() {
       updated_at: now,
     };
     folders.unshift(folder);
-    writeJSON(foldersFile, folders);
+    await writeJSON(foldersFile, folders);
   }
   return folder;
 }
@@ -806,7 +836,7 @@ export function createDailyLogEntry(audioSourceUri, durationSeconds = 0) {
 
     const entries = await readJSON(entriesFile);
     entries.unshift(entry);
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
 
     // Sync audio to iCloud
     uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e) => Sentry.captureMessage("iCloud sync failed: " + e.message, "warning"))
@@ -962,7 +992,7 @@ export function consolidateDailyLogEntries(date) {
     const doneIds = new Set(dayDone.map((e) => e.id));
     const remaining = allEntries.filter((e) => !doneIds.has(e.id));
     remaining.unshift(combinedEntry);
-    writeJSON(entriesFile, remaining);
+    await writeJSON(entriesFile, remaining);
 
     // Delete originals (audio + text files) — orphan cleanup handles stragglers on crash
     for (const entry of dayDone) {
@@ -1013,7 +1043,7 @@ export async function exportAllData() {
 export function importAllData(data) {
   return withWriteLock(async () => {
     ensureDirs();
-    writeJSON(foldersFile, data.folders);
+    await writeJSON(foldersFile, data.folders);
 
     // Mark entries as encrypted before writing metadata (single write)
     const key = await getEncryptionKey()
@@ -1025,7 +1055,7 @@ export function importAllData(data) {
         }
       }
     }
-    writeJSON(entriesFile, data.entries);
+    await writeJSON(entriesFile, data.entries);
 
     let audioCount = 0;
     let textCount = 0;
@@ -1079,8 +1109,8 @@ export async function downloadAudioFromICloud(entryId) {
 export function importFromICloudRestore(data) {
   return withWriteLock(async () => {
     ensureDirs()
-    writeJSON(foldersFile, data.folders)
-    writeJSON(entriesFile, data.entries)
+    await writeJSON(foldersFile, data.folders)
+    await writeJSON(entriesFile, data.entries)
 
     // Write downloaded text file contents (already encrypted from iCloud)
     for (const [entryId, content] of Object.entries(data.texts)) {
@@ -1101,14 +1131,14 @@ export async function getRawEntries() {
 }
 
 export function overwriteFolders(folders) {
-  return withWriteLock(() => {
-    writeJSON(foldersFile, folders)
+  return withWriteLock(async () => {
+    await writeJSON(foldersFile, folders)
   })
 }
 
 export function overwriteEntries(entries) {
-  return withWriteLock(() => {
-    writeJSON(entriesFile, entries)
+  return withWriteLock(async () => {
+    await writeJSON(entriesFile, entries)
   })
 }
 
@@ -1119,7 +1149,7 @@ export function moveEntryToFolder(entryId, targetFolderId) {
     if (!entry) return null;
     entry.folder_id = targetFolderId;
     entry.updated_at = new Date().toISOString();
-    writeJSON(entriesFile, entries);
+    await writeJSON(entriesFile, entries);
     return { ...entry };
   })
 }
