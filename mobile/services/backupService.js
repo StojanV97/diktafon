@@ -1,8 +1,17 @@
 import { File, Paths } from "expo-file-system";
 import JSZip from "jszip";
+import crypto from "react-native-quick-crypto";
 import { exportAllData, importAllData } from "./journalStorage";
+import { encryptBlob, decryptBlob } from "./cryptoService";
 
-export async function createBackup() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function sanitizeBackupPath(relativePath) {
+  if (relativePath.includes("..") || relativePath.startsWith("/")) return null;
+  return relativePath;
+}
+
+export async function createBackup(password) {
   const zip = new JSZip();
   const data = await exportAllData();
 
@@ -18,15 +27,36 @@ export async function createBackup() {
 
   const zipData = await zip.generateAsync({ type: "uint8array" });
   const date = new Date().toISOString().slice(0, 10);
+
+  if (password) {
+    const encrypted = encryptBlob(zipData, password);
+    const backupFile = new File(Paths.cache, `diktafon-backup-${date}.enc`);
+    backupFile.write(encrypted);
+    return backupFile.uri;
+  }
+
   const backupFile = new File(Paths.cache, `diktafon-backup-${date}.zip`);
   backupFile.write(zipData);
-
   return backupFile.uri;
 }
 
-export async function restoreFromBackup(fileUri) {
+export async function restoreFromBackup(fileUri, password) {
   const sourceFile = new File(fileUri);
-  const zipData = sourceFile.bytes();
+  let zipData;
+
+  if (password) {
+    const encryptedData = sourceFile.bytes();
+    try {
+      const decrypted = decryptBlob(encryptedData, password);
+      zipData = decrypted;
+    } catch (e) {
+      if (e.message === "Pogresna lozinka") throw e;
+      throw new Error("Pogresna lozinka ili ostecen backup fajl");
+    }
+  } else {
+    zipData = sourceFile.bytes();
+  }
+
   const zip = await JSZip.loadAsync(zipData);
 
   if (!zip.file("folders.json") || !zip.file("entries.json")) {
@@ -44,16 +74,20 @@ export async function restoreFromBackup(fileUri) {
   }
 
   const audioFiles = [];
+  let skippedFiles = 0;
   const audioFolder = zip.folder("audio");
   if (audioFolder) {
     const promises = [];
     audioFolder.forEach((relativePath, zipEntry) => {
       if (zipEntry.dir) return;
+      const safe = sanitizeBackupPath(relativePath);
+      if (!safe) { skippedFiles++; return; }
+      const id = safe.replace(".wav", "");
+      if (!UUID_RE.test(id)) { skippedFiles++; return; }
       promises.push(
         zipEntry.async("uint8array").then((audioData) => {
-          const id = relativePath.replace(".wav", "");
           audioFiles.push({ id, data: audioData });
-        })
+        }).catch(() => { skippedFiles++; })
       );
     });
     await Promise.all(promises);
@@ -65,11 +99,14 @@ export async function restoreFromBackup(fileUri) {
     const promises = [];
     textFolder.forEach((relativePath, zipEntry) => {
       if (zipEntry.dir) return;
+      const safe = sanitizeBackupPath(relativePath);
+      if (!safe) { skippedFiles++; return; }
+      const id = safe.replace("journal_", "").replace(".txt", "");
+      if (!UUID_RE.test(id)) { skippedFiles++; return; }
       promises.push(
         zipEntry.async("string").then((text) => {
-          const id = relativePath.replace("journal_", "").replace(".txt", "");
           textFiles.push({ id, text });
-        })
+        }).catch(() => { skippedFiles++; })
       );
     });
     await Promise.all(promises);
@@ -77,10 +114,12 @@ export async function restoreFromBackup(fileUri) {
 
   // Create a safety backup before overwriting current data
   try {
-    await createBackup();
+    await createBackup(null);
   } catch (e) {
     if (__DEV__) console.warn("Pre-restore backup failed:", e);
+    throw new Error("SAFETY_BACKUP_FAILED: " + e.message);
   }
 
-  return importAllData({ folders, entries, audioFiles, textFiles });
+  const stats = await importAllData({ folders, entries, audioFiles, textFiles });
+  return { ...stats, skippedFiles };
 }

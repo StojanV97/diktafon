@@ -7,7 +7,7 @@ public class ReactNativeWidgetExtensionModule: Module {
         Name("ReactNativeWidgetExtension")
 
         Function("setWidgetData") { (jsonString: String) in
-            let defaults = UserDefaults(suiteName: "group.com.local.diktafon")
+            let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
             defaults?.set(jsonString, forKey: "widgetData")
             defaults?.synchronize()
 
@@ -21,6 +21,17 @@ public class ReactNativeWidgetExtensionModule: Module {
                 return ActivityAuthorizationInfo().areActivitiesEnabled
             }
             return false
+        }
+
+        Function("getPendingAction") { () -> String? in
+            let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
+            let pending = defaults?.bool(forKey: "pendingRecordAction") ?? false
+            if pending {
+                defaults?.removeObject(forKey: "pendingRecordAction")
+                defaults?.synchronize()
+                return "record"
+            }
+            return nil
         }
     }
 }

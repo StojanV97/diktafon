@@ -1,22 +1,30 @@
+import { Buffer } from "@craftzdog/react-native-buffer"
+global.Buffer = global.Buffer || Buffer
+
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { theme, colors } from "./theme";
-import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries } from "./services/journalStorage";
+import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries, cleanupDecryptedAudio, importFromICloudRestore } from "./services/journalStorage";
+import { initEncryption, clearCachedKey } from "./services/cryptoService";
 import { releaseContext } from "./services/whisperService";
-import { syncWidgetData } from "./services/widgetDataService";
+import * as ScreenCapture from "expo-screen-capture";
+import { syncWidgetData, getPendingAction } from "./services/widgetDataService";
 import { runAutoMove } from "./services/autoMoveService";
 import { onAuthStateChange } from "./services/authService";
 import { initPurchases, loginUser } from "./services/subscriptionService";
-import { pullAndMerge, isSyncEnabled } from "./services/icloudSyncService";
+import { pullAndMerge, isSyncEnabled, checkICloudDataExists, restoreFromICloud, enableSync } from "./services/icloudSyncService";
+import { setupSslPinning } from "./services/sslPinningService";
+import { initRuntimeProtection } from "./services/runtimeProtectionService";
+import { isBiometricLockEnabled, authenticateWithBiometrics } from "./services/biometricService";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
@@ -25,20 +33,62 @@ import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
 
 const SENTRY_DSN = "YOUR_SENTRY_DSN"
-if (SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")) {
-  Sentry.init({ dsn: SENTRY_DSN, tracesSampleRate: 0.2 })
+const sentryEnabled = SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")
+if (sentryEnabled) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.2,
+    beforeSend(event) {
+      // Strip file paths from exception values and messages
+      const scrub = (str) => str?.replace(/\/Users\/[^\s:]+/g, "[path]")
+        .replace(/\/var\/mobile\/[^\s:]+/g, "[path]")
+        .replace(/\/data\/data\/[^\s:]+/g, "[path]")
+
+      if (event.message) event.message = scrub(event.message)
+      if (event.exception?.values) {
+        for (const ex of event.exception.values) {
+          if (ex.value) ex.value = scrub(ex.value)
+        }
+      }
+
+      // Remove breadcrumb data that could contain sensitive info
+      if (event.breadcrumbs) {
+        for (const bc of event.breadcrumbs) {
+          if (bc.data?.url) bc.data.url = bc.data.url.replace(/key=[^&]+/, "key=[REDACTED]")
+        }
+      }
+
+      return event
+    },
+  })
 }
 
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
+
+const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
 
 const linking = {
-  prefixes: ["com.diktafon.app://"],
+  prefixes: ["com.diktafon.app://", "diktafon://"],
   config: {
     screens: {
       DailyLog: { path: "dailylog" },
     },
+  },
+  getStateFromPath(path, config) {
+    const { getStateFromPath: defaultGetState } = require("@react-navigation/native");
+    const normalized = path.replace(/^\/+/, "");
+    if (normalized === "record") {
+      return {
+        routes: [{ name: "DailyLog", params: { action: "record" } }],
+      };
+    }
+    const state = defaultGetState(path, config);
+    if (!state?.routes?.length) return undefined;
+    const allValid = state.routes.every((r) => VALID_DEEP_LINK_SCREENS.has(r.name));
+    return allValid ? state : undefined;
   },
 };
 
@@ -95,6 +145,16 @@ const errorStyles = StyleSheet.create({
 function App() {
   const [ready, setReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Home");
+  const [locked, setLocked] = useState(false);
+
+  const checkPendingControlAction = useCallback(async () => {
+    try {
+      const action = await getPendingAction()
+      if (action === "record" && navigationRef.current) {
+        navigationRef.current.navigate("DailyLog", { action: "record" })
+      }
+    } catch {}
+  }, [])
 
   const [fontTimeout, setFontTimeout] = useState(false);
 
@@ -107,13 +167,23 @@ function App() {
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => setFontTimeout(true), 10000);
+    const timer = setTimeout(() => {
+      setFontTimeout(true);
+      Sentry.addBreadcrumb({
+        category: "startup",
+        message: "Font loading timed out after 10s",
+        level: "warning",
+      });
+    }, 10000);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     async function init() {
       try {
+        cleanupDecryptedAudio(); // Clear leftover decrypted audio from crash/force-kill
+        await setupSslPinning().catch(() => {});
+        await initEncryption();
         await migrateData();
 
         const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");
@@ -126,6 +196,12 @@ function App() {
         } catch (e) {
           if (__DEV__) console.warn("RevenueCat init failed:", e.message);
         }
+
+        try {
+          await initRuntimeProtection();
+        } catch (e) {
+          if (__DEV__) console.warn("freeRASP init failed:", e.message);
+        }
       } catch (e) {
         Sentry.captureException(e);
         if (__DEV__) console.warn("App init failed:", e.message);
@@ -136,10 +212,6 @@ function App() {
         );
       }
 
-      setReady(true);
-      syncWidgetData();
-      runAutoMove();
-
       const corrupted = getCorruptionStatus();
       if (corrupted) {
         Alert.alert(
@@ -149,6 +221,7 @@ function App() {
         );
       }
 
+      // iCloud sync BEFORE setReady — prevents races with user operations
       try {
         const syncEnabled = await isSyncEnabled();
         if (syncEnabled) {
@@ -156,28 +229,84 @@ function App() {
           const localEntries = await getRawEntries();
           const result = await pullAndMerge(localFolders, localEntries);
           if (result.changed) {
-            overwriteFolders(result.folders);
-            overwriteEntries(result.entries);
+            await overwriteFolders(result.folders);
+            await overwriteEntries(result.entries);
           }
         }
       } catch (e) {
         if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
       }
+
+      // Fresh install restore: detect empty local + iCloud data exists
+      try {
+        const localFolders = await getRawFolders();
+        const localEntries = await getRawEntries();
+        if (localFolders.length === 0 && localEntries.length === 0) {
+          const hasICloudData = await checkICloudDataExists();
+          if (hasICloudData) {
+            await new Promise((resolve) => {
+              Alert.alert(
+                "iCloud podaci",
+                "Pronadjeni su podaci na iCloud-u. Zelite li da ih vratite?",
+                [
+                  { text: "Ne", onPress: resolve },
+                  {
+                    text: "Vrati podatke",
+                    onPress: async () => {
+                      try {
+                        const data = await restoreFromICloud();
+                        await importFromICloudRestore(data);
+                        await enableSync();
+                      } catch (e) {
+                        if (__DEV__) console.warn("iCloud restore failed:", e.message);
+                      }
+                      resolve();
+                    },
+                  },
+                ]
+              );
+            });
+          }
+        }
+      } catch (e) {
+        if (__DEV__) console.warn("iCloud restore check failed:", e.message);
+      }
+
+      setReady(true);
+      syncWidgetData().catch(() => {});
+      runAutoMove().catch(() => {});
     }
     init();
   }, []);
 
-  // Release whisper context when app goes to background
+  // Enable app-switcher blur protection (iOS)
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
+    ScreenCapture.enableAppSwitcherProtectionAsync().catch(() => {});
+    return () => { ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {}); };
+  }, []);
+
+  // Release whisper context when app goes to background, biometric check on foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", async (state) => {
       if (state === "background") {
         releaseContext();
+        clearCachedKey();
+        cleanupDecryptedAudio();
+        // Mark as locked so biometric check runs on next foreground
+        const bioEnabled = await isBiometricLockEnabled();
+        if (bioEnabled) setLocked(true);
       } else if (state === "active") {
         runAutoMove();
+        if (locked) {
+          const success = await authenticateWithBiometrics();
+          if (success) setLocked(false);
+        } else {
+          checkPendingControlAction();
+        }
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [locked, checkPendingControlAction]);
 
   // Auth state listener — link RevenueCat on sign-in
   useEffect(() => {
@@ -205,11 +334,30 @@ function App() {
     );
   }
 
+  if (locked) {
+    return (
+      <PaperProvider theme={theme}>
+        <View style={loadingStyles.container} onLayout={onLayoutRootView}>
+          <Text style={errorStyles.title}>Diktafon je zakljucan</Text>
+          <TouchableOpacity
+            style={errorStyles.button}
+            onPress={async () => {
+              const success = await authenticateWithBiometrics();
+              if (success) setLocked(false);
+            }}
+          >
+            <Text style={errorStyles.buttonText}>Otkljucaj</Text>
+          </TouchableOpacity>
+        </View>
+      </PaperProvider>
+    );
+  }
+
   return (
     <PaperProvider theme={theme}>
       <ErrorBoundary>
         <View style={loadingStyles.flex1} onLayout={onLayoutRootView}>
-          <NavigationContainer linking={linking}>
+          <NavigationContainer linking={linking} ref={navigationRef} onReady={checkPendingControlAction}>
             <StatusBar style="dark" />
             <Stack.Navigator initialRouteName={initialRoute} screenOptions={stackScreenOptions}>
               <Stack.Screen
@@ -250,4 +398,4 @@ function App() {
   );
 }
 
-export default Sentry.wrap(App);
+export default sentryEnabled ? Sentry.wrap(App) : App;

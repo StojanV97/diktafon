@@ -1,0 +1,33 @@
+name: Security Audit
+
+on:
+  pull_request:
+    paths:
+      - "mobile/package.json"
+      - "mobile/package-lock.json"
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: mobile
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Generate SBOM
+        working-directory: mobile
+        run: npm sbom --sbom-format cyclonedx > ../sbom.json
+        continue-on-error: true

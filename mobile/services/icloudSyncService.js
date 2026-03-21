@@ -1,6 +1,7 @@
 import { NativeModules, Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 import { getSettings, updateSettings } from "./settingsService"
+import { getEncryptionKey, encryptText, decryptText } from "./cryptoService"
 
 // Lazy import — react-native-cloud-store is iOS-only native module
 let CloudStore = null
@@ -122,12 +123,33 @@ export async function downloadFileFromICloud(relativePath, localUri) {
 // ── JSON Sync Helpers ──────────────────────────────────
 
 export async function syncJSONToICloud(relativePath, data) {
-  await writeFileToICloud(relativePath, JSON.stringify(data))
+  const json = JSON.stringify(data)
+  const key = await getEncryptionKey()
+  if (key) {
+    const encrypted = encryptText(json, key)
+    await writeFileToICloud(relativePath, Buffer.from(encrypted).toString("base64"))
+  } else {
+    // Never sync plaintext to iCloud — encryption key required
+    if (__DEV__) console.warn("icloudSyncService: skipping sync, no encryption key")
+    return
+  }
 }
 
 export async function readJSONFromICloud(relativePath) {
   const content = await readFileFromICloud(relativePath)
   if (!content) return null
+
+  // Try decryption first, fall back to plaintext for backward compat
+  const key = await getEncryptionKey()
+  if (key) {
+    try {
+      const decrypted = decryptText(Buffer.from(content, "base64"), key)
+      return JSON.parse(decrypted)
+    } catch {
+      // Fall through to plaintext parse (pre-encryption data)
+    }
+  }
+
   try {
     return JSON.parse(content)
   } catch {
@@ -135,20 +157,51 @@ export async function readJSONFromICloud(relativePath) {
   }
 }
 
+// ── iCloud File Deletion ────────────────────────────────
+
+export async function deleteFileFromICloud(relativePath) {
+  const enabled = await isSyncEnabled()
+  if (!enabled) return
+  const cs = getCloudStore()
+  if (!cs) return
+
+  try {
+    const fullPath = icloudPath(relativePath)
+    const exists = await cs.exist(fullPath)
+    if (exists) await cs.unlink(fullPath)
+  } catch (e) {
+    if (__DEV__) console.warn(`iCloud delete failed for ${relativePath}:`, e.message)
+    Sentry.captureException(e)
+  }
+}
+
+export async function deleteEntryFilesFromICloud(entryId) {
+  await deleteFileFromICloud(`audio/${entryId}.wav`)
+  await deleteFileFromICloud(`texts/journal_${entryId}.txt`)
+}
+
 // ── Conflict Resolution ────────────────────────────────
 
 /**
  * Merge two arrays of records by ID, keeping the one with later updated_at.
  * Records unique to either side are included (union).
+ * Local tombstones (deleted_locally) are preserved — cloud records with
+ * matching IDs are skipped to prevent resurrection.
  */
 export function mergeRecords(localRecords, cloudRecords) {
   const merged = new Map()
+  const tombstoneIds = new Set(
+    localRecords.filter(r => r.deleted_locally).map(r => r.id)
+  )
 
   for (const record of localRecords) {
     merged.set(record.id, record)
   }
 
   for (const record of cloudRecords) {
+    // Never resurrect tombstoned records from cloud
+    if (tombstoneIds.has(record.id)) continue
+
     const existing = merged.get(record.id)
     if (!existing) {
       merged.set(record.id, record)
@@ -192,15 +245,46 @@ export async function pullAndMerge(localFolders, localEntries) {
   const entriesChanged = mergedEntries.length !== localEntries.length ||
     JSON.stringify(mergedEntries) !== JSON.stringify(localEntries)
 
-  // Push merged data back to iCloud
-  await syncJSONToICloud("folders.json", mergedFolders)
-  await syncJSONToICloud("entries.json", mergedEntries)
+  // Push only non-tombstoned data to iCloud (tombstones are local-only)
+  const cloudSafeFolders = mergedFolders.filter(f => !f.deleted_locally)
+  const cloudSafeEntries = mergedEntries.filter(e => !e.deleted_locally)
+  await syncJSONToICloud("folders.json", cloudSafeFolders)
+  await syncJSONToICloud("entries.json", cloudSafeEntries)
 
   return {
     folders: mergedFolders,
     entries: mergedEntries,
     changed: foldersChanged || entriesChanged,
   }
+}
+
+// ── Fresh Install Restore ───────────────────────────────
+
+export async function checkICloudDataExists() {
+  const available = await isICloudAvailable()
+  if (!available) return false
+  const hasFolders = await fileExistsOnICloud("folders.json")
+  const hasEntries = await fileExistsOnICloud("entries.json")
+  return hasFolders || hasEntries
+}
+
+export async function restoreFromICloud() {
+  const folders = await readJSONFromICloud("folders.json") || []
+  const entries = await readJSONFromICloud("entries.json") || []
+
+  // Download text files for completed entries (small, do immediately)
+  const texts = {}
+  for (const entry of entries) {
+    if (entry.status !== "done") continue
+    try {
+      const content = await readFileFromICloud(`texts/journal_${entry.id}.txt`)
+      if (content) texts[entry.id] = content
+    } catch {}
+    // Mark entries for lazy audio download
+    if (entry.audio_file) entry.audio_on_icloud = true
+  }
+
+  return { folders, entries, texts }
 }
 
 // ── Sync Status ────────────────────────────────────────

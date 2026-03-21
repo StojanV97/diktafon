@@ -3,6 +3,7 @@ import { Alert, View } from "react-native"
 import { Button, Divider, Text } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { getUser, signOut } from "../../services/authService"
+import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
@@ -48,7 +49,7 @@ export default function AccountSection({ navigation, setSnackbar, onUserChanged 
               onUserChanged?.(null)
               setSnackbar("Uspesno si se odjavio/la.")
             } catch (e) {
-              setSnackbar("Odjava nije uspela: " + e.message)
+              setSnackbar(safeErrorMessage(e, "Odjava nije uspela."))
             }
           },
         },

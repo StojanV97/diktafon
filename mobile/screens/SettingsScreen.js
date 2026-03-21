@@ -5,6 +5,8 @@ import WhisperModelSection from "../components/settings/WhisperModelSection"
 import EngineSection from "../components/settings/EngineSection"
 import AutoMoveSection from "../components/settings/AutoMoveSection"
 import BackupSection from "../components/settings/BackupSection"
+import EncryptionSection from "../components/settings/EncryptionSection"
+import BiometricSection from "../components/settings/BiometricSection"
 import AccountSection from "../components/settings/AccountSection"
 import ICloudSyncSection from "../components/settings/ICloudSyncSection"
 import SubscriptionSection from "../components/settings/SubscriptionSection"
@@ -20,6 +22,8 @@ export default function SettingsScreen({ navigation }) {
         <WhisperModelSection setSnackbar={setSnackbar} />
         <EngineSection />
         <AutoMoveSection setSnackbar={setSnackbar} />
+        <EncryptionSection setSnackbar={setSnackbar} />
+        <BiometricSection setSnackbar={setSnackbar} />
         <BackupSection setSnackbar={setSnackbar} />
         <AccountSection
           navigation={navigation}

@@ -5,8 +5,14 @@
     "preview": { "distribution": "internal" },
     "production": {
       "autoIncrement": "buildNumber",
+      "env": {
+        "EXPO_NO_SOURCE_MAPS": "1"
+      },
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   }

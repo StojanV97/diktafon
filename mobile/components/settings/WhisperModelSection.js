@@ -3,6 +3,7 @@ import { View } from "react-native"
 import { Button, Divider, ProgressBar, Text } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import * as whisperService from "../../services/whisperService"
+import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
@@ -31,7 +32,7 @@ export default function WhisperModelSection({ setSnackbar }) {
       setModelStatus(whisperService.getModelStatus())
       setSnackbar("Model je uspesno preuzet.")
     } catch (e) {
-      setSnackbar("Preuzimanje nije uspelo: " + e.message)
+      setSnackbar(safeErrorMessage(e, "Preuzimanje nije uspelo."))
     } finally {
       setDownloading(false)
     }

@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 // MARK: - Data Model
 
@@ -29,7 +30,7 @@ struct DiktafonProvider: TimelineProvider {
     }
 
     private func loadData() -> WidgetData {
-        let defaults = UserDefaults(suiteName: "group.com.local.diktafon")
+        let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
         guard let jsonString = defaults?.string(forKey: "widgetData"),
               let jsonData = jsonString.data(using: .utf8),
               let data = try? JSONDecoder().decode(WidgetData.self, from: jsonData) else {
@@ -92,7 +93,7 @@ struct DiktafonWidgetView: View {
 
             Spacer()
 
-            Link(destination: URL(string: "com.local.diktafon://dailylog?action=record")!) {
+            Link(destination: URL(string: "com.diktafon.app://dailylog?action=record")!) {
                 HStack(spacing: 4) {
                     Image(systemName: "record.circle")
                         .font(.system(size: 13, weight: .semibold))
@@ -143,7 +144,7 @@ struct DiktafonWidgetView: View {
 
                 Spacer()
 
-                Link(destination: URL(string: "com.local.diktafon://dailylog?action=record")!) {
+                Link(destination: URL(string: "com.diktafon.app://dailylog?action=record")!) {
                     HStack(spacing: 4) {
                         Image(systemName: "record.circle")
                             .font(.system(size: 14, weight: .semibold))
@@ -177,10 +178,9 @@ extension Color {
     }
 }
 
-// MARK: - Widget Entry Point
+// MARK: - Home Widget
 
-@main
-struct DiktafonWidgetBundle: Widget {
+struct DiktafonHomeWidget: Widget {
     let kind: String = "DiktafonWidget"
 
     var body: some WidgetConfiguration {
@@ -196,5 +196,46 @@ struct DiktafonWidgetBundle: Widget {
         .configurationDisplayName("Diktafon")
         .description("Brzi pristup snimanju")
         .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+// MARK: - Control Widget (iOS 18+)
+
+@available(iOS 18.0, *)
+struct RecordIntent: AppIntent {
+    static var title: LocalizedStringResource = "Snimi"
+    static var description: IntentDescription = "Pokreni snimanje u Diktafonu"
+    static var openAppWhenRun: Bool = true
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.diktafon.app")
+        defaults?.set(true, forKey: "pendingRecordAction")
+        defaults?.synchronize()
+        return .result()
+    }
+}
+
+@available(iOS 18.0, *)
+struct DiktafonRecordControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.diktafon.app.record") {
+            ControlWidgetButton(action: RecordIntent()) {
+                Label("Snimi", systemImage: "mic.fill")
+            }
+        }
+        .displayName("Diktafon")
+        .description("Pokreni snimanje")
+    }
+}
+
+// MARK: - Widget Bundle Entry Point
+
+@main
+struct DiktafonWidgets: WidgetBundle {
+    var body: some Widget {
+        DiktafonHomeWidget()
+        if #available(iOS 18.0, *) {
+            DiktafonRecordControl()
+        }
     }
 }

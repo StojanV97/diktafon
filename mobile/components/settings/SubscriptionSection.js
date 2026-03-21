@@ -4,6 +4,7 @@ import { Button, Divider, ProgressBar, Text } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { isPremium, getOfferings, purchasePackage, restorePurchases, getUsageFromProfile, MONTHLY_MINUTES_LIMIT } from "../../services/subscriptionService"
 import { getProfile } from "../../services/authService"
+import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 
@@ -44,7 +45,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
       if (result) setSnackbar("Premium je aktiviran!")
     } catch (e) {
       if (e.userCancelled) return
-      setSnackbar("Kupovina nije uspela: " + e.message)
+      setSnackbar(safeErrorMessage(e, "Kupovina nije uspela."))
     } finally {
       setPurchaseLoading(false)
     }
@@ -57,7 +58,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
       setPremium(result)
       setSnackbar(result ? "Premium je obnovljen!" : "Nema prethodnih kupovina.")
     } catch (e) {
-      setSnackbar("Obnova nije uspela: " + e.message)
+      setSnackbar(safeErrorMessage(e, "Obnova nije uspela."))
     } finally {
       setPurchaseLoading(false)
     }

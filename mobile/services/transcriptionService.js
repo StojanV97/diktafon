@@ -4,7 +4,7 @@ import * as assemblyAIService from "./assemblyAIService"
 import { isPremium } from "./subscriptionService"
 import {
   fetchEntry,
-  entryAudioUri,
+  getDecryptedAudioUri,
   updateEntryToProcessing,
   completeEntry,
   failEntry,
@@ -25,7 +25,7 @@ export async function preflight(engine) {
 
 export async function transcribeSingle(entryId, engine, { onStatusChange, onError }) {
   const entry = await fetchEntry(entryId)
-  const audioUri = entryAudioUri(entryId)
+  const audioUri = await getDecryptedAudioUri(entryId)
 
   try {
     if (engine === "assemblyai") {
@@ -61,8 +61,10 @@ export async function transcribeBatch(entryIds, engine, callbacks) {
   }
 }
 
-const MAX_POLL_FAILURES = 36 // 36 × 5s = 3 minutes
-const _pollFailureCounts = {}
+const MAX_CONSECUTIVE_FAILURES = 12 // 12 consecutive failures before giving up
+const MAX_TOTAL_FAILURES = 60
+const BACKOFF_AFTER = 3 // skip every other poll after 3+ consecutive failures
+const _pollState = {} // { consecutive: number, total: number }
 
 export async function pollProcessingEntries(entries) {
   const processing = entries.filter(
@@ -72,34 +74,50 @@ export async function pollProcessingEntries(entries) {
 
   const processingIds = new Set(processing.map((e) => e.id))
   // Clean up stale keys for entries no longer processing
-  for (const key of Object.keys(_pollFailureCounts)) {
-    if (!processingIds.has(key)) delete _pollFailureCounts[key]
+  for (const key of Object.keys(_pollState)) {
+    if (!processingIds.has(key)) delete _pollState[key]
   }
 
   const changed = []
   await Promise.all(
     processing.map(async (e) => {
+      const state = _pollState[e.id] || { consecutive: 0, total: 0 }
+
+      // Simple backoff: skip every other poll after BACKOFF_AFTER consecutive failures
+      if (state.consecutive >= BACKOFF_AFTER) {
+        state.skipped = (state.skipped || 0) + 1
+        if (state.skipped % 2 !== 0) {
+          _pollState[e.id] = state
+          return
+        }
+      }
+
       try {
         const result = await assemblyAIService.check(e.assemblyai_id)
-        // Reset failure count on successful poll
-        delete _pollFailureCounts[e.id]
         if (result.status === "done") {
+          delete _pollState[e.id]
           const updated = await completeEntry(e.id, result.text, result.duration_seconds)
           if (updated) changed.push({ entryId: e.id, entry: updated })
         } else if (result.status === "error") {
+          delete _pollState[e.id]
           const updated = await failEntry(e.id, result.error)
           if (updated) changed.push({ entryId: e.id, entry: updated })
-          delete _pollFailureCounts[e.id]
+        } else {
+          // "processing" — reset consecutive failures (server responded OK) but keep total
+          if (_pollState[e.id]) _pollState[e.id].consecutive = 0
         }
       } catch (err) {
-        _pollFailureCounts[e.id] = (_pollFailureCounts[e.id] || 0) + 1
-        if (_pollFailureCounts[e.id] >= MAX_POLL_FAILURES) {
+        state.consecutive++
+        state.total++
+        _pollState[e.id] = state
+
+        if (state.consecutive >= MAX_CONSECUTIVE_FAILURES || state.total >= MAX_TOTAL_FAILURES) {
           Sentry.captureException(err, {
-            extra: { entryId: e.id, assemblyaiId: e.assemblyai_id, pollFailures: MAX_POLL_FAILURES },
+            extra: { entryId: e.id, assemblyaiId: e.assemblyai_id, consecutive: state.consecutive, total: state.total },
           })
           const updated = await failEntry(e.id, "Transkripcija nije uspela. Pokusajte ponovo.")
           if (updated) changed.push({ entryId: e.id, entry: updated })
-          delete _pollFailureCounts[e.id]
+          delete _pollState[e.id]
         }
       }
     })

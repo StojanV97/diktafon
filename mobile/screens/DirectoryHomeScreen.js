@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -28,11 +29,15 @@ import {
   getAllTags,
   fetchDailyLogStats,
   createDailyLogEntry,
+  tombstoneFolder,
+  deleteFolderWithICloud,
 } from "../services/journalStorage";
+import { isSyncEnabled } from "../services/icloudSyncService";
 import { useRecorder } from "../hooks/useRecorder";
 import RecordingOverlay from "../components/RecordingOverlay";
 import BottomActionBar from "../components/BottomActionBar";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
+import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 
 function formatDate(iso) {
@@ -85,7 +90,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         const stats = await fetchDailyLogStats();
         setDailyStats(stats);
       } catch (e) {
-        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
       }
     },
   });
@@ -98,7 +103,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         await startRecording();
       }
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
@@ -108,7 +113,7 @@ export default function DirectoryHomeScreen({ navigation }) {
       setFolders(data);
       setDailyStats(stats);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -181,7 +186,7 @@ export default function DirectoryHomeScreen({ navigation }) {
       }
       setDialogVisible(false);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setDialogLoading(false);
     }
@@ -197,10 +202,48 @@ export default function DirectoryHomeScreen({ navigation }) {
     if (!deleteTarget || deleteLoading) return;
     setDeleteLoading(true);
     try {
+      const syncOn = await isSyncEnabled();
+      if (syncOn) {
+        setDeleteDialogVisible(false);
+        Alert.alert(
+          "Obrisi i sa iCloud-a?",
+          `"${deleteTarget.name}" i svi zapisi u njemu ce biti obrisani lokalno.`,
+          [
+            {
+              text: "Ne, samo lokalno",
+              onPress: async () => {
+                try {
+                  await tombstoneFolder(deleteTarget.id);
+                  setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+            {
+              text: "Obrisi svuda",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteFolderWithICloud(deleteTarget.id);
+                  setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+          ]
+        );
+        return;
+      }
       await deleteFolder(deleteTarget.id);
       setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setDeleteLoading(false);
     }

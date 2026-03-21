@@ -7,7 +7,7 @@ module.exports = {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    scheme: "com.diktafon.app",
+    scheme: ["com.diktafon.app", "diktafon"],
     userInterfaceStyle: "light",
     ios: {
       supportsTablet: false,
@@ -16,6 +16,12 @@ module.exports = {
       infoPlist: {
         NSMicrophoneUsageDescription:
           "Diktafon koristi mikrofon za snimanje glasovnih zapisa.",
+        NSFileProtectionKey: "NSFileProtectionCompleteUntilFirstUserAuthentication",
+        // AES-256-GCM used for local data-at-rest protection only (not network communication).
+        // Qualifies as exempt under Apple's encryption FAQ and EAR Category 5 Part 2 Note 4
+        // (mass-market encryption for personal data protection).
+        ITSAppUsesNonExemptEncryption: false,
+        NSFaceIDUsageDescription: "Diktafon koristi Face ID za zastitu vasih podataka.",
       },
     },
     android: {

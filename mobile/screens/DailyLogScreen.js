@@ -30,7 +30,10 @@ import {
   createDailyLogEntry,
   getDailyCombinedTranscripts,
   consolidateDailyLogEntries,
+  tombstoneEntry,
+  deleteEntryWithICloud,
 } from "../services/journalStorage";
+import { isSyncEnabled } from "../services/icloudSyncService";
 import { useRecorder } from "../hooks/useRecorder";
 import { useTranscription } from "../hooks/useTranscription";
 import RecordingOverlay from "../components/RecordingOverlay";
@@ -41,6 +44,7 @@ import EngineChoiceDialog from "../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../utils/entryUtils";
+import { safeErrorMessage } from "../utils/errorHelpers";
 import { syncWidgetData } from "../services/widgetDataService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 
@@ -72,6 +76,9 @@ function formatSectionDate(dateStr) {
 const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
 
 export default function DailyLogScreen({ navigation, route }) {
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,6 +106,7 @@ export default function DailyLogScreen({ navigation, route }) {
   // Move dialog
   const [moveDialogVisible, setMoveDialogVisible] = useState(false);
   const [moveTargetEntryId, setMoveTargetEntryId] = useState(null);
+  const [moveLoading, setMoveLoading] = useState(false);
   const [regularFolders, setRegularFolders] = useState([]);
 
   // Combined transcript per date
@@ -117,7 +125,7 @@ export default function DailyLogScreen({ navigation, route }) {
         setEntries((prev) => [entry, ...prev]);
         syncWidgetData();
       } catch (e) {
-        setSnackbar("Cuvanje snimka nije uspelo: " + e.message);
+        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
       }
     },
   });
@@ -133,7 +141,7 @@ export default function DailyLogScreen({ navigation, route }) {
       const data = await fetchDailyLogEntries();
       setEntries(data);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -182,12 +190,24 @@ export default function DailyLogScreen({ navigation, route }) {
     navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
   }, [navigation, headerLeft, headerRight]);
 
-  // Auto-start recording when opened via widget deep link
+  // Refs for reading recording state without adding to effect dependencies
+  const isRecordingRef = useRef(false);
+  const isPausedRef = useRef(false);
+  isRecordingRef.current = isRecording;
+  isPausedRef.current = isPaused;
+
+  // Auto-start/stop recording when opened via deep link (widget or Action Button)
   const autoRecordTimerRef = useRef(null);
   useEffect(() => {
     if (route.params?.action === "record") {
-      navigation.setParams({ action: undefined });
-      autoRecordTimerRef.current = setTimeout(() => handleStartRecording(), 500);
+      autoRecordTimerRef.current = setTimeout(() => {
+        navigation.setParams({ action: undefined });
+        if (isRecordingRef.current || isPausedRef.current) {
+          handleStop();
+        } else {
+          handleStartRecording();
+        }
+      }, 500);
     }
     return () => {
       if (autoRecordTimerRef.current) clearTimeout(autoRecordTimerRef.current);
@@ -216,6 +236,7 @@ export default function DailyLogScreen({ navigation, route }) {
 
   // Load combined transcripts for dates where at least one entry is done
   useEffect(() => {
+    let ignore = false;
     const datesWithDone = grouped
       .filter(({ data }) => data.some((e) => e.status === "done"))
       .map(({ date }) => date);
@@ -226,8 +247,9 @@ export default function DailyLogScreen({ navigation, route }) {
     }
 
     getDailyCombinedTranscripts(datesWithDone)
-      .then((results) => setCombinedTexts(results))
-      .catch(() => {});
+      .then((results) => { if (!ignore) setCombinedTexts(results); })
+      .catch((e) => { if (!ignore) setSnackbar(safeErrorMessage(e, "Ucitavanje transkripata nije uspelo.")); });
+    return () => { ignore = true; };
   }, [grouped]);
 
   const toggleSection = (date) => {
@@ -243,16 +265,24 @@ export default function DailyLogScreen({ navigation, route }) {
     setMenuVisible(null);
     setEngineTargetId(entryId);
     setBatchDate(null);
-    const { defaultEngine } = await getSettings();
-    setEngineChoice(defaultEngine);
+    try {
+      const { defaultEngine } = await getSettings();
+      setEngineChoice(defaultEngine);
+    } catch {
+      setEngineChoice("local");
+    }
     setEngineDialogVisible(true);
   };
 
   const openBatchEngineDialog = async (date = null) => {
     setBatchDate(date);
     setEngineTargetId(null);
-    const { defaultEngine } = await getSettings();
-    setEngineChoice(defaultEngine);
+    try {
+      const { defaultEngine } = await getSettings();
+      setEngineChoice(defaultEngine);
+    } catch {
+      setEngineChoice("local");
+    }
     setEngineDialogVisible(true);
   };
 
@@ -261,8 +291,8 @@ export default function DailyLogScreen({ navigation, route }) {
       await consolidateDailyLogEntries(date);
     }
     const data = await fetchDailyLogEntries();
-    setEntries(data);
-    syncWidgetData();
+    if (mountedRef.current) setEntries(data);
+    syncWidgetData().catch(() => {});
   };
 
   const onTranscribeConfirm = async () => {
@@ -308,11 +338,51 @@ export default function DailyLogScreen({ navigation, route }) {
     if (!deleteTarget || deleteLoading) return;
     setDeleteLoading(true);
     try {
+      const syncOn = await isSyncEnabled();
+      if (syncOn) {
+        setDeleteDialogVisible(false);
+        Alert.alert(
+          "Obrisi i sa iCloud-a?",
+          "Ovaj snimak ce biti obrisan lokalno.",
+          [
+            {
+              text: "Ne, samo lokalno",
+              onPress: async () => {
+                try {
+                  await tombstoneEntry(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                  syncWidgetData();
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+            {
+              text: "Obrisi svuda",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteEntryWithICloud(deleteTarget.id);
+                  setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                  syncWidgetData();
+                } catch (e) {
+                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                }
+                setDeleteLoading(false);
+                setDeleteTarget(null);
+              },
+            },
+          ]
+        );
+        return;
+      }
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       syncWidgetData();
     } catch (e) {
-      setSnackbar("Brisanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
     } finally {
       setDeleteLoading(false);
     }
@@ -323,21 +393,51 @@ export default function DailyLogScreen({ navigation, route }) {
   const onDeleteAllConfirm = async () => {
     setDeleteAllDialogVisible(false);
     const total = entries.length;
+    const syncOn = await isSyncEnabled();
+    if (syncOn) {
+      Alert.alert(
+        "Obrisi i sa iCloud-a?",
+        `Svih ${total} zapisa ce biti obrisano lokalno.`,
+        [
+          {
+            text: "Ne, samo lokalno",
+            onPress: async () => {
+              let failures = 0;
+              for (const entry of entries) {
+                try { await tombstoneEntry(entry.id); } catch { failures++; }
+              }
+              await load();
+              syncWidgetData();
+              if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+              else setSnackbar(`Obrisano ${total} zapisa.`);
+            },
+          },
+          {
+            text: "Obrisi svuda",
+            style: "destructive",
+            onPress: async () => {
+              let failures = 0;
+              for (const entry of entries) {
+                try { await deleteEntryWithICloud(entry.id); } catch { failures++; }
+              }
+              await load();
+              syncWidgetData();
+              if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+              else setSnackbar(`Obrisano ${total} zapisa.`);
+            },
+          },
+        ]
+      );
+      return;
+    }
     let failures = 0;
     for (const entry of entries) {
-      try {
-        await deleteEntry(entry.id);
-      } catch {
-        failures++;
-      }
+      try { await deleteEntry(entry.id); } catch { failures++; }
     }
     await load();
     syncWidgetData();
-    if (failures > 0) {
-      setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
-    } else {
-      setSnackbar(`Obrisano ${total} zapisa.`);
-    }
+    if (failures > 0) setSnackbar(`Brisanje nije uspelo za ${failures} od ${total} zapisa.`);
+    else setSnackbar(`Obrisano ${total} zapisa.`);
   };
 
   const onMovePress = async (entryId) => {
@@ -348,18 +448,23 @@ export default function DailyLogScreen({ navigation, route }) {
       setMoveTargetEntryId(entryId);
       setMoveDialogVisible(true);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
   const onMoveConfirm = async (folderId, folderName) => {
-    setMoveDialogVisible(false);
+    if (moveLoading) return;
+    setMoveLoading(true);
     try {
       await moveEntryToFolder(moveTargetEntryId, folderId);
       setEntries((prev) => prev.filter((e) => e.id !== moveTargetEntryId));
       setSnackbar(`Premesteno u "${folderName}"`);
+      setMoveDialogVisible(false);
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
+    } finally {
+      setMoveLoading(false);
+      setMoveTargetEntryId(null);
     }
   };
 
@@ -375,7 +480,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await startRecording();
     } catch (e) {
-      setSnackbar(e.message);
+      setSnackbar(safeErrorMessage(e));
     }
   };
 
@@ -383,7 +488,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await pauseRecording();
     } catch (e) {
-      setSnackbar("Pauza nije uspela: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Pauza nije uspela."));
     }
   };
 
@@ -391,7 +496,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await resumeRecording();
     } catch (e) {
-      setSnackbar("Nastavak nije uspeo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Nastavak nije uspeo."));
     }
   };
 
@@ -399,7 +504,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await stopRecording();
     } catch (e) {
-      setSnackbar("Zaustavljanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Zaustavljanje nije uspelo."));
     }
   };
 
@@ -407,7 +512,7 @@ export default function DailyLogScreen({ navigation, route }) {
     try {
       await cancelRecording();
     } catch (e) {
-      setSnackbar("Otkazivanje nije uspelo: " + e.message);
+      setSnackbar(safeErrorMessage(e, "Otkazivanje nije uspelo."));
     }
   };
 
@@ -442,11 +547,18 @@ export default function DailyLogScreen({ navigation, route }) {
     );
   }, [collapsedDates]);
 
+  const clipboardTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+  }, []);
+
   const copyCombinedText = useCallback((date) => {
     const text = combinedTexts[date];
     if (!text) return;
     ExpoClipboard.setStringAsync(text);
-    setSnackbar("Tekst je kopiran.");
+    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 20 sekundi.");
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+    clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 20000);
   }, [combinedTexts]);
 
   const shareCombinedText = async (date) => {
@@ -696,7 +808,7 @@ export default function DailyLogScreen({ navigation, route }) {
         <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
 
         {/* Move to folder dialog */}
-        <Dialog visible={moveDialogVisible} onDismiss={() => setMoveDialogVisible(false)} style={styles.dialog}>
+        <Dialog visible={moveDialogVisible} onDismiss={() => !moveLoading && setMoveDialogVisible(false)} style={styles.dialog}>
           <Dialog.Title style={typography.heading}>Premesti u folder</Dialog.Title>
           <Dialog.Content>
             {regularFolders.length === 0 ? (
@@ -705,18 +817,23 @@ export default function DailyLogScreen({ navigation, route }) {
               regularFolders.map((folder) => (
                 <TouchableOpacity
                   key={folder.id}
-                  style={styles.folderRow}
+                  style={[styles.folderRow, moveLoading && { opacity: 0.5 }]}
                   onPress={() => onMoveConfirm(folder.id, folder.name)}
+                  disabled={moveLoading}
                 >
                   <View style={[styles.folderDot, { backgroundColor: folder.color || colors.primary }]} />
                   <Text style={[typography.body, { flex: 1 }]}>{folder.name}</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.muted} />
+                  {moveLoading ? (
+                    <ActivityIndicator size={16} color={colors.muted} />
+                  ) : (
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={colors.muted} />
+                  )}
                 </TouchableOpacity>
               ))
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setMoveDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={() => setMoveDialogVisible(false)} textColor={colors.muted} disabled={moveLoading}>Otkazi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
