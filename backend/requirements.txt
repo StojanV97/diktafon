@@ -1,8 +1,0 @@
-fastapi==0.115.6
-uvicorn==0.34.0
-python-multipart==0.0.20
-openai==1.59.9
-faster-whisper==1.1.0
-assemblyai
-requests
-python-dotenv==1.0.1
