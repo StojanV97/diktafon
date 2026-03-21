@@ -1,11 +1,10 @@
-// Re-export from decomposed storage modules.
-// All consumers import from this file — the barrel preserves the exact public API.
-export {
-  // storageCore
-  getCorruptionStatus,
-  getLastWriteError,
+// Barrel re-export — preserves exact public API of the old journalStorage.js
 
-  // folderRepository
+// storageCore
+export { getCorruptionStatus, getLastWriteError } from "./storageCore";
+
+// folderRepository
+export {
   createFolder,
   fetchFolders,
   getFolder,
@@ -15,8 +14,10 @@ export {
   tombstoneFolder,
   deleteFolderWithICloud,
   getTombstonedFolders,
+} from "./folderRepository";
 
-  // entryRepository
+// entryRepository
+export {
   createEntry,
   fetchEntries,
   fetchEntry,
@@ -30,16 +31,20 @@ export {
   updateEntryText,
   failEntry,
   moveEntryToFolder,
+} from "./entryRepository";
 
-  // audioHelpers
+// audioHelpers
+export {
   getDecryptedAudioUri,
   cleanupDecryptedAudio,
   entryAudioUri,
   entryAudioExists,
   deleteEntryAudio,
   downloadAudioFromICloud,
+} from "./audioHelpers";
 
-  // dailyLogRepository
+// dailyLogRepository
+export {
   getOrCreateDailyLogFolder,
   createDailyLogEntry,
   fetchDailyLogEntries,
@@ -47,8 +52,10 @@ export {
   getDailyCombinedTranscript,
   getDailyCombinedTranscripts,
   consolidateDailyLogEntries,
+} from "./dailyLogRepository";
 
-  // importExport
+// importExport
+export {
   exportAllData,
   importAllData,
   importFromICloudRestore,
@@ -56,7 +63,7 @@ export {
   getRawEntries,
   overwriteFolders,
   overwriteEntries,
+} from "./importExport";
 
-  // migration
-  migrateData,
-} from "../src/services/storage";
+// migration
+export { migrateData } from "./migration";
