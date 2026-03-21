@@ -47,31 +47,7 @@ import { statusConfig, groupByDate } from "../utils/entryUtils";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { syncWidgetData } from "../services/widgetDataService";
 import { colors, spacing, radii, elevation, typography } from "../theme";
-
-function formatDuration(seconds) {
-  if (!seconds) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function formatTime(iso) {
-  const d = new Date(iso);
-  const h = d.getHours().toString().padStart(2, "0");
-  const m = d.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function formatSectionDate(dateStr) {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const date = new Date(dateStr + "T00:00:00");
-  const month = date.toLocaleString("sr-Latn-RS", { month: "long" });
-  const day = date.getDate();
-  if (dateStr === today) return `Danas — ${day}. ${month}`;
-  if (dateStr === yesterday) return `Juce — ${day}. ${month}`;
-  return `${day}. ${month}`;
-}
+import { formatDuration, formatTime, formatSectionDate } from "../src/utils/formatters";
 
 const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
 

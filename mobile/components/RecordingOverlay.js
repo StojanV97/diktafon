@@ -3,13 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing, radii, typography } from "../theme";
-
-function formatTimer(ms) {
-  const total = Math.floor((ms ?? 0) / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatTimer } from "../src/utils/formatters";
 
 function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop, onCancel }) {
   return (

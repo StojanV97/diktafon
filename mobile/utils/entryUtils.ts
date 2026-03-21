@@ -1,6 +1,9 @@
 import { colors } from "../theme"
+import type { EntryStatus, StatusConfig } from "../src/types"
+import { getRecordedDate } from "../src/utils/dateHelpers"
+import type { Entry } from "../src/types"
 
-export function statusConfig(status) {
+export function statusConfig(status: EntryStatus | string): StatusConfig {
   switch (status) {
     case "recorded":
       return { label: "Snimljeno", icon: "check", bg: colors.primaryLight, fg: colors.primary }
@@ -13,10 +16,10 @@ export function statusConfig(status) {
   }
 }
 
-export function groupByDate(entries) {
-  const map = {}
+export function groupByDate(entries: Pick<Entry, "recorded_date" | "created_at">[]) {
+  const map: Record<string, typeof entries> = {}
   for (const e of entries) {
-    const date = e.recorded_date || e.created_at.slice(0, 10)
+    const date = getRecordedDate(e)
     if (!map[date]) map[date] = []
     map[date].push(e)
   }

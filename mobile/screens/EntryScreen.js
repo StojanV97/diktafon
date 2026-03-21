@@ -26,24 +26,7 @@ import { fileExistsOnICloud } from "../services/icloudSyncService";
 import useAutoSave from "../hooks/useAutoSave";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString("sr-Latn-RS");
-}
-
-function formatDuration(seconds) {
-  if (!seconds) return "";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m} min ${s} s`;
-}
-
-function formatPlaybackTime(seconds) {
-  if (!seconds || isNaN(seconds)) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../src/utils/formatters";
 
 export default function EntryScreen({ route, navigation }) {
   usePreventScreenCapture();
@@ -243,7 +226,7 @@ export default function EntryScreen({ route, navigation }) {
         <Text style={typography.heading}>{record.filename}</Text>
         <Text style={[typography.caption, { marginTop: spacing.xs, marginBottom: spacing.lg }]}>
           {formatDate(record.created_at)}
-          {record.duration_seconds > 0 && `  \u2022  ${formatDuration(record.duration_seconds)}`}
+          {record.duration_seconds > 0 && `  \u2022  ${formatDurationVerbose(record.duration_seconds)}`}
         </Text>
 
         <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>

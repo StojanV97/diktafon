@@ -39,17 +39,7 @@ import BottomActionBar from "../components/BottomActionBar";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString("sr-Latn-RS");
-}
-
-function formatDuration(seconds) {
-  if (!seconds) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatDate, formatDuration } from "../src/utils/formatters";
 
 export default function DirectoryHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();

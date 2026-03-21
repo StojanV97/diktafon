@@ -40,6 +40,7 @@ import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../utils/entryUtils";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
+import { formatDurationCompact } from "../src/utils/formatters";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
 
@@ -52,13 +53,6 @@ const AUDIO_TYPES = [
   "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
   "audio/flac", "audio/aac", "audio/x-m4a", "audio/webm", "audio/*",
 ];
-
-function formatDuration(seconds) {
-  if (!seconds) return "";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 export default function DirectoryScreen({ route, navigation }) {
   const { id: folderId } = route.params;
@@ -380,7 +374,7 @@ export default function DirectoryScreen({ route, navigation }) {
           <View style={styles.cardMeta}>
             {item.duration_seconds > 0 && (
               <Text style={[typography.caption, { color: colors.primary }]}>
-                {formatDuration(item.duration_seconds)}
+                {formatDurationCompact(item.duration_seconds)}
               </Text>
             )}
             <Menu
