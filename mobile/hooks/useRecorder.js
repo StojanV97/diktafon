@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Linking } from "react-native";
+import { t } from "../src/i18n";
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -67,11 +68,11 @@ export function useRecorder({ onRecordingComplete }) {
     const status = await AudioModule.requestRecordingPermissionsAsync();
     if (!status.granted) {
       Alert.alert(
-        "Dozvola za mikrofon",
-        "Potrebna je dozvola za mikrofon da bi snimanje radilo. Otvorite podesavanja da biste omogucili pristup.",
+        t('recording.micPermissionTitle'),
+        t('recording.micPermissionMessage'),
         [
-          { text: "Otkazi", style: "cancel" },
-          { text: "Otvori podesavanja", onPress: () => Linking.openSettings() },
+          { text: t('common.cancel'), style: "cancel" },
+          { text: t('recording.openSettings'), onPress: () => Linking.openSettings() },
         ]
       );
       return { started: false, reason: "permission_denied" };
@@ -80,7 +81,7 @@ export function useRecorder({ onRecordingComplete }) {
     await audioRecorder.prepareToRecordAsync();
     const recStatus = audioRecorder.getStatus();
     if (!recStatus.canRecord) {
-      throw new Error("Snimac nije spreman.");
+      throw new Error(t('recording.recorderNotReady'));
     }
     audioRecorder.record();
     setIsPaused(false);

@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy"
 import { supabase } from "./supabaseClient"
+import { t } from "../src/i18n"
 
 const DEV_API_KEY = __DEV__ ? process.env.EXPO_PUBLIC_ASSEMBLYAI_KEY : null
 
@@ -14,7 +15,7 @@ function withTimeout(promise, ms) {
   return Promise.race([
     promise,
     new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Prekoraceno vreme. Proverite internet vezu.")), ms)
+      timer = setTimeout(() => reject(new Error(t('assemblyAI.timeout'))), ms)
     }),
   ]).finally(() => clearTimeout(timer))
 }
@@ -24,8 +25,8 @@ function fetchWithTimeout(url, options, timeoutMs) {
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   return fetch(url, { ...options, signal: controller.signal })
     .catch((e) => {
-      if (e.name === "AbortError") throw new Error("Prekoraceno vreme. Proverite internet vezu.")
-      throw new Error("Greska u mrezi. Proverite internet vezu.")
+      if (e.name === "AbortError") throw new Error(t('assemblyAI.timeout'))
+      throw new Error(t('assemblyAI.networkError'))
     })
     .finally(() => clearTimeout(timer))
 }
@@ -62,11 +63,11 @@ async function submitDirect(fileUri, options = {}) {
   try {
     uploadBody = JSON.parse(uploadRes.body)
   } catch {
-    throw new Error("Neispravan odgovor od servera pri uploadu. Pokusajte ponovo.")
+    throw new Error(t('assemblyAI.invalidUploadResponse'))
   }
   const { upload_url } = uploadBody
   if (!upload_url) {
-    throw new Error("Server nije vratio URL za upload. Pokusajte ponovo.")
+    throw new Error(t('assemblyAI.noUploadUrl'))
   }
 
   // 2. Create transcript job
@@ -87,9 +88,9 @@ async function submitDirect(fileUri, options = {}) {
   const data = await res.json()
   if (!res.ok) {
     if (__DEV__) console.warn("AssemblyAI submit error:", data.error)
-    throw new Error("Greska pri slanju na AssemblyAI. Pokusajte ponovo.")
+    throw new Error(t('assemblyAI.submitError'))
   }
-  if (!data.id) throw new Error("Server nije vratio ID transkripcije. Pokusajte ponovo.")
+  if (!data.id) throw new Error(t('assemblyAI.noTranscriptId'))
   return { assemblyai_id: data.id }
 }
 
@@ -101,17 +102,17 @@ async function checkDirect(transcriptId) {
   try {
     data = await res.json()
   } catch {
-    throw new Error("Neispravan odgovor od servera pri proveri statusa.")
+    throw new Error(t('assemblyAI.invalidStatusResponse'))
   }
 
   if (!res.ok) {
     if (__DEV__) console.warn("AssemblyAI check error:", data.error)
-    return { status: "error", error: "Greska pri proveri statusa transkripcije." }
+    return { status: "error", error: t('assemblyAI.statusCheckError') }
   }
 
   if (!validateTranscriptResponse(data)) {
     if (__DEV__) console.warn("AssemblyAI invalid response shape:", JSON.stringify(data).slice(0, 200))
-    return { status: "error", error: "Neispravan odgovor od servera." }
+    return { status: "error", error: t('assemblyAI.invalidResponse') }
   }
 
   if (data.status === "completed") {
@@ -126,7 +127,7 @@ async function checkDirect(transcriptId) {
   }
   if (data.status === "error") {
     if (__DEV__) console.warn("AssemblyAI transcription error:", data.error)
-    return { status: "error", error: "Transkripcija nije uspela. Pokusajte ponovo." }
+    return { status: "error", error: t('assemblyAI.transcriptionFailed') }
   }
   return { status: "processing" }
 }
@@ -140,7 +141,7 @@ function formatUtterances(data) {
       const totalSec = Math.floor(u.start / 1000)
       const m = Math.floor(totalSec / 60)
       const s = String(totalSec % 60).padStart(2, "0")
-      lines.push(`\n[Govornik ${u.speaker} – ${m}:${s}]`)
+      lines.push(`\n${t('assemblyAI.speakerLabel', { num: u.speaker, time: `${m}:${s}` })}`)
     }
     lines.push(u.text)
   }

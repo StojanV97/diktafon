@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react"
 import { TouchableOpacity, View, StyleSheet } from "react-native"
 import { ActivityIndicator, Button, Dialog, RadioButton, Text } from "react-native-paper"
 import { colors, spacing, radii, typography } from "../theme"
+import { t } from "../src/i18n"
 import { isPremium, getOfferings, purchasePackage } from "../services/subscriptionService"
 import { hasDevKey } from "../services/assemblyAIService"
 import { getSession } from "../services/authService"
@@ -78,16 +79,16 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
   return (
     <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
       <Dialog.Title style={typography.heading}>
-        {title || "Izaberi tip transkripcije"}
+        {title || t('engine.chooseType')}
       </Dialog.Title>
       <Dialog.Content>
         <RadioButton.Group onValueChange={handleEngineChange} value={engineChoice}>
           <TouchableOpacity style={styles.engineRow} onPress={() => handleEngineChange("local")}>
             <RadioButton value="local" color={colors.primary} />
             <View style={styles.engineInfo}>
-              <Text style={[typography.heading, { fontSize: 15 }]}>Na uredjaju — Besplatno</Text>
+              <Text style={[typography.heading, { fontSize: 15 }]}>{t('engine.onDevice')}</Text>
               <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                Transkripcija na uredjaju (Whisper AI). Potpuno privatno, bez interneta. Model ~140MB (preuzima se jednom).
+                {t('engine.onDeviceDesc')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -95,7 +96,7 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
             <RadioButton value="assemblyai" color={colors.primary} />
             <View style={styles.engineInfo}>
               <View style={styles.labelRow}>
-                <Text style={[typography.heading, { fontSize: 15 }]}>AssemblyAI — Premium</Text>
+                <Text style={[typography.heading, { fontSize: 15 }]}>{t('engine.assemblyAI')}</Text>
                 {!premium && (
                   <View style={styles.premiumBadge}>
                     <Text style={styles.premiumBadgeText}>Premium</Text>
@@ -103,8 +104,8 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
                 )}
               </View>
               <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                Prepoznavanje govornika (ko je govorio sta), visa tacnost, podrska za akcentovane govore, automatske interpunkcije i detekcija tema.
-                {!premium && "\nDostupno za Premium korisnike."}
+                {t('engine.assemblyAIDesc')}
+                {!premium && "\n" + t('settings.engine.premiumRequired')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -121,13 +122,13 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
         )}
       </Dialog.Content>
       <Dialog.Actions>
-        <Button onPress={onDismiss} textColor={colors.muted}>Otkazi</Button>
+        <Button onPress={onDismiss} textColor={colors.muted}>{t('common.cancel')}</Button>
         <Button
           onPress={handleConfirm}
           textColor={colors.primary}
           disabled={engineChoice === "assemblyai" && !premium}
         >
-          Pokreni
+          {t('common.start')}
         </Button>
       </Dialog.Actions>
     </Dialog>
@@ -149,10 +150,10 @@ function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSign
     return (
       <View style={styles.upgradeBox}>
         <Text style={[typography.body, { marginBottom: spacing.md }]}>
-          Potrebna je prijava za premium funkcije.
+          {t('engine.signInRequired')}
         </Text>
         <Button mode="contained" onPress={onSignIn} buttonColor={colors.primary}>
-          Prijavi se
+          {t('engine.signIn')}
         </Button>
       </View>
     )
@@ -161,10 +162,10 @@ function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSign
   return (
     <View style={styles.upgradeBox}>
       <Text style={[typography.body, { fontFamily: "Inter_600SemiBold", marginBottom: spacing.sm }]}>
-        Otključaj Premium
+        {t('engine.unlockPremium')}
       </Text>
       <Text style={[typography.caption, { marginBottom: spacing.md }]}>
-        Cloud transkripcija sa prepoznavanjem govornika.
+        {t('engine.premiumCaption')}
       </Text>
       {loading ? (
         <ActivityIndicator size="small" color={colors.primary} />
@@ -184,7 +185,7 @@ function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSign
         ))
       ) : (
         <Text style={typography.caption}>
-          Pretplata trenutno nije dostupna.
+          {t('engine.notAvailable')}
         </Text>
       )}
     </View>

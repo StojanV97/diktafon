@@ -27,6 +27,7 @@ import useAutoSave from "../hooks/useAutoSave";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../src/utils/formatters";
+import { t } from "../src/i18n";
 
 export default function EntryScreen({ route, navigation }) {
   usePreventScreenCapture();
@@ -123,7 +124,7 @@ export default function EntryScreen({ route, navigation }) {
   const copyText = () => {
     if (!currentText) return;
     ExpoClipboard.setStringAsync(currentText);
-    setSnackbar("Tekst je kopiran. Bice obrisan iz clipboard-a za 20 sekundi.");
+    setSnackbar(t('dailyLog.copiedClipboard'));
     if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
     clipboardTimerRef.current = setTimeout(() => ExpoClipboard.setStringAsync(""), 20000);
   };
@@ -144,17 +145,17 @@ export default function EntryScreen({ route, navigation }) {
     try {
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        setSnackbar("Deljenje fajlova nije dostupno na ovom uredjaju.");
+        setSnackbar(t('entry.sharingNotAvailable'));
         return;
       }
       const shareUri = decryptedAudioUri || entryAudioUri(record.id);
       await Sharing.shareAsync(shareUri, {
         mimeType: "audio/wav",
-        dialogTitle: "Sacuvaj snimak",
+        dialogTitle: t('entry.saveRecording'),
         UTI: "com.microsoft.waveform-audio",
       });
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Nije moguce sacuvati snimak."));
+      setSnackbar(safeErrorMessage(e, t('entry.saveRecordingFailed')));
     }
   };
 
@@ -164,7 +165,7 @@ export default function EntryScreen({ route, navigation }) {
     try {
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        setSnackbar("Deljenje fajlova nije dostupno na ovom uredjaju.");
+        setSnackbar(t('entry.sharingNotAvailable'));
         return;
       }
       const baseName = record.filename.replace(/\.[^.]+$/, "");
@@ -174,11 +175,11 @@ export default function EntryScreen({ route, navigation }) {
       });
       await Sharing.shareAsync(txtPath, {
         mimeType: "text/plain",
-        dialogTitle: "Sacuvaj transkript",
+        dialogTitle: t('entry.saveTranscript'),
         UTI: "public.plain-text",
       });
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Nije moguce sacuvati transkript."));
+      setSnackbar(safeErrorMessage(e, t('entry.saveTranscriptFailed')));
     }
   };
 
@@ -194,10 +195,10 @@ export default function EntryScreen({ route, navigation }) {
           setAudioOnICloud(false);
         }
       } else {
-        setSnackbar("Preuzimanje audio fajla nije uspelo.");
+        setSnackbar(t('entry.downloadFailed'));
       }
     } catch {
-      setSnackbar("Preuzimanje audio fajla nije uspelo.");
+      setSnackbar(t('entry.downloadFailed'));
     } finally {
       setAudioDownloading(false);
     }
@@ -214,7 +215,7 @@ export default function EntryScreen({ route, navigation }) {
   if (!record) {
     return (
       <View style={styles.center}>
-        <Text style={[typography.body, { color: colors.muted }]}>Zapis nije pronadjen.</Text>
+        <Text style={[typography.body, { color: colors.muted }]}>{t('entry.notFound')}</Text>
       </View>
     );
   }
@@ -229,7 +230,7 @@ export default function EntryScreen({ route, navigation }) {
           {record.duration_seconds > 0 && `  \u2022  ${formatDurationVerbose(record.duration_seconds)}`}
         </Text>
 
-        <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>TRANSKRIPCIJA</Text>
+        <Text style={[typography.monoLabel, { marginBottom: spacing.md }]}>{t('entry.transcription')}</Text>
         {record.status === "done" && record.text
           ? <TextInput
               style={styles.bodyText}
@@ -241,7 +242,7 @@ export default function EntryScreen({ route, navigation }) {
           : record.text
             ? <Text style={styles.bodyText} selectable>{record.text}</Text>
             : <Text style={[typography.body, { color: colors.muted, fontStyle: 'italic' }]}>
-                Transkript nije dostupan. Vrati se i tapni „Transkribisi".
+                {t('entry.transcriptUnavailable')}
               </Text>
         }
       </ScrollView>
@@ -252,17 +253,17 @@ export default function EntryScreen({ route, navigation }) {
           {audioOnICloud && !audioDownloading ? (
             <TouchableOpacity onPress={handleDownloadAudio} style={{ alignItems: "center" }}>
               <MaterialCommunityIcons name="cloud-download-outline" size={28} color={colors.primary} />
-              <Text style={[typography.caption, { color: colors.primary, marginTop: spacing.xs }]}>Preuzmi sa iCloud-a</Text>
+              <Text style={[typography.caption, { color: colors.primary, marginTop: spacing.xs }]}>{t('entry.downloadFromICloud')}</Text>
             </TouchableOpacity>
           ) : audioOnICloud && audioDownloading ? (
             <>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Preuzimanje sa iCloud-a...</Text>
+              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>{t('entry.downloadingFromICloud')}</Text>
             </>
           ) : (
             <>
               <MaterialCommunityIcons name="file-music-outline" size={24} color={colors.muted} />
-              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>Audio fajl nije pronadjen</Text>
+              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.xs }]}>{t('entry.audioNotFound')}</Text>
             </>
           )}
         </View>
@@ -327,7 +328,7 @@ export default function EntryScreen({ route, navigation }) {
         <View style={[styles.actions, elevation.sm]}>
           <TouchableOpacity onPress={copyText} style={styles.actionBtn}>
             <MaterialCommunityIcons name="content-copy" size={20} color={colors.muted} />
-            <Text style={styles.actionLabel}>Kopiraj</Text>
+            <Text style={styles.actionLabel}>{t('entry.copy')}</Text>
           </TouchableOpacity>
 
           <View style={styles.actionDivider} />
@@ -338,27 +339,27 @@ export default function EntryScreen({ route, navigation }) {
             anchor={
               <TouchableOpacity onPress={() => setShareMenuVisible(true)} style={styles.actionBtn}>
                 <MaterialCommunityIcons name="share-variant" size={20} color={colors.muted} />
-                <Text style={styles.actionLabel}>Podeli</Text>
+                <Text style={styles.actionLabel}>{t('entry.share')}</Text>
               </TouchableOpacity>
             }
           >
             <Menu.Item
               leadingIcon="text-box-outline"
               onPress={shareText}
-              title="Podeli transkript"
+              title={t('entry.shareTranscript')}
             />
             {record.audio_file && (
               <Menu.Item
                 leadingIcon="music-note"
                 onPress={saveRecordingToFiles}
-                title="Sacuvaj snimak u Fajlove"
+                title={t('entry.saveRecordingToFiles')}
               />
             )}
             {currentText && (
               <Menu.Item
                 leadingIcon="file-document-outline"
                 onPress={saveTranscriptToFiles}
-                title="Sacuvaj transkript u Fajlove"
+                title={t('entry.saveTranscriptToFiles')}
               />
             )}
           </Menu>

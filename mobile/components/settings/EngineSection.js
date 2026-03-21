@@ -7,6 +7,7 @@ import { isPremium } from "../../services/subscriptionService"
 import { hasDevKey } from "../../services/assemblyAIService"
 import { colors, spacing, radii, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 export default function EngineSection() {
   const [defaultEngine, setDefaultEngine] = useState("local")
@@ -39,7 +40,7 @@ export default function EngineSection() {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name="cog-outline" size={20} color={colors.primary} />
-        <Text style={styles.sectionTitle}>Podrazumevani motor</Text>
+        <Text style={styles.sectionTitle}>{t('settings.engine.title')}</Text>
       </View>
       <Divider style={styles.divider} />
       <View style={styles.sectionBody}>
@@ -48,9 +49,9 @@ export default function EngineSection() {
             <View style={radioStyles.radioRow}>
               <RadioButton value="local" color={colors.primary} />
               <View style={radioStyles.radioInfo}>
-                <Text style={typography.body}>Na uredjaju (privatno)</Text>
+                <Text style={typography.body}>{t('settings.engine.onDevice')}</Text>
                 <Text style={[typography.caption, { marginTop: 2 }]}>
-                  Whisper AI, bez interneta
+                  {t('settings.engine.onDeviceDesc')}
                 </Text>
               </View>
             </View>
@@ -60,7 +61,7 @@ export default function EngineSection() {
               <RadioButton value="assemblyai" color={colors.primary} disabled={!premium} />
               <View style={radioStyles.radioInfo}>
                 <View style={radioStyles.labelRow}>
-                  <Text style={typography.body}>AssemblyAI (oblak)</Text>
+                  <Text style={typography.body}>{t('settings.engine.cloud')}</Text>
                   {!premium && (
                     <View style={radioStyles.premiumBadge}>
                       <Text style={radioStyles.premiumBadgeText}>Premium</Text>
@@ -69,8 +70,8 @@ export default function EngineSection() {
                 </View>
                 <Text style={[typography.caption, { marginTop: 2 }]}>
                   {premium
-                    ? "Visa tacnost, prepoznavanje govornika"
-                    : "Dostupno za Premium korisnike"}
+                    ? t('settings.engine.cloudDesc')
+                    : t('settings.engine.premiumRequired')}
                 </Text>
               </View>
             </View>

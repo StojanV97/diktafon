@@ -41,6 +41,7 @@ import { statusConfig, groupByDate } from "../utils/entryUtils";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography } from "../theme";
 import { formatDurationCompact } from "../src/utils/formatters";
+import { t } from "../src/i18n";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
 
@@ -94,7 +95,7 @@ export default function DirectoryScreen({ route, navigation }) {
         const entry = await createEntry(folderId, filename, uri, durationSeconds, pendingRecordingTypeRef.current);
         setEntries((prev) => [entry, ...prev]);
       } catch (e) {
-        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
+        setSnackbar(safeErrorMessage(e, t('errors.saveFailed')));
       }
     },
   });
@@ -141,12 +142,12 @@ export default function DirectoryScreen({ route, navigation }) {
     const unsub = navigation.addListener("beforeRemove", (e) => {
       e.preventDefault();
       Alert.alert(
-        "Snimanje u toku",
-        "Snimanje je aktivno. Zelite li da otkazete snimanje i napustite ekran?",
+        t('recording.activeAlertTitle'),
+        t('recording.activeAlertMessage'),
         [
-          { text: "Nastavi snimanje", style: "cancel" },
+          { text: t('recording.continueRecording'), style: "cancel" },
           {
-            text: "Otkazi i napusti",
+            text: t('recording.cancelAndLeave'),
             style: "destructive",
             onPress: () => {
               cancelRecording().catch(() => {});
@@ -229,7 +230,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await pauseRecording();
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Pauza nije uspela."));
+      setSnackbar(safeErrorMessage(e, t('recording.pauseFailed')));
     }
   };
 
@@ -237,7 +238,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await resumeRecording();
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Nastavak nije uspeo."));
+      setSnackbar(safeErrorMessage(e, t('recording.resumeFailed')));
     }
   };
 
@@ -245,7 +246,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await stopRecording();
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Zaustavljanje nije uspelo."));
+      setSnackbar(safeErrorMessage(e, t('recording.stopFailed')));
     }
   };
 
@@ -253,7 +254,7 @@ export default function DirectoryScreen({ route, navigation }) {
     try {
       await cancelRecording();
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Otkazivanje nije uspelo."));
+      setSnackbar(safeErrorMessage(e, t('recording.cancelFailed')));
     }
   };
 
@@ -270,7 +271,7 @@ export default function DirectoryScreen({ route, navigation }) {
       const entry = await createEntry(folderId, asset.name, asset.uri, 0);
       setEntries((prev) => [entry, ...prev]);
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Uvoz nije uspeo."));
+      setSnackbar(safeErrorMessage(e, t('directory.importFailed')));
     }
   };
 
@@ -308,31 +309,31 @@ export default function DirectoryScreen({ route, navigation }) {
       if (syncOn) {
         setDeleteDialogVisible(false);
         Alert.alert(
-          "Obrisi i sa iCloud-a?",
-          `"${deleteTarget.filename}" ce biti obrisan lokalno.`,
+          t('deleteDialog.icloudTitle'),
+          t('deleteDialog.icloudEntryMessage', { filename: deleteTarget.filename }),
           [
             {
-              text: "Ne, samo lokalno",
+              text: t('deleteDialog.localOnly'),
               onPress: async () => {
                 try {
                   await tombstoneEntry(deleteTarget.id);
                   setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
                 } catch (e) {
-                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                  setSnackbar(safeErrorMessage(e, t('errors.deleteFailed')));
                 }
                 setDeleteLoading(false);
                 setDeleteTarget(null);
               },
             },
             {
-              text: "Obrisi svuda",
+              text: t('deleteDialog.everywhere'),
               style: "destructive",
               onPress: async () => {
                 try {
                   await deleteEntryWithICloud(deleteTarget.id);
                   setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
                 } catch (e) {
-                  setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+                  setSnackbar(safeErrorMessage(e, t('errors.deleteFailed')));
                 }
                 setDeleteLoading(false);
                 setDeleteTarget(null);
@@ -345,7 +346,7 @@ export default function DirectoryScreen({ route, navigation }) {
       await deleteEntry(deleteTarget.id);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Brisanje nije uspelo."));
+      setSnackbar(safeErrorMessage(e, t('errors.deleteFailed')));
     } finally {
       setDeleteLoading(false);
     }
@@ -393,14 +394,14 @@ export default function DirectoryScreen({ route, navigation }) {
                 <Menu.Item
                   leadingIcon="text-recognition"
                   onPress={() => openEngineDialog(item.id)}
-                  title="U tekst"
+                  title={t('dailyLog.toText')}
                 />
               )}
               {(isDone || isRecorded) && (
                 <Menu.Item
                   leadingIcon="delete-outline"
                   onPress={() => onDeletePress(item.id, item.filename)}
-                  title="Obrisi"
+                  title={t('common.delete')}
                 />
               )}
             </Menu>
@@ -424,7 +425,7 @@ export default function DirectoryScreen({ route, navigation }) {
               onPress={() => openEngineDialog(item.id)}
               activeOpacity={0.7}
             >
-              <Text style={styles.transcribeLinkText}>U tekst</Text>
+              <Text style={styles.transcribeLinkText}>{t('dailyLog.toText')}</Text>
               <MaterialCommunityIcons name="chevron-right" size={16} color={colors.primary} />
             </TouchableOpacity>
           )}
@@ -461,9 +462,9 @@ export default function DirectoryScreen({ route, navigation }) {
       />
       {selectedDay && (
         <View style={styles.filterBar}>
-          <Text style={styles.filterCount}>{entryCounts.get(selectedDay) || 0} snimaka</Text>
+          <Text style={styles.filterCount}>{entryCounts.get(selectedDay) || 0} {t('directory.entries')}</Text>
           <TouchableOpacity onPress={() => setSelectedDay(null)}>
-            <Text style={styles.filterLink}>Prikaži sve</Text>
+            <Text style={styles.filterLink}>{t('directory.showAll')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -488,7 +489,7 @@ export default function DirectoryScreen({ route, navigation }) {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <MaterialCommunityIcons name="microphone-outline" size={48} color={colors.muted} style={{ marginBottom: spacing.md, opacity: 0.4 }} />
-            <Text style={[typography.body, styles.emptyText]}>Nema snimaka</Text>
+            <Text style={[typography.body, styles.emptyText]}>{t('directory.noEntries')}</Text>
           </View>
         }
       />
@@ -508,10 +509,10 @@ export default function DirectoryScreen({ route, navigation }) {
       {!isActiveSession && (
         <BottomActionBar
           leftIcon="home-outline"
-          leftLabel="Pocetna"
+          leftLabel={t('directory.home')}
           onLeftPress={() => navigation.navigate("Home")}
           centerIcon="file-upload-outline"
-          centerLabel="Uvezi"
+          centerLabel={t('directory.import')}
           onCenterPress={importFile}
           onRightPress={handleStartRecording}
           isRecording={false}
@@ -523,8 +524,8 @@ export default function DirectoryScreen({ route, navigation }) {
           visible={deleteDialogVisible}
           onDismiss={() => setDeleteDialogVisible(false)}
           onConfirm={onDeleteConfirm}
-          title="Obrisi zapis"
-          message={`Obrisati "${deleteTarget?.filename}"?`}
+          title={t('deleteDialog.title')}
+          message={t('deleteDialog.entryMessage', { filename: deleteTarget?.filename })}
           loading={deleteLoading}
         />
         <EngineChoiceDialog

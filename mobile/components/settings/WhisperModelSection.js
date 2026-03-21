@@ -6,6 +6,7 @@ import * as whisperService from "../../services/whisperService"
 import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B"
@@ -30,9 +31,9 @@ export default function WhisperModelSection({ setSnackbar }) {
         setDownloadProgress(progress)
       })
       setModelStatus(whisperService.getModelStatus())
-      setSnackbar("Model je uspesno preuzet.")
+      setSnackbar(t('settings.whisper.downloadSuccess'))
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Preuzimanje nije uspelo."))
+      setSnackbar(safeErrorMessage(e, t('settings.whisper.downloadFailed')))
     } finally {
       setDownloading(false)
     }
@@ -41,27 +42,27 @@ export default function WhisperModelSection({ setSnackbar }) {
   const handleDeleteModel = () => {
     whisperService.deleteModel()
     setModelStatus(whisperService.getModelStatus())
-    setSnackbar("Model je obrisan.")
+    setSnackbar(t('settings.whisper.deleted'))
   }
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name="brain" size={20} color={colors.primary} />
-        <Text style={styles.sectionTitle}>Whisper model</Text>
+        <Text style={styles.sectionTitle}>{t('settings.whisper.title')}</Text>
       </View>
       <Divider style={styles.divider} />
       <View style={styles.sectionBody}>
         <Text style={typography.body}>
-          Status:{" "}
+          {t('settings.whisper.status')}{" "}
           <Text style={{ fontFamily: "Inter_600SemiBold" }}>
             {modelStatus.downloaded
-              ? `Preuzet (${formatBytes(modelStatus.sizeBytes)})`
-              : "Nije preuzet"}
+              ? t('settings.whisper.downloaded', { size: formatBytes(modelStatus.sizeBytes) })
+              : t('settings.whisper.notDownloaded')}
           </Text>
         </Text>
         <Text style={[typography.caption, { marginTop: spacing.xs }]}>
-          Besplatno · Radi offline · ~466 MB · Sporije, slabiji kvalitet za srpski
+          {t('settings.whisper.caption')}
         </Text>
         {downloading && (
           <View style={{ marginTop: spacing.md }}>
@@ -83,7 +84,7 @@ export default function WhisperModelSection({ setSnackbar }) {
               textColor={colors.danger}
               style={styles.btn}
             >
-              Obrisi model
+              {t('settings.whisper.deleteModel')}
             </Button>
           ) : (
             <Button
@@ -94,7 +95,7 @@ export default function WhisperModelSection({ setSnackbar }) {
               buttonColor={colors.primary}
               style={styles.btn}
             >
-              Preuzmi model
+              {t('settings.whisper.downloadModel')}
             </Button>
           )}
         </View>

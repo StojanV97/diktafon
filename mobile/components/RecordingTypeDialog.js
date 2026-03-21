@@ -3,11 +3,12 @@ import { TouchableOpacity, View, StyleSheet } from "react-native";
 import { Dialog, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing, radii, typography } from "../theme";
+import { t } from "../src/i18n";
 
 export default function RecordingTypeDialog({ visible, onDismiss, onConfirm }) {
   return (
     <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
-      <Dialog.Title style={typography.heading}>Vrsta snimka</Dialog.Title>
+      <Dialog.Title style={typography.heading}>{t('recordingType.title')}</Dialog.Title>
       <Dialog.Content>
         <TouchableOpacity
           style={styles.row}
@@ -16,9 +17,9 @@ export default function RecordingTypeDialog({ visible, onDismiss, onConfirm }) {
         >
           <MaterialCommunityIcons name="note-text-outline" size={24} color={colors.primary} />
           <View style={styles.info}>
-            <Text style={[typography.heading, { fontSize: 15 }]}>Beleška</Text>
+            <Text style={[typography.heading, { fontSize: 15 }]}>{t('recordingType.note')}</Text>
             <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-              Jedan govornik
+              {t('recordingType.noteDesc')}
             </Text>
           </View>
         </TouchableOpacity>
@@ -29,9 +30,9 @@ export default function RecordingTypeDialog({ visible, onDismiss, onConfirm }) {
         >
           <MaterialCommunityIcons name="account-group-outline" size={24} color={colors.primary} />
           <View style={styles.info}>
-            <Text style={[typography.heading, { fontSize: 15 }]}>Razgovor</Text>
+            <Text style={[typography.heading, { fontSize: 15 }]}>{t('recordingType.conversation')}</Text>
             <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-              Više govornika
+              {t('recordingType.conversationDesc')}
             </Text>
           </View>
         </TouchableOpacity>

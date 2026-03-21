@@ -8,6 +8,7 @@ import * as backupService from "../../services/backupService"
 import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 export default function BackupSection({ setSnackbar }) {
   const [backupLoading, setBackupLoading] = useState(false)
@@ -27,12 +28,12 @@ export default function BackupSection({ setSnackbar }) {
     if (!usePassword) {
       // Warn about unencrypted export
       Alert.alert(
-        "Backup bez sifre",
-        "Backup ce sadrzati sve snimke i transkripte bez ikakve zastite. Da li ste sigurni?",
+        t('settings.backup.unencryptedTitle'),
+        t('settings.backup.unencryptedMessage'),
         [
-          { text: "Otkazi", style: "cancel", onPress: () => { setShowPasswordCreate(false); setPassword(""); setConfirmPassword("") } },
+          { text: t('common.cancel'), style: "cancel", onPress: () => { setShowPasswordCreate(false); setPassword(""); setConfirmPassword("") } },
           {
-            text: "Nastavi",
+            text: t('common.continue'),
             style: "destructive",
             onPress: async () => {
               setShowPasswordCreate(false)
@@ -40,9 +41,9 @@ export default function BackupSection({ setSnackbar }) {
               try {
                 const uri = await backupService.createBackup(null)
                 await Sharing.shareAsync(uri, { mimeType: "application/zip", UTI: "public.zip-archive" })
-                setSnackbar("Backup je kreiran.")
+                setSnackbar(t('settings.backup.created'))
               } catch (e) {
-                setSnackbar(safeErrorMessage(e, "Backup nije uspeo."))
+                setSnackbar(safeErrorMessage(e, t('settings.backup.failed')))
               } finally {
                 setBackupLoading(false)
                 setPassword("")
@@ -59,9 +60,9 @@ export default function BackupSection({ setSnackbar }) {
     try {
       const uri = await backupService.createBackup(password)
       await Sharing.shareAsync(uri, { mimeType: "application/octet-stream", UTI: "public.data" })
-      setSnackbar("Sifrovan backup je kreiran.")
+      setSnackbar(t('settings.backup.encryptedCreated'))
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Backup nije uspeo."))
+      setSnackbar(safeErrorMessage(e, t('settings.backup.failed')))
     } finally {
       setBackupLoading(false)
       setPassword("")
@@ -87,7 +88,7 @@ export default function BackupSection({ setSnackbar }) {
         confirmRestore(fileUri, null)
       }
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Oporavak nije uspeo."))
+      setSnackbar(safeErrorMessage(e, t('settings.backup.restoreFailed')))
     }
   }
 
@@ -99,25 +100,25 @@ export default function BackupSection({ setSnackbar }) {
 
   const confirmRestore = (fileUri, pw) => {
     Alert.alert(
-      "Oporavak iz backup-a",
-      "Ovo ce zameniti sve trenutne podatke. Nastaviti?",
+      t('settings.backup.restoreTitle'),
+      t('settings.backup.restoreMessage'),
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Nastavi",
+          text: t('common.continue'),
           style: "destructive",
           onPress: async () => {
             setBackupLoading(true)
             try {
               const stats = await backupService.restoreFromBackup(fileUri, pw)
-              const msg = `Oporavak zavrsen: ${stats.folders} fascikli, ${stats.entries} unosa, ${stats.audioFiles} snimaka, ${stats.textFiles} transkripata.`
+              const msg = t('settings.backup.restored', { folders: stats.folders, entries: stats.entries, audioFiles: stats.audioFiles, textFiles: stats.textFiles })
               setSnackbar(
                 stats.skippedFiles > 0
-                  ? `${msg} Upozorenje: ${stats.skippedFiles} fajlova nije moglo biti ucitano.`
+                  ? `${msg} ${t('settings.backup.restoreWarning', { skippedFiles: stats.skippedFiles })}`
                   : msg
               )
             } catch (e) {
-              setSnackbar(safeErrorMessage(e, "Oporavak nije uspeo."))
+              setSnackbar(safeErrorMessage(e, t('settings.backup.restoreFailed')))
             } finally {
               setBackupLoading(false)
             }
@@ -131,12 +132,12 @@ export default function BackupSection({ setSnackbar }) {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.primary} />
-        <Text style={styles.sectionTitle}>Backup i oporavak</Text>
+        <Text style={styles.sectionTitle}>{t('settings.backup.title')}</Text>
       </View>
       <Divider style={styles.divider} />
       <View style={styles.sectionBody}>
         <Text style={[typography.caption, { marginBottom: spacing.md }]}>
-          Sacuvaj ili oporavi sve fascikle, snimke i transkripte.
+          {t('settings.backup.caption')}
         </Text>
         {backupLoading && (
           <ActivityIndicator
@@ -149,11 +150,11 @@ export default function BackupSection({ setSnackbar }) {
         {showPasswordCreate && (
           <View style={{ marginBottom: spacing.md }}>
             <Text style={[typography.caption, { marginBottom: spacing.xs }]}>
-              Unesi lozinku za sifrovanje backup-a (opciono):
+              {t('settings.backup.passwordLabel')}
             </Text>
             <TextInput
               mode="outlined"
-              label="Lozinka"
+              label={t('settings.backup.passwordInput')}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -163,7 +164,7 @@ export default function BackupSection({ setSnackbar }) {
               <>
                 <TextInput
                   mode="outlined"
-                  label="Potvrdi lozinku"
+                  label={t('settings.backup.confirmPassword')}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -171,7 +172,7 @@ export default function BackupSection({ setSnackbar }) {
                 />
                 {confirmPassword !== "" && password !== confirmPassword && (
                   <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.sm }]}>
-                    Lozinke se ne poklapaju.
+                    {t('settings.backup.passwordMismatch')}
                   </Text>
                 )}
               </>
@@ -184,14 +185,14 @@ export default function BackupSection({ setSnackbar }) {
                 style={styles.btn}
                 disabled={!!password && password !== confirmPassword}
               >
-                {password ? "Sifruj i sacuvaj" : "Sacuvaj bez sifre"}
+                {password ? t('settings.backup.encryptAndSave') : t('settings.backup.saveUnencrypted')}
               </Button>
               <Button
                 mode="outlined"
                 onPress={() => { setShowPasswordCreate(false); setPassword(""); setConfirmPassword("") }}
                 style={styles.btn}
               >
-                Otkazi
+                {t('common.cancel')}
               </Button>
             </View>
           </View>
@@ -200,11 +201,11 @@ export default function BackupSection({ setSnackbar }) {
         {showPasswordRestore && (
           <View style={{ marginBottom: spacing.md }}>
             <Text style={[typography.caption, { marginBottom: spacing.xs }]}>
-              Unesi lozinku za desifrovanje backup-a:
+              {t('settings.backup.decryptPasswordLabel')}
             </Text>
             <TextInput
               mode="outlined"
-              label="Lozinka"
+              label={t('settings.backup.passwordInput')}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -218,14 +219,14 @@ export default function BackupSection({ setSnackbar }) {
                 disabled={!password}
                 style={styles.btn}
               >
-                Desifruj i oporavi
+                {t('settings.backup.decryptAndRestore')}
               </Button>
               <Button
                 mode="outlined"
                 onPress={() => { setShowPasswordRestore(false); setPassword(""); setRestoreFileUri(null) }}
                 style={styles.btn}
               >
-                Otkazi
+                {t('common.cancel')}
               </Button>
             </View>
           </View>
@@ -242,7 +243,7 @@ export default function BackupSection({ setSnackbar }) {
               icon="download"
               style={styles.btn}
             >
-              Kreiraj backup
+              {t('settings.backup.createButton')}
             </Button>
             <Button
               mode="outlined"
@@ -251,7 +252,7 @@ export default function BackupSection({ setSnackbar }) {
               icon="upload"
               style={styles.btn}
             >
-              Oporavi iz backup-a
+              {t('settings.backup.restoreButton')}
             </Button>
           </View>
         )}

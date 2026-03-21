@@ -7,6 +7,7 @@ import { getProfile } from "../../services/authService"
 import { safeErrorMessage } from "../../utils/errorHelpers"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 export default function SubscriptionSection({ setSnackbar, user }) {
   const [premium, setPremium] = useState(false)
@@ -42,10 +43,10 @@ export default function SubscriptionSection({ setSnackbar, user }) {
     try {
       const result = await purchasePackage(pkg)
       setPremium(result)
-      if (result) setSnackbar("Premium je aktiviran!")
+      if (result) setSnackbar(t('settings.subscription.activated'))
     } catch (e) {
       if (e.userCancelled) return
-      setSnackbar(safeErrorMessage(e, "Kupovina nije uspela."))
+      setSnackbar(safeErrorMessage(e, t('settings.subscription.purchaseFailed')))
     } finally {
       setPurchaseLoading(false)
     }
@@ -56,9 +57,9 @@ export default function SubscriptionSection({ setSnackbar, user }) {
     try {
       const result = await restorePurchases()
       setPremium(result)
-      setSnackbar(result ? "Premium je obnovljen!" : "Nema prethodnih kupovina.")
+      setSnackbar(result ? t('settings.subscription.restored') : t('settings.subscription.noPurchases'))
     } catch (e) {
-      setSnackbar(safeErrorMessage(e, "Obnova nije uspela."))
+      setSnackbar(safeErrorMessage(e, t('settings.subscription.restoreFailed')))
     } finally {
       setPurchaseLoading(false)
     }
@@ -68,7 +69,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name="star-outline" size={20} color={colors.primary} />
-        <Text style={styles.sectionTitle}>Pretplata</Text>
+        <Text style={styles.sectionTitle}>{t('settings.subscription.title')}</Text>
       </View>
       <Divider style={styles.divider} />
       <View style={styles.sectionBody}>
@@ -77,13 +78,13 @@ export default function SubscriptionSection({ setSnackbar, user }) {
             <View style={premiumStyles.premiumBadge}>
               <MaterialCommunityIcons name="check-decagram" size={20} color={colors.success} />
               <Text style={[typography.body, { marginLeft: spacing.sm, fontFamily: "Inter_600SemiBold" }]}>
-                Diktafon Premium
+                {t('settings.subscription.premiumBadge')}
               </Text>
             </View>
             {usageInfo && (
               <View style={{ marginTop: spacing.md }}>
                 <Text style={typography.body}>
-                  AssemblyAI transkripcija: {usageInfo.used} / {usageInfo.limit} min ovog meseca
+                  {t('settings.subscription.usage', { used: usageInfo.used, limit: usageInfo.limit })}
                 </Text>
                 <ProgressBar
                   progress={usageInfo.used / usageInfo.limit}
@@ -91,7 +92,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
                   style={[styles.progressBar, { marginTop: spacing.sm }]}
                 />
                 <Text style={[typography.caption, { marginTop: spacing.xs }]}>
-                  Preostalo: {usageInfo.remaining} min
+                  {t('settings.subscription.remaining', { remaining: usageInfo.remaining })}
                 </Text>
               </View>
             )}
@@ -99,10 +100,10 @@ export default function SubscriptionSection({ setSnackbar, user }) {
         ) : (
           <>
             <Text style={[typography.body, { marginBottom: spacing.md }]}>
-              Otključaj AssemblyAI cloud transkripciju sa prepoznavanjem govornika.
+              {t('settings.subscription.unlockCaption')}
             </Text>
             <Text style={[typography.caption, { marginBottom: spacing.lg }]}>
-              {MONTHLY_MINUTES_LIMIT} min/mesec cloud transkripcije · Visa tacnost · Prepoznavanje govornika
+              {t('settings.subscription.features', { limit: MONTHLY_MINUTES_LIMIT })}
             </Text>
             {offerings?.availablePackages?.map((pkg) => (
               <Button
@@ -124,7 +125,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
               textColor={colors.muted}
               style={styles.btn}
             >
-              Obnovi kupovinu
+              {t('settings.subscription.restoreButton')}
             </Button>
           </>
         )}

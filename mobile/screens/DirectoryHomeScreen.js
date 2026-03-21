@@ -40,6 +40,7 @@ import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../theme";
 import { formatDate, formatDuration } from "../src/utils/formatters";
+import { t } from "../src/i18n";
 
 export default function DirectoryHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -80,7 +81,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         const stats = await fetchDailyLogStats();
         setDailyStats(stats);
       } catch (e) {
-        setSnackbar(safeErrorMessage(e, "Cuvanje snimka nije uspelo."));
+        setSnackbar(safeErrorMessage(e, t('errors.saveFailed')));
       }
     },
   });
@@ -157,7 +158,7 @@ export default function DirectoryHomeScreen({ navigation }) {
     const name = dialogName.trim();
     if (!name || dialogLoading) return;
     if (name.length > 100) {
-      setSnackbar("Naziv ne moze biti duzi od 100 karaktera.");
+      setSnackbar(t('home.nameTooLong'));
       return;
     }
 
@@ -196,11 +197,11 @@ export default function DirectoryHomeScreen({ navigation }) {
       if (syncOn) {
         setDeleteDialogVisible(false);
         Alert.alert(
-          "Obrisi i sa iCloud-a?",
-          `"${deleteTarget.name}" i svi zapisi u njemu ce biti obrisani lokalno.`,
+          t('deleteDialog.icloudTitle'),
+          t('deleteDialog.folderIcloudMessage', { name: deleteTarget.name }),
           [
             {
-              text: "Ne, samo lokalno",
+              text: t('deleteDialog.localOnly'),
               onPress: async () => {
                 try {
                   await tombstoneFolder(deleteTarget.id);
@@ -213,7 +214,7 @@ export default function DirectoryHomeScreen({ navigation }) {
               },
             },
             {
-              text: "Obrisi svuda",
+              text: t('deleteDialog.everywhere'),
               style: "destructive",
               onPress: async () => {
                 try {
@@ -268,13 +269,13 @@ export default function DirectoryHomeScreen({ navigation }) {
           <MaterialCommunityIcons name="calendar-today" size={24} color={colors.primary} />
         </View>
         <View style={styles.danasBody}>
-          <Text style={styles.danasTitle}>Brzi Zapis</Text>
+          <Text style={styles.danasTitle}>{t('home.quickRecord')}</Text>
           {dailyStats.clipCount > 0 ? (
             <Text style={[typography.caption, { marginTop: 2 }]}>
-              {dailyStats.clipCount} {dailyStats.clipCount === 1 ? "snimak" : "snimaka"} · {formatDuration(dailyStats.totalDuration)}
+              {dailyStats.clipCount} {dailyStats.clipCount === 1 ? t('home.entry') : t('home.entries')} · {formatDuration(dailyStats.totalDuration)}
             </Text>
           ) : (
-            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>Nema snimaka</Text>
+            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>{t('home.noEntries')}</Text>
           )}
         </View>
         <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
@@ -336,12 +337,12 @@ export default function DirectoryHomeScreen({ navigation }) {
           <Menu.Item
             leadingIcon="pencil-outline"
             onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
-            title="Izmeni"
+            title={t('common.edit')}
           />
           <Menu.Item
             leadingIcon="delete-outline"
             onPress={() => onDeletePress(item.id, item.name)}
-            title="Obrisi"
+            title={t('common.delete')}
           />
         </Menu>
       </TouchableOpacity>
@@ -374,7 +375,7 @@ export default function DirectoryHomeScreen({ navigation }) {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={[typography.body, styles.emptyText]}>
-              Nema direktorijuma.{"\n"}Tapni + da kreiras direktorijum.
+              {t('home.noFolders')}
             </Text>
           </View>
         }
@@ -382,7 +383,7 @@ export default function DirectoryHomeScreen({ navigation }) {
 
       <BottomActionBar
         leftIcon="folder-plus-outline"
-        leftLabel="Direktorijum"
+        leftLabel={t('home.newFolder')}
         onLeftPress={() => openDialog("create")}
         onRightPress={handleRecordPress}
         isRecording={isRecording}
@@ -392,12 +393,12 @@ export default function DirectoryHomeScreen({ navigation }) {
         {/* Create / Edit Dialog */}
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)} style={styles.dialog}>
           <Dialog.Title style={typography.heading}>
-            {dialogMode === "create" ? "Novi direktorijum" : "Izmeni direktorijum"}
+            {dialogMode === "create" ? t('home.newFolderTitle') : t('home.editFolderTitle')}
           </Dialog.Title>
           <Dialog.ScrollArea style={styles.dialogScrollArea}>
             <ScrollView>
               <TextInput
-                label="Naziv"
+                label={t('home.folderName')}
                 value={dialogName}
                 onChangeText={setDialogName}
                 mode="outlined"
@@ -409,7 +410,7 @@ export default function DirectoryHomeScreen({ navigation }) {
               />
 
               {/* Color picker */}
-              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>BOJA</Text>
+              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>{t('home.color')}</Text>
               <View style={styles.colorRow}>
                 {FOLDER_COLORS.map((c) => (
                   <TouchableOpacity
@@ -425,10 +426,10 @@ export default function DirectoryHomeScreen({ navigation }) {
               </View>
 
               {/* Tag input */}
-              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>TAGOVI</Text>
+              <Text style={[typography.monoLabel, { marginBottom: spacing.sm, marginTop: spacing.xs }]}>{t('home.tags')}</Text>
               <View style={styles.tagInputRow}>
                 <TextInput
-                  label="Novi tag"
+                  label={t('home.newTag')}
                   value={dialogTagInput}
                   onChangeText={setDialogTagInput}
                   onSubmitEditing={addTag}
@@ -445,7 +446,7 @@ export default function DirectoryHomeScreen({ navigation }) {
                   style={styles.addTagBtn}
                   buttonColor={colors.primary}
                 >
-                  Dodaj
+                  {t('common.add')}
                 </Button>
               </View>
 
@@ -485,9 +486,9 @@ export default function DirectoryHomeScreen({ navigation }) {
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)} textColor={colors.muted}>Otkazi</Button>
+            <Button onPress={() => setDialogVisible(false)} textColor={colors.muted}>{t('common.cancel')}</Button>
             <Button onPress={onDialogConfirm} textColor={colors.primary} disabled={dialogLoading} loading={dialogLoading}>
-              {dialogMode === "create" ? "Kreiraj" : "Sacuvaj"}
+              {dialogMode === "create" ? t('common.create') : t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -496,8 +497,8 @@ export default function DirectoryHomeScreen({ navigation }) {
           visible={deleteDialogVisible}
           onDismiss={() => setDeleteDialogVisible(false)}
           onConfirm={onDeleteConfirm}
-          title="Obrisi direktorijum"
-          message={`Obrisati "${deleteTarget?.name}" i sve zapise u njemu?`}
+          title={t('home.deleteFolderTitle')}
+          message={t('home.deleteFolderMessage', { name: deleteTarget?.name })}
           loading={deleteLoading}
         />
       </Portal>

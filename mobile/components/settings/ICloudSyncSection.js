@@ -20,6 +20,7 @@ import {
 import { getSettings } from "../../services/settingsService"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 export default function ICloudSyncSection({ setSnackbar }) {
   const [icloudAvailable, setIcloudAvailable] = useState(false)
@@ -62,26 +63,26 @@ export default function ICloudSyncSection({ setSnackbar }) {
     try {
       if (value) {
         await enableSync()
-        setSnackbar("iCloud sinhronizacija ukljucena.")
+        setSnackbar(t('settings.icloud.enabled'))
       } else {
         await disableSync()
-        setSnackbar("iCloud sinhronizacija iskljucena.")
+        setSnackbar(t('settings.icloud.disabled'))
       }
       await loadTombstoneCount()
     } catch (e) {
       setIcloudSyncOn(!value)
-      setSnackbar("Greska pri promeni iCloud podesavanja.")
+      setSnackbar(t('settings.icloud.toggleError'))
     }
   }
 
   const handleRestoreTombstoned = () => {
     Alert.alert(
-      "Vrati obrisane podatke",
-      "Ovo ce vratiti sve lokalno obrisane podatke sa iCloud-a.",
+      t('settings.icloud.restoreDeletedTitle'),
+      t('settings.icloud.restoreDeletedMessage'),
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Vrati",
+          text: t('settings.icloud.restoreDeletedButton'),
           onPress: async () => {
             setRestoring(true)
             try {
@@ -95,9 +96,9 @@ export default function ICloudSyncSection({ setSnackbar }) {
                 await overwriteEntries(result.entries)
               }
               setTombstoneCount(0)
-              setSnackbar("Obrisani podaci su vraceni.")
+              setSnackbar(t('settings.icloud.restored'))
             } catch (e) {
-              setSnackbar("Vracanje podataka nije uspelo.")
+              setSnackbar(t('settings.icloud.restoreFailed'))
               if (__DEV__) console.warn("Tombstone restore failed:", e.message)
             } finally {
               setRestoring(false)
@@ -112,16 +113,16 @@ export default function ICloudSyncSection({ setSnackbar }) {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name="cloud-sync-outline" size={20} color={colors.primary} />
-        <Text style={styles.sectionTitle}>iCloud sinhronizacija</Text>
+        <Text style={styles.sectionTitle}>{t('settings.icloud.title')}</Text>
       </View>
       <Divider style={styles.divider} />
       <View style={styles.sectionBody}>
         <Text style={[typography.caption, { marginBottom: spacing.md }]}>
-          Automatski sacuvaj i sinhronizuj sve podatke preko iCloud-a. Besplatno.
+          {t('settings.icloud.caption')}
         </Text>
         {!icloudAvailable ? (
           <Text style={[typography.body, { color: colors.warning }]}>
-            iCloud nije dostupan. Proveri da li si prijavljen u iCloud podesavanjima.
+            {t('settings.icloud.notAvailable')}
           </Text>
         ) : (
           <>
@@ -131,9 +132,9 @@ export default function ICloudSyncSection({ setSnackbar }) {
             >
               <View style={styles.toggleRowInner}>
                 <View style={{ flex: 1 }}>
-                  <Text style={typography.body}>Sinhronizacija ukljucena</Text>
+                  <Text style={typography.body}>{t('settings.icloud.syncOn')}</Text>
                   <Text style={[typography.caption, { marginTop: 2 }]}>
-                    Fascikle, zapisi i transkripti se cuvaju u iCloud-u
+                    {t('settings.icloud.syncDesc')}
                   </Text>
                 </View>
                 <Switch
@@ -154,10 +155,10 @@ export default function ICloudSyncSection({ setSnackbar }) {
                   icon="backup-restore"
                   style={styles.btn}
                 >
-                  Vrati obrisane podatke ({tombstoneCount})
+                  {t('settings.icloud.restoreDeleted', { count: tombstoneCount })}
                 </Button>
                 <Text style={[typography.caption, { marginTop: spacing.xs, color: colors.muted }]}>
-                  Vraca lokalno obrisane zapise sa iCloud-a
+                  {t('settings.icloud.restoreDeletedDesc')}
                 </Text>
               </View>
             )}

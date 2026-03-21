@@ -6,6 +6,7 @@ import { fetchFolders, getFolder } from "../../services/journalStorage"
 import { getSettings, updateSettings } from "../../services/settingsService"
 import { colors, spacing, radii, typography } from "../../theme"
 import { sectionStyles } from "./sectionStyles"
+import { t } from "../../src/i18n"
 
 export default function AutoMoveSection({ setSnackbar }) {
   const [autoMoveFolder, setAutoMoveFolder] = useState(null)
@@ -57,12 +58,12 @@ export default function AutoMoveSection({ setSnackbar }) {
       <View style={sectionStyles.section}>
         <View style={sectionStyles.sectionHeader}>
           <MaterialCommunityIcons name="folder-move-outline" size={20} color={colors.primary} />
-          <Text style={sectionStyles.sectionTitle}>Brzi Zapis</Text>
+          <Text style={sectionStyles.sectionTitle}>{t('settings.autoMove.title')}</Text>
         </View>
         <Divider style={sectionStyles.divider} />
         <View style={sectionStyles.sectionBody}>
           <Text style={[typography.caption, { marginBottom: spacing.md }]}>
-            Automatski premesti zavrsene zapise u izabrani folder.
+            {t('settings.autoMove.caption')}
           </Text>
           <View style={styles.autoMoveStatus}>
             {autoMoveFolder ? (
@@ -71,7 +72,7 @@ export default function AutoMoveSection({ setSnackbar }) {
                 <Text style={typography.body}>{autoMoveFolder.name}</Text>
               </View>
             ) : (
-              <Text style={[typography.body, { color: colors.muted }]}>Iskljuceno</Text>
+              <Text style={[typography.body, { color: colors.muted }]}>{t('settings.autoMove.off')}</Text>
             )}
           </View>
           <View style={sectionStyles.btnRow}>
@@ -81,7 +82,7 @@ export default function AutoMoveSection({ setSnackbar }) {
               buttonColor={colors.primary}
               style={sectionStyles.btn}
             >
-              Izaberi folder
+              {t('settings.autoMove.selectFolder')}
             </Button>
             {autoMoveFolder && (
               <Button
@@ -90,7 +91,7 @@ export default function AutoMoveSection({ setSnackbar }) {
                 textColor={colors.danger}
                 style={sectionStyles.btn}
               >
-                Iskljuci
+                {t('settings.autoMove.disable')}
               </Button>
             )}
           </View>
@@ -101,9 +102,9 @@ export default function AutoMoveSection({ setSnackbar }) {
             >
               <View style={sectionStyles.toggleRowInner}>
                 <View style={{ flex: 1 }}>
-                  <Text style={typography.body}>Sacuvaj snimke pri premestanju</Text>
+                  <Text style={typography.body}>{t('settings.autoMove.keepAudio')}</Text>
                   <Text style={[typography.caption, { marginTop: 2 }]}>
-                    Podrazumevano se brisu snimci, cuva se samo transkript
+                    {t('settings.autoMove.keepAudioDesc')}
                   </Text>
                 </View>
                 <Switch
@@ -123,10 +124,10 @@ export default function AutoMoveSection({ setSnackbar }) {
           onDismiss={() => setAutoMoveDialogVisible(false)}
           style={styles.dialog}
         >
-          <Dialog.Title style={typography.heading}>Izaberi folder</Dialog.Title>
+          <Dialog.Title style={typography.heading}>{t('settings.autoMove.selectTitle')}</Dialog.Title>
           <Dialog.Content>
             {autoMoveFolders.length === 0 ? (
-              <Text style={typography.body}>Nema dostupnih foldera.</Text>
+              <Text style={typography.body}>{t('settings.autoMove.noFolders')}</Text>
             ) : (
               autoMoveFolders.map((folder) => (
                 <TouchableOpacity
@@ -143,7 +144,7 @@ export default function AutoMoveSection({ setSnackbar }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setAutoMoveDialogVisible(false)} textColor={colors.muted}>
-              Otkazi
+              {t('common.cancel')}
             </Button>
           </Dialog.Actions>
         </Dialog>

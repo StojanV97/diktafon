@@ -2,17 +2,18 @@ import { colors } from "../theme"
 import type { EntryStatus, StatusConfig } from "../src/types"
 import { getRecordedDate } from "../src/utils/dateHelpers"
 import type { Entry } from "../src/types"
+import { t } from "../src/i18n"
 
 export function statusConfig(status: EntryStatus | string): StatusConfig {
   switch (status) {
     case "recorded":
-      return { label: "Snimljeno", icon: "check", bg: colors.primaryLight, fg: colors.primary }
+      return { label: t('entry.statusRecorded'), icon: "check", bg: colors.primaryLight, fg: colors.primary }
     case "processing":
-      return { label: "Transkribuje...", icon: "progress-clock", bg: colors.warningLight, fg: colors.warning }
+      return { label: t('entry.statusProcessing'), icon: "progress-clock", bg: colors.warningLight, fg: colors.warning }
     case "error":
-      return { label: "Greska", icon: "alert-circle-outline", bg: colors.dangerLight, fg: colors.danger }
+      return { label: t('entry.statusError'), icon: "alert-circle-outline", bg: colors.dangerLight, fg: colors.danger }
     default:
-      return { label: "Gotovo", icon: "check-circle-outline", bg: colors.successLight, fg: colors.success }
+      return { label: t('entry.statusDone'), icon: "check-circle-outline", bg: colors.successLight, fg: colors.success }
   }
 }
 

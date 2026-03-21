@@ -3,12 +3,10 @@ import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing, radii } from "../theme";
+import { t } from "../src/i18n";
 
-const MONTHS = [
-  "januar", "februar", "mart", "april", "maj", "jun",
-  "jul", "avgust", "septembar", "oktobar", "novembar", "decembar",
-];
-const DAYS = ["NED", "PON", "UTO", "SRI", "ČET", "PET", "SUB"];
+const MONTHS = t('calendar.months');
+const DAYS = t('calendar.days');
 
 const CHIP_W = 44;
 const CHIP_H = 56;

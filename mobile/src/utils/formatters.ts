@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 /**
  * Format seconds as "M:SS" (e.g., "2:05"). Returns "0:00" for falsy input.
  */
@@ -65,8 +67,8 @@ export function formatSectionDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
   const month = date.toLocaleString("sr-Latn-RS", { month: "long" });
   const day = date.getDate();
-  if (dateStr === today) return `Danas — ${day}. ${month}`;
-  if (dateStr === yesterday) return `Juce — ${day}. ${month}`;
+  if (dateStr === today) return `${t('calendar.today')} — ${day}. ${month}`;
+  if (dateStr === yesterday) return `${t('calendar.yesterday')} — ${day}. ${month}`;
   return `${day}. ${month}`;
 }
 

@@ -2,6 +2,7 @@ import { initWhisper } from "whisper.rn";
 import { File, Directory, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import crypto from "react-native-quick-crypto";
+import { t } from "../src/i18n";
 
 const MODEL_URL =
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
@@ -55,7 +56,7 @@ export async function downloadModel(onProgress) {
   // Validate — detect interrupted/partial downloads
   if (!tempFile.exists || tempFile.size < MIN_MODEL_SIZE) {
     if (tempFile.exists) tempFile.delete()
-    throw new Error("Preuzimanje modela nije zavrseno. Pokusajte ponovo.");
+    throw new Error(t('whisper.downloadIncomplete'));
   }
 
   // Verify integrity — reject tampered or corrupted downloads
@@ -63,7 +64,7 @@ export async function downloadModel(onProgress) {
   const hash = crypto.createHash("sha256").update(Buffer.from(fileBytes)).digest("hex");
   if (hash !== MODEL_SHA256) {
     tempFile.delete();
-    throw new Error("Model fajl nije prosao proveru integriteta. Pokusajte ponovo.");
+    throw new Error(t('whisper.integrityFailed'));
   }
 
   // Atomic swap: delete old model only after successful download
@@ -85,7 +86,7 @@ export function deleteModel() {
 
 export async function transcribe(audioFileUri, onProgress) {
   if (!modelFile.exists) {
-    throw new Error("Whisper model nije preuzet. Preuzmi ga u Podesavanjima.");
+    throw new Error(t('whisper.modelNotDownloaded'));
   }
 
   if (!whisperContext) {

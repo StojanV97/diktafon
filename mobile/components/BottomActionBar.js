@@ -4,6 +4,7 @@ import { Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing } from "../theme";
+import { t } from "../src/i18n";
 
 function BottomActionBar({
   extraLeftIcon,
@@ -58,7 +59,7 @@ function BottomActionBar({
           color={isRecording ? colors.danger : colors.primary}
         />
         <Text style={[styles.bottomBtnText, isRecording && { color: colors.danger }]}>
-          {isRecording ? "Zaustavi" : "Snimi"}
+          {isRecording ? t('recording.stop') : t('recording.record')}
         </Text>
       </TouchableOpacity>
     </View>

@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as AppleAuthentication from "expo-apple-authentication"
 import { signInWithApple } from "../services/authService"
 import { colors, spacing, radii, elevation, typography } from "../theme"
+import { t } from "../src/i18n"
 
 function navigateToHome(navigation) {
   AsyncStorage.setItem("hasSeenAuth", "true")
@@ -35,7 +36,7 @@ export default function AuthScreen({ navigation }) {
       if (e.code === "ERR_REQUEST_CANCELED") {
         // User cancelled — not an error
       } else {
-        setError(e.message || "Prijavljivanje nije uspelo")
+        setError(e.message || t('auth.signInFailed'))
       }
     } finally {
       setLoading(false)
@@ -53,10 +54,10 @@ export default function AuthScreen({ navigation }) {
           <MaterialCommunityIcons name="account-circle-outline" size={64} color={colors.primary} />
         </View>
 
-        <Text style={styles.title}>Prijavi se</Text>
+        <Text style={styles.title}>{t('auth.signIn')}</Text>
 
         <Text style={styles.subtitle}>
-          Prijava ti omogucava backup u oblaku, sinhronizaciju izmedju uredjaja i premium funkcije.
+          {t('auth.signInSubtitle')}
         </Text>
 
         {error && (
@@ -82,14 +83,13 @@ export default function AuthScreen({ navigation }) {
           style={styles.skipButton}
           disabled={loading}
         >
-          Nastavi bez naloga
+          {t('auth.continueWithout')}
         </Button>
       </View>
 
       <View style={styles.footer}>
         <Text style={[typography.caption, styles.footerText]}>
-          Aplikacija radi potpuno i bez naloga.{"\n"}
-          Nalog je potreban samo za cloud backup i premium transkripciju.
+          {t('auth.footer')}
         </Text>
       </View>
     </View>

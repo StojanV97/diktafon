@@ -4,6 +4,7 @@ import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing, radii, typography } from "../theme";
 import { formatTimer } from "../src/utils/formatters";
+import { t } from "../src/i18n";
 
 function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResume, onStop, onCancel }) {
   return (
@@ -53,7 +54,7 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
         </TouchableOpacity>
       </View>
       <Text style={[typography.caption, { marginTop: spacing.sm }]}>
-        {isPaused ? "Odbaci \u00B7 Nastavi \u00B7 Sacuvaj" : "Odbaci \u00B7 Pauziraj \u00B7 Sacuvaj"}
+        {isPaused ? t('recording.overlay.discardResumeSave') : t('recording.overlay.discardPauseSave')}
       </Text>
     </View>
   );
