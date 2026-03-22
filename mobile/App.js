@@ -2,8 +2,7 @@ import { Buffer } from "@craftzdog/react-native-buffer"
 global.Buffer = global.Buffer || Buffer
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, AppState, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
@@ -12,19 +11,16 @@ import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
-import { theme, colors } from "./theme";
-import { migrateData, getCorruptionStatus, getRawFolders, getRawEntries, overwriteFolders, overwriteEntries, cleanupDecryptedAudio, importFromICloudRestore } from "./services/journalStorage";
-import { initEncryption, clearCachedKey } from "./services/cryptoService";
-import { releaseContext } from "./services/whisperService";
 import * as ScreenCapture from "expo-screen-capture";
-import { syncWidgetData, getPendingAction } from "./services/widgetDataService";
-import { runAutoMove } from "./services/autoMoveService";
+import { theme, colors } from "./theme";
 import { onAuthStateChange } from "./services/authService";
-import { initPurchases, loginUser } from "./services/subscriptionService";
-import { pullAndMerge, isSyncEnabled, checkICloudDataExists, restoreFromICloud, enableSync } from "./services/icloudSyncService";
-import { setupSslPinning } from "./services/sslPinningService";
-import { initRuntimeProtection } from "./services/runtimeProtectionService";
-import { isBiometricLockEnabled, authenticateWithBiometrics } from "./services/biometricService";
+import { loginUser } from "./services/subscriptionService";
+import { t } from "./src/i18n";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { useAppInit } from "./src/hooks/useAppInit";
+import { useBiometricLock } from "./src/hooks/useBiometricLock";
+import { linking } from "./src/navigation/linking";
+import { stackScreenOptions } from "./src/navigation/options";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
@@ -32,14 +28,12 @@ import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
 
-const SENTRY_DSN = "YOUR_SENTRY_DSN"
-const sentryEnabled = SENTRY_DSN && !SENTRY_DSN.startsWith("YOUR_")
-if (sentryEnabled) {
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN
+if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
     tracesSampleRate: 0.2,
     beforeSend(event) {
-      // Strip file paths from exception values and messages
       const scrub = (str) => str?.replace(/\/Users\/[^\s:]+/g, "[path]")
         .replace(/\/var\/mobile\/[^\s:]+/g, "[path]")
         .replace(/\/data\/data\/[^\s:]+/g, "[path]")
@@ -51,7 +45,6 @@ if (sentryEnabled) {
         }
       }
 
-      // Remove breadcrumb data that could contain sensitive info
       if (event.breadcrumbs) {
         for (const bc of event.breadcrumbs) {
           if (bc.data?.url) bc.data.url = bc.data.url.replace(/key=[^&]+/, "key=[REDACTED]")
@@ -68,94 +61,9 @@ SplashScreen.preventAutoHideAsync();
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef();
 
-const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
-
-const linking = {
-  prefixes: ["com.diktafon.app://", "diktafon://"],
-  config: {
-    screens: {
-      DailyLog: { path: "dailylog" },
-    },
-  },
-  getStateFromPath(path, config) {
-    const { getStateFromPath: defaultGetState } = require("@react-navigation/native");
-    const normalized = path.replace(/^\/+/, "");
-    if (normalized === "record") {
-      return {
-        routes: [{ name: "DailyLog", params: { action: "record" } }],
-      };
-    }
-    const state = defaultGetState(path, config);
-    if (!state?.routes?.length) return undefined;
-    const allValid = state.routes.every((r) => VALID_DEEP_LINK_SCREENS.has(r.name));
-    return allValid ? state : undefined;
-  },
-};
-
-const stackScreenOptions = {
-  animation: "slide_from_right",
-  headerShadowVisible: false,
-  headerStyle: { backgroundColor: colors.surface },
-  headerTintColor: colors.foreground,
-  headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontWeight: "600" },
-  contentStyle: { backgroundColor: colors.background },
-};
-
-class ErrorBoundary extends React.Component {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    Sentry.captureException(error, { extra: errorInfo });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>Nesto nije u redu</Text>
-          <TouchableOpacity
-            style={errorStyles.button}
-            onPress={() => this.setState({ hasError: false })}
-          >
-            <Text style={errorStyles.buttonText}>Ponovo pokreni</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-const loadingStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  flex1: { flex: 1 },
-});
-
-const errorStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  title: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: colors.foreground, marginBottom: 16 },
-  button: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  buttonText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
-});
-
 function App() {
-  const [ready, setReady] = useState(false);
-  const [initialRoute, setInitialRoute] = useState("Home");
-  const [locked, setLocked] = useState(false);
-
-  const checkPendingControlAction = useCallback(async () => {
-    try {
-      const action = await getPendingAction()
-      if (action === "record" && navigationRef.current) {
-        navigationRef.current.navigate("DailyLog", { action: "record" })
-      }
-    } catch {}
-  }, [])
-
+  const { ready, initialRoute } = useAppInit();
+  const { locked, unlock, checkPendingControlAction } = useBiometricLock(navigationRef);
   const [fontTimeout, setFontTimeout] = useState(false);
 
   const [fontsLoaded] = useFonts({
@@ -178,135 +86,11 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    async function init() {
-      try {
-        cleanupDecryptedAudio(); // Clear leftover decrypted audio from crash/force-kill
-        await setupSslPinning().catch(() => {});
-        await initEncryption();
-        await migrateData();
-
-        const hasSeenAuth = await AsyncStorage.getItem("hasSeenAuth");
-        if (!hasSeenAuth) {
-          setInitialRoute("Auth");
-        }
-
-        try {
-          await initPurchases("ios");
-        } catch (e) {
-          if (__DEV__) console.warn("RevenueCat init failed:", e.message);
-        }
-
-        try {
-          await initRuntimeProtection();
-        } catch (e) {
-          if (__DEV__) console.warn("freeRASP init failed:", e.message);
-        }
-      } catch (e) {
-        Sentry.captureException(e);
-        if (__DEV__) console.warn("App init failed:", e.message);
-        Alert.alert(
-          "Greska pri pokretanju",
-          "Aplikacija se pokrenula sa mogucim greskama u podacima. Preporucujemo vracanje iz rezervne kopije.",
-          [{ text: "U redu" }]
-        );
-      }
-
-      const corrupted = getCorruptionStatus();
-      if (corrupted) {
-        Alert.alert(
-          "Upozorenje",
-          "Podaci su mozda osteceni. Preporucujemo vracanje iz rezervne kopije.",
-          [{ text: "U redu" }]
-        );
-      }
-
-      // iCloud sync BEFORE setReady — prevents races with user operations
-      try {
-        const syncEnabled = await isSyncEnabled();
-        if (syncEnabled) {
-          const localFolders = await getRawFolders();
-          const localEntries = await getRawEntries();
-          const result = await pullAndMerge(localFolders, localEntries);
-          if (result.changed) {
-            await overwriteFolders(result.folders);
-            await overwriteEntries(result.entries);
-          }
-        }
-      } catch (e) {
-        if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
-      }
-
-      // Fresh install restore: detect empty local + iCloud data exists
-      try {
-        const localFolders = await getRawFolders();
-        const localEntries = await getRawEntries();
-        if (localFolders.length === 0 && localEntries.length === 0) {
-          const hasICloudData = await checkICloudDataExists();
-          if (hasICloudData) {
-            await new Promise((resolve) => {
-              Alert.alert(
-                "iCloud podaci",
-                "Pronadjeni su podaci na iCloud-u. Zelite li da ih vratite?",
-                [
-                  { text: "Ne", onPress: resolve },
-                  {
-                    text: "Vrati podatke",
-                    onPress: async () => {
-                      try {
-                        const data = await restoreFromICloud();
-                        await importFromICloudRestore(data);
-                        await enableSync();
-                      } catch (e) {
-                        if (__DEV__) console.warn("iCloud restore failed:", e.message);
-                      }
-                      resolve();
-                    },
-                  },
-                ]
-              );
-            });
-          }
-        }
-      } catch (e) {
-        if (__DEV__) console.warn("iCloud restore check failed:", e.message);
-      }
-
-      setReady(true);
-      syncWidgetData().catch(() => {});
-      runAutoMove().catch(() => {});
-    }
-    init();
-  }, []);
-
   // Enable app-switcher blur protection (iOS)
   useEffect(() => {
     ScreenCapture.enableAppSwitcherProtectionAsync().catch(() => {});
     return () => { ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {}); };
   }, []);
-
-  // Release whisper context when app goes to background, biometric check on foreground
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", async (state) => {
-      if (state === "background") {
-        releaseContext();
-        clearCachedKey();
-        cleanupDecryptedAudio();
-        // Mark as locked so biometric check runs on next foreground
-        const bioEnabled = await isBiometricLockEnabled();
-        if (bioEnabled) setLocked(true);
-      } else if (state === "active") {
-        runAutoMove();
-        if (locked) {
-          const success = await authenticateWithBiometrics();
-          if (success) setLocked(false);
-        } else {
-          checkPendingControlAction();
-        }
-      }
-    });
-    return () => subscription.remove();
-  }, [locked, checkPendingControlAction]);
 
   // Auth state listener — link RevenueCat on sign-in
   useEffect(() => {
@@ -327,7 +111,7 @@ function App() {
   if ((!fontsLoaded && !fontTimeout) || !ready) {
     return (
       <PaperProvider theme={theme}>
-        <View style={loadingStyles.container}>
+        <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </PaperProvider>
@@ -337,16 +121,10 @@ function App() {
   if (locked) {
     return (
       <PaperProvider theme={theme}>
-        <View style={loadingStyles.container} onLayout={onLayoutRootView}>
-          <Text style={errorStyles.title}>Diktafon je zakljucan</Text>
-          <TouchableOpacity
-            style={errorStyles.button}
-            onPress={async () => {
-              const success = await authenticateWithBiometrics();
-              if (success) setLocked(false);
-            }}
-          >
-            <Text style={errorStyles.buttonText}>Otkljucaj</Text>
+        <View style={styles.loading} onLayout={onLayoutRootView}>
+          <Text style={styles.lockTitle}>{t('app.lockTitle')}</Text>
+          <TouchableOpacity style={styles.lockButton} onPress={unlock}>
+            <Text style={styles.lockButtonText}>{t('app.unlock')}</Text>
           </TouchableOpacity>
         </View>
       </PaperProvider>
@@ -356,40 +134,16 @@ function App() {
   return (
     <PaperProvider theme={theme}>
       <ErrorBoundary>
-        <View style={loadingStyles.flex1} onLayout={onLayoutRootView}>
+        <View style={styles.flex1} onLayout={onLayoutRootView}>
           <NavigationContainer linking={linking} ref={navigationRef} onReady={checkPendingControlAction}>
             <StatusBar style="dark" />
             <Stack.Navigator initialRouteName={initialRoute} screenOptions={stackScreenOptions}>
-              <Stack.Screen
-                name="Home"
-                component={DirectoryHomeScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Directory"
-                component={DirectoryScreen}
-                options={({ route }) => ({ title: route.params?.name || "Direktorijum" })}
-              />
-              <Stack.Screen
-                name="Entry"
-                component={EntryScreen}
-                options={{ title: "Zapis" }}
-              />
-              <Stack.Screen
-                name="DailyLog"
-                component={DailyLogScreen}
-                options={{ title: "Brzi Zapis" }}
-              />
-              <Stack.Screen
-                name="Settings"
-                component={SettingsScreen}
-                options={{ title: "Podesavanja" }}
-              />
-              <Stack.Screen
-                name="Auth"
-                component={AuthScreen}
-                options={{ title: "Prijava" }}
-              />
+              <Stack.Screen name="Home" component={DirectoryHomeScreen} options={{ headerShown: false }} />
+              <Stack.Screen name="Directory" component={DirectoryScreen} options={({ route }) => ({ title: route.params?.name || t('nav.directory') })} />
+              <Stack.Screen name="Entry" component={EntryScreen} options={{ title: t('nav.entry') }} />
+              <Stack.Screen name="DailyLog" component={DailyLogScreen} options={{ title: t('nav.dailyLog') }} />
+              <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('nav.settings') }} />
+              <Stack.Screen name="Auth" component={AuthScreen} options={{ title: t('nav.auth') }} />
             </Stack.Navigator>
           </NavigationContainer>
         </View>
@@ -398,4 +152,12 @@ function App() {
   );
 }
 
-export default sentryEnabled ? Sentry.wrap(App) : App;
+const styles = StyleSheet.create({
+  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  flex1: { flex: 1 },
+  lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: colors.foreground, marginBottom: 16 },
+  lockButton: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  lockButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
+});
+
+export default SENTRY_DSN ? Sentry.wrap(App) : App;

@@ -9,6 +9,30 @@ export default {
     add: "Add",
     create: "Create",
     edit: "Edit",
+    ok: "OK",
+    no: "No",
+  },
+
+  app: {
+    errorTitle: "Something went wrong",
+    retry: "Try again",
+    initErrorTitle: "Startup error",
+    initErrorMessage: "The app started with possible data errors. We recommend restoring from a backup.",
+    corruptionTitle: "Warning",
+    corruptionMessage: "Data may be corrupted. We recommend restoring from a backup.",
+    icloudRestoreTitle: "iCloud data",
+    icloudRestoreMessage: "Data was found on iCloud. Would you like to restore it?",
+    icloudRestoreButton: "Restore data",
+    lockTitle: "Diktafon is locked",
+    unlock: "Unlock",
+  },
+
+  nav: {
+    directory: "Directory",
+    entry: "Entry",
+    dailyLog: "Quick Record",
+    settings: "Settings",
+    auth: "Sign in",
   },
 
   errors: {

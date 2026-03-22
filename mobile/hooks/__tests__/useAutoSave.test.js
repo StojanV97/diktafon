@@ -69,15 +69,20 @@ describe("useAutoSave", () => {
     expect(saveFn).toHaveBeenCalledTimes(1)
   })
 
-  test("cleanup on unmount clears pending timer", () => {
+  test("saves pending text on unmount and clears timer", () => {
     const saveFn = jest.fn()
     const { result, unmount } = renderHook(() => useAutoSave(saveFn, 500))
 
     act(() => result.current.init("original"))
     act(() => result.current.handleTextChange("pending"))
     unmount()
-    act(() => jest.advanceTimersByTime(500))
 
-    expect(saveFn).not.toHaveBeenCalled()
+    // Should save pending text on unmount
+    expect(saveFn).toHaveBeenCalledWith("pending")
+    expect(saveFn).toHaveBeenCalledTimes(1)
+
+    // Timer should be cleared — no duplicate call after delay
+    act(() => jest.advanceTimersByTime(500))
+    expect(saveFn).toHaveBeenCalledTimes(1)
   })
 })

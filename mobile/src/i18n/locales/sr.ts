@@ -9,6 +9,30 @@ export default {
     add: "Dodaj",
     create: "Kreiraj",
     edit: "Izmeni",
+    ok: "U redu",
+    no: "Ne",
+  },
+
+  app: {
+    errorTitle: "Nesto nije u redu",
+    retry: "Ponovo pokreni",
+    initErrorTitle: "Greska pri pokretanju",
+    initErrorMessage: "Aplikacija se pokrenula sa mogucim greskama u podacima. Preporucujemo vracanje iz rezervne kopije.",
+    corruptionTitle: "Upozorenje",
+    corruptionMessage: "Podaci su mozda osteceni. Preporucujemo vracanje iz rezervne kopije.",
+    icloudRestoreTitle: "iCloud podaci",
+    icloudRestoreMessage: "Pronadjeni su podaci na iCloud-u. Zelite li da ih vratite?",
+    icloudRestoreButton: "Vrati podatke",
+    lockTitle: "Diktafon je zakljucan",
+    unlock: "Otkljucaj",
+  },
+
+  nav: {
+    directory: "Direktorijum",
+    entry: "Zapis",
+    dailyLog: "Brzi Zapis",
+    settings: "Podesavanja",
+    auth: "Prijava",
   },
 
   errors: {
