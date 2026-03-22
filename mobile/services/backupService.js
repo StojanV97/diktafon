@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import crypto from "react-native-quick-crypto";
 import { exportAllData, importAllData } from "./journalStorage";
 import { encryptBlob, decryptBlob } from "./cryptoService";
+import { t } from "../src/i18n";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -45,22 +46,22 @@ export async function restoreFromBackup(fileUri, password) {
   let zipData;
 
   if (password) {
-    const encryptedData = sourceFile.bytes();
+    const encryptedData = sourceFile.bytesSync();
     try {
       const decrypted = decryptBlob(encryptedData, password);
       zipData = decrypted;
     } catch (e) {
-      if (e.message === "Pogresna lozinka") throw e;
-      throw new Error("Pogresna lozinka ili ostecen backup fajl");
+      if (e.message === "Pogresna lozinka") throw new Error(t("settings.backup.wrongPassword"));
+      throw new Error(t("settings.backup.wrongPasswordOrCorrupted"));
     }
   } else {
-    zipData = sourceFile.bytes();
+    zipData = sourceFile.bytesSync();
   }
 
   const zip = await JSZip.loadAsync(zipData);
 
   if (!zip.file("folders.json") || !zip.file("entries.json")) {
-    throw new Error("Nevazeci backup fajl — nedostaje folders.json ili entries.json");
+    throw new Error(t("settings.backup.invalidBackup"));
   }
 
   const foldersJSON = await zip.file("folders.json").async("string");
@@ -70,7 +71,7 @@ export async function restoreFromBackup(fileUri, password) {
     folders = JSON.parse(foldersJSON);
     entries = JSON.parse(entriesJSON);
   } catch {
-    throw new Error("Backup fajl je ostecen — podaci nisu citljivi.");
+    throw new Error(t("settings.backup.corruptedData"));
   }
 
   const audioFiles = [];

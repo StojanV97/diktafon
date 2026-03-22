@@ -261,6 +261,10 @@ export default {
       restored: "Oporavak zavrsen: %{folders} fascikli, %{entries} unosa, %{audioFiles} snimaka, %{textFiles} transkripata.",
       restoreWarning: "Upozorenje: %{skippedFiles} fajlova nije moglo biti ucitano.",
       restoreFailed: "Oporavak nije uspeo.",
+      wrongPassword: "Pogresna lozinka",
+      wrongPasswordOrCorrupted: "Pogresna lozinka ili ostecen backup fajl",
+      invalidBackup: "Nevazeci backup fajl — nedostaje folders.json ili entries.json",
+      corruptedData: "Backup fajl je ostecen — podaci nisu citljivi.",
     },
     icloud: {
       title: "iCloud sinhronizacija",

@@ -261,6 +261,10 @@ export default {
       restored: "Restore complete: %{folders} folders, %{entries} entries, %{audioFiles} recordings, %{textFiles} transcripts.",
       restoreWarning: "Warning: %{skippedFiles} files could not be loaded.",
       restoreFailed: "Restore failed.",
+      wrongPassword: "Wrong password",
+      wrongPasswordOrCorrupted: "Wrong password or corrupted backup file",
+      invalidBackup: "Invalid backup file — missing folders.json or entries.json",
+      corruptedData: "Backup file is corrupted — data is unreadable.",
     },
     icloud: {
       title: "iCloud sync",
