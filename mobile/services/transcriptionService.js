@@ -118,7 +118,7 @@ export async function pollProcessingEntries(entries) {
           Sentry.captureException(err, {
             extra: { entryId: e.id, assemblyaiId: e.assemblyai_id, consecutive: state.consecutive, total: state.total },
           })
-          const updated = await failEntry(e.id, "Transkripcija nije uspela. Pokusajte ponovo.")
+          const updated = await failEntry(e.id)
           if (updated) changed.push({ entryId: e.id, entry: updated })
           delete _pollState[e.id]
         }

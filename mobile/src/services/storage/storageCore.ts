@@ -63,7 +63,7 @@ export async function readJSON(file: InstanceType<typeof File>): Promise<any[]> 
       const key = await getEncryptionKey();
       if (key) {
         try {
-          const bytes = file.bytes();
+          const bytes = file.bytesSync();
           const decrypted = decryptText(bytes, key);
           result = JSON.parse(decrypted);
         } catch {
@@ -82,7 +82,7 @@ export async function readJSON(file: InstanceType<typeof File>): Promise<any[]> 
         const key = await getEncryptionKey();
         if (key) {
           try {
-            const bytes = bakFile.bytes();
+            const bytes = bakFile.bytesSync();
             const decrypted = decryptText(bytes, key);
             result = JSON.parse(decrypted);
           } catch {

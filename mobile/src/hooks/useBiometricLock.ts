@@ -36,7 +36,7 @@ export function useBiometricLock(navigationRef: any) {
         const bioEnabled = await isBiometricLockEnabled();
         if (bioEnabled) setLocked(true);
       } else if (state === "active") {
-        runAutoMove();
+        runAutoMove().catch(() => {});
         if (locked) {
           const success = await authenticateWithBiometrics();
           if (success) setLocked(false);

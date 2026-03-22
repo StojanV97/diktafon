@@ -41,6 +41,9 @@ export default {
     deleteFailed: "Deletion failed.",
     timeout: "Request timed out. Check your internet connection.",
     network: "Network error. Check your internet connection.",
+    modelDownloadFailed: "Model download failed: %{error}",
+    premiumRequired: "Premium subscription is required for AssemblyAI transcription.",
+    unknown: "Unknown error",
   },
 
   recording: {
@@ -197,6 +200,12 @@ export default {
   },
 
   settings: {
+    encryption: {
+      title: "Data encryption",
+      active: "Data is encrypted",
+      keySync: "Key is automatically synced via iCloud Keychain",
+      pending: "Encryption will be activated on the next transcription.",
+    },
     account: {
       title: "Account",
       signedInAs: "Signed in as:",
@@ -302,6 +311,7 @@ export default {
     networkError: "Network error. Check your internet connection.",
     invalidUploadResponse: "Invalid server response during upload. Please try again.",
     noUploadUrl: "Server did not return an upload URL. Please try again.",
+    uploadFailed: "Recording upload failed. Please try again.",
     submitError: "Error submitting to AssemblyAI. Please try again.",
     noTranscriptId: "Server did not return a transcript ID. Please try again.",
     invalidStatusResponse: "Invalid server response while checking status.",

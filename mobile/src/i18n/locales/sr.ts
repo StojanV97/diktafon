@@ -41,6 +41,9 @@ export default {
     deleteFailed: "Brisanje nije uspelo.",
     timeout: "Prekoraceno vreme. Proverite internet vezu.",
     network: "Greska u mrezi. Proverite internet vezu.",
+    modelDownloadFailed: "Preuzimanje modela nije uspelo: %{error}",
+    premiumRequired: "Potrebna je Premium pretplata za AssemblyAI transkripciju.",
+    unknown: "Nepoznata greska",
   },
 
   recording: {
@@ -197,6 +200,12 @@ export default {
   },
 
   settings: {
+    encryption: {
+      title: "Sifrovanje podataka",
+      active: "Podaci su sifrovani",
+      keySync: "Kljuc se automatski sinhronizuje preko iCloud Keychain-a",
+      pending: "Sifrovanje ce biti aktivirano pri sledecoj transkripciji.",
+    },
     account: {
       title: "Nalog",
       signedInAs: "Prijavljen kao:",
@@ -302,6 +311,7 @@ export default {
     networkError: "Greska u mrezi. Proverite internet vezu.",
     invalidUploadResponse: "Neispravan odgovor od servera pri uploadu. Pokusajte ponovo.",
     noUploadUrl: "Server nije vratio URL za upload. Pokusajte ponovo.",
+    uploadFailed: "Upload snimka nije uspeo. Pokusajte ponovo.",
     submitError: "Greska pri slanju na AssemblyAI. Pokusajte ponovo.",
     noTranscriptId: "Server nije vratio ID transkripcije. Pokusajte ponovo.",
     invalidStatusResponse: "Neispravan odgovor od servera pri proveri statusa.",

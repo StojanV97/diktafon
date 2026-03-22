@@ -226,7 +226,7 @@ export function failEntry(entryId: string, error?: string) {
     const entry = entries.find((e: any) => e.id === entryId);
     if (!entry) return null;
     entry.status = "error";
-    entry.text = "Transkribovanje nije uspelo";
+    entry.text = "";
     entry.updated_at = new Date().toISOString();
     delete entry.assemblyai_id;
     await writeJSON(entriesFile, entries);

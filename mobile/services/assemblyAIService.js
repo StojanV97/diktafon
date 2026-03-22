@@ -171,7 +171,7 @@ export async function submit(fileUri, options = {}) {
 
   if (uploadError) {
     if (__DEV__) console.warn("Supabase upload error:", uploadError.message)
-    throw new Error("Upload snimka nije uspeo. Pokusajte ponovo.")
+    throw new Error(t("assemblyAI.uploadFailed"))
   }
 
   // Call edge function to submit to AssemblyAI

@@ -165,6 +165,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
 
   // --- Menu ---
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
+  const closeMenu = useCallback(() => setMenuVisible(null), []);
 
   // --- Delete (single) ---
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
@@ -436,15 +437,15 @@ export default function DailyLogScreen({ navigation, route }: any) {
   const renderItem = useCallback(({ item }: any) => (
     <DailyLogEntryCard
       item={item}
-      menuVisible={menuVisible}
+      isMenuOpen={menuVisible === item.id}
       onMenuOpen={setMenuVisible}
-      onMenuClose={() => setMenuVisible(null)}
+      onMenuClose={closeMenu}
       onPress={onEntryPress}
       onTranscribe={openSingleEngineDialog}
       onMove={onMovePress}
       onDelete={onDeletePress}
     />
-  ), [menuVisible, onEntryPress, openSingleEngineDialog, onMovePress, onDeletePress]);
+  ), [menuVisible, closeMenu, onEntryPress, openSingleEngineDialog, onMovePress, onDeletePress]);
 
   // --- Loading state ---
   if (loading) {

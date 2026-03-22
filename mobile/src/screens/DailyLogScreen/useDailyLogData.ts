@@ -53,6 +53,15 @@ export function useDailyLogData(setSnackbar: (msg: string) => void) {
     return () => { ignore = true; };
   }, [grouped, setSnackbar]);
 
+  const consolidateAndReload = useCallback(async (dates: string[]) => {
+    for (const date of dates) {
+      await consolidateDailyLogEntries(date);
+    }
+    const data = await fetchDailyLogEntries();
+    if (mountedRef.current) setEntries(data);
+    syncWidgetData().catch(() => {});
+  }, [setEntries]);
+
   // After AssemblyAI polling resolves all batch entries, consolidate
   useEffect(() => {
     if (batchEntryIds.size === 0) return;
@@ -69,16 +78,7 @@ export function useDailyLogData(setSnackbar: (msg: string) => void) {
     )];
     setBatchEntryIds(new Set());
     if (dates.length > 0) consolidateAndReload(dates);
-  }, [entries, batchEntryIds]);
-
-  const consolidateAndReload = async (dates: string[]) => {
-    for (const date of dates) {
-      await consolidateDailyLogEntries(date);
-    }
-    const data = await fetchDailyLogEntries();
-    if (mountedRef.current) setEntries(data);
-    syncWidgetData().catch(() => {});
-  };
+  }, [entries, batchEntryIds, consolidateAndReload]);
 
   // Re-fetch entries when app comes to foreground
   useEffect(() => {

@@ -14,7 +14,7 @@ import { t } from "../../i18n";
 
 interface Props {
   item: any;
-  menuVisible: string | null;
+  isMenuOpen: boolean;
   onMenuOpen: (id: string) => void;
   onMenuClose: () => void;
   onPress: (id: string) => void;
@@ -25,7 +25,7 @@ interface Props {
 
 function DailyLogEntryCard({
   item,
-  menuVisible,
+  isMenuOpen,
   onMenuOpen,
   onMenuClose,
   onPress,
@@ -106,7 +106,7 @@ function DailyLogEntryCard({
         </View>
 
         <Menu
-          visible={menuVisible === item.id}
+          visible={isMenuOpen}
           onDismiss={onMenuClose}
           anchor={
             <IconButton

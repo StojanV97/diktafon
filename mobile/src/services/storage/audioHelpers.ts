@@ -11,7 +11,7 @@ const tempAudioDir = new Directory(Paths.cache, "decrypted_audio");
 export async function encryptAudioFile(audioFile: InstanceType<typeof File>): Promise<void> {
   const key = await getEncryptionKey();
   if (!key) return;
-  const rawBytes = audioFile.bytes();
+  const rawBytes = audioFile.bytesSync();
   const encrypted = encryptBytes(rawBytes, key);
   audioFile.write(encrypted);
 }
@@ -24,7 +24,7 @@ export async function getDecryptedAudioUri(entryId: string): Promise<string | nu
   if (!key) return audioFile.uri;
 
   try {
-    const encBytes = audioFile.bytes();
+    const encBytes = audioFile.bytesSync();
     const decrypted = decryptBytes(encBytes, key);
     tempAudioDir.create({ idempotent: true });
     const tempFile = new File(tempAudioDir, `${entryId}.wav`);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AppState } from "react-native"
 import * as whisperService from "../services/whisperService"
+import { t } from "../src/i18n"
 import {
   preflight,
   transcribeSingle,
@@ -57,15 +58,15 @@ export function useTranscription({ entries, setEntries, onComplete }) {
         return { ready: true }
       } catch (e) {
         setModelDownloadVisible(false)
-        return { ready: false, message: "Preuzimanje modela nije uspelo: " + e.message }
+        return { ready: false, message: t("errors.modelDownloadFailed", { error: e.message }) }
       }
     }
 
     if (check.reason === "PREMIUM_REQUIRED") {
-      return { ready: false, reason: "PREMIUM_REQUIRED", message: "Potrebna je Premium pretplata za AssemblyAI transkripciju." }
+      return { ready: false, reason: "PREMIUM_REQUIRED", message: t("errors.premiumRequired") }
     }
 
-    return { ready: false, message: "Nepoznata greska" }
+    return { ready: false, message: t("errors.unknown") }
   }
 
   const startTranscription = async (entryId, engine) => {
