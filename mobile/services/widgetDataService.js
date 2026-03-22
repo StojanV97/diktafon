@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { requireNativeModule } from "expo-modules-core";
+import * as Sentry from "@sentry/react-native";
 import { fetchDailyLogStats } from "./journalStorage";
 
 let WidgetModule;
@@ -32,6 +33,6 @@ export async function syncWidgetData() {
     });
     WidgetModule.setWidgetData(data);
   } catch (e) {
-    if (__DEV__) console.warn("Widget data sync failed:", e);
+    Sentry.captureException(e, { extra: { context: "syncWidgetData" } });
   }
 }

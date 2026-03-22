@@ -4,9 +4,8 @@ import * as Sentry from "@sentry/react-native"
 import { createClient } from "@supabase/supabase-js"
 import { getEncryptionKey, encryptText, decryptText } from "./cryptoService"
 
-// TODO: Replace with your Supabase project URL and anon key
-const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY"
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://YOUR_PROJECT.supabase.co"
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "YOUR_ANON_KEY"
 
 // SecureStore has a ~2KB limit on iOS. Supabase tokens typically fit,
 // but if a value is too large we fall back to encrypted AsyncStorage.

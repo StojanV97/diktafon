@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import { fetchDailyLogEntries, getFolder, moveEntryToFolder, deleteEntryAudio } from "./journalStorage";
 import { getSettings, updateSettings } from "./settingsService";
 import { syncWidgetData } from "./widgetDataService";
@@ -24,9 +25,9 @@ export async function runAutoMove() {
       await moveEntryToFolder(entry.id, settings.autoMoveFolderId);
       if (!settings.autoMoveKeepAudio) {
         try {
-          deleteEntryAudio(entry.id);
+          await deleteEntryAudio(entry.id);
         } catch (e) {
-          if (__DEV__) console.warn("Auto-move: audio delete failed for", entry.id, e.message);
+          Sentry.captureException(e, { extra: { entryId: entry.id, context: "autoMoveDeleteAudio" } });
         }
       }
     }
@@ -34,7 +35,7 @@ export async function runAutoMove() {
     syncWidgetData();
     return { moved: toMove.length, folderName: folder.name };
   } catch (e) {
-    if (__DEV__) console.warn("Auto-move failed:", e.message);
+    Sentry.captureException(e, { extra: { context: "runAutoMove" } });
     return null;
   }
 }

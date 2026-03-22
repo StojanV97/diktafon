@@ -29,6 +29,10 @@ export default function useAutoSave(saveFn, delay = 1500) {
     }
   }, [saveFn])
 
+  // Ref so the unmount effect always calls the latest doSave without re-running
+  const doSaveRef = useRef(doSave)
+  doSaveRef.current = doSave
+
   const handleTextChange = useCallback((newText) => {
     setEditableText(newText)
     editableTextRef.current = newText
@@ -49,12 +53,13 @@ export default function useAutoSave(saveFn, delay = 1500) {
     lastSavedRef.current = text
   }, [])
 
+  // Only run on actual unmount — uses ref to avoid re-triggering when doSave changes
   useEffect(() => {
     return () => {
       clearTimer()
-      doSave(editableTextRef.current)
+      doSaveRef.current(editableTextRef.current)
     }
-  }, [clearTimer, doSave])
+  }, [])
 
   return { editableText, handleTextChange, flush, init }
 }

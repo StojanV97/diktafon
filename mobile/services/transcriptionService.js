@@ -103,8 +103,11 @@ export async function pollProcessingEntries(entries) {
           const updated = await failEntry(e.id, result.error)
           if (updated) changed.push({ entryId: e.id, entry: updated })
         } else {
-          // "processing" — reset consecutive failures (server responded OK) but keep total
-          if (_pollState[e.id]) _pollState[e.id].consecutive = 0
+          // "processing" — reset consecutive failures and backoff (server responded OK)
+          if (_pollState[e.id]) {
+            _pollState[e.id].consecutive = 0
+            _pollState[e.id].skipped = 0
+          }
         }
       } catch (err) {
         state.consecutive++
