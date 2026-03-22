@@ -56,6 +56,7 @@ module.exports = {
       // expo-dev-client only in dev builds — excluded from production
       ...(IS_DEV ? ["expo-dev-client"] : []),
       "expo-secure-store",
+      "./plugins/withDisableBackup",
       "expo-apple-authentication",
       "./plugins/withICloud",
       [
@@ -76,6 +77,11 @@ module.exports = {
         },
       ],
     ],
+    extra: {
+      FREERASP_APPLE_TEAM_ID: process.env.FREERASP_APPLE_TEAM_ID || "",
+      FREERASP_ANDROID_CERT_HASH: process.env.FREERASP_ANDROID_CERT_HASH || "",
+      FREERASP_WATCHER_MAIL: process.env.FREERASP_WATCHER_MAIL || "",
+    },
     experiments: {
       reactCompiler: true,
     },

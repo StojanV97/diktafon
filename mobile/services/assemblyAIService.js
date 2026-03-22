@@ -1,4 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy"
+import crypto from "react-native-quick-crypto"
+import { encryptBytes } from "./cryptoService"
 import { supabase } from "./supabaseClient"
 import { t } from "../src/i18n"
 
@@ -156,16 +158,22 @@ export async function submit(fileUri, options = {}) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error("AUTH_REQUIRED")
 
-  // Upload audio to Supabase Storage (temp bucket)
-  const filename = `transcribe/${session.user.id}/${Date.now()}.wav`
+  // Generate a random per-file key and encrypt audio before upload
+  const fileKey = crypto.randomBytes(32)
+  const fileKeyBase64 = Buffer.from(fileKey).toString("base64")
+
   const fileContent = await FileSystem.readAsStringAsync(fileUri, {
     encoding: FileSystem.EncodingType.Base64,
   })
+  const rawBytes = decode(fileContent)
+  const encryptedBytes = encryptBytes(rawBytes, fileKey)
 
+  // Upload encrypted audio to Supabase Storage
+  const filename = `transcribe/${session.user.id}/${Date.now()}.enc`
   const { error: uploadError } = await supabase.storage
     .from("audio-uploads")
-    .upload(filename, decode(fileContent), {
-      contentType: "audio/wav",
+    .upload(filename, encryptedBytes, {
+      contentType: "application/octet-stream",
       upsert: true,
     })
 
@@ -174,11 +182,12 @@ export async function submit(fileUri, options = {}) {
     throw new Error(t("assemblyAI.uploadFailed"))
   }
 
-  // Call edge function to submit to AssemblyAI
+  // Call edge function with per-file decryption key (HTTPS protects it in transit)
   const { data, error } = await supabase.functions.invoke("transcribe/submit", {
     body: {
       storage_path: filename,
       speaker_labels: options.speakerLabels ?? true,
+      file_key: fileKeyBase64,
     },
   })
 

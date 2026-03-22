@@ -34,6 +34,7 @@ export {
   // audioHelpers
   getDecryptedAudioUri,
   cleanupDecryptedAudio,
+  cleanupDecryptedFile,
   entryAudioUri,
   entryAudioExists,
   deleteEntryAudio,

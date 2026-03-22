@@ -81,27 +81,89 @@ serve(async (req) => {
   }
 })
 
+// AES-256-GCM decryption using Web Crypto API
+// Format: [12-byte IV][ciphertext][16-byte auth tag]
+async function decryptAES256GCM(encrypted: Uint8Array, keyBytes: Uint8Array): Promise<Uint8Array> {
+  const IV_LENGTH = 12
+  const TAG_LENGTH = 16
+  const iv = encrypted.slice(0, IV_LENGTH)
+  const ciphertext = encrypted.slice(IV_LENGTH, encrypted.length - TAG_LENGTH)
+  const tag = encrypted.slice(encrypted.length - TAG_LENGTH)
+  // Web Crypto expects auth tag appended to ciphertext
+  const combined = new Uint8Array(ciphertext.length + tag.length)
+  combined.set(ciphertext)
+  combined.set(tag, ciphertext.length)
+  const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"])
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, cryptoKey, combined)
+  return new Uint8Array(decrypted)
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
 async function handleSubmit(
   req: Request,
   supabase: any,
   userId: string,
   headers: Record<string, string>,
 ) {
-  const { storage_path, speaker_labels } = await req.json()
+  const { storage_path, speaker_labels, file_key } = await req.json()
 
-  // Generate signed URL for the uploaded audio
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  // Validate storage path belongs to the requesting user
+  const expectedPrefix = `transcribe/${userId}/`
+  if (typeof storage_path !== "string" || !storage_path.startsWith(expectedPrefix) || storage_path.includes("..")) {
+    return new Response(JSON.stringify({ error: "Invalid storage path" }), {
+      status: 403,
+      headers: { ...headers, "Content-Type": "application/json" },
+    })
+  }
+
+  // Download audio from storage
+  const { data: fileData, error: downloadError } = await supabase.storage
     .from("audio-uploads")
-    .createSignedUrl(storage_path, 3600)
+    .download(storage_path)
 
-  if (signedUrlError) {
-    return new Response(JSON.stringify({ error: "Failed to get audio URL" }), {
+  if (downloadError || !fileData) {
+    return new Response(JSON.stringify({ error: "Failed to download audio" }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" },
     })
   }
 
-  // Submit to AssemblyAI
+  // Decrypt if per-file key provided, otherwise treat as plaintext (legacy)
+  const rawBytes = new Uint8Array(await fileData.arrayBuffer())
+  let audioBytes: Uint8Array
+  if (file_key) {
+    const keyBytes = base64ToBytes(file_key)
+    audioBytes = await decryptAES256GCM(rawBytes, keyBytes)
+  } else {
+    audioBytes = rawBytes
+  }
+
+  // Upload decrypted audio directly to AssemblyAI (in-memory, never persisted)
+  const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
+    method: "POST",
+    headers: {
+      authorization: ASSEMBLYAI_API_KEY,
+      "content-type": "application/octet-stream",
+    },
+    body: audioBytes,
+  })
+
+  if (!uploadRes.ok) {
+    return new Response(JSON.stringify({ error: "AssemblyAI upload failed" }), {
+      status: 502,
+      headers: { ...headers, "Content-Type": "application/json" },
+    })
+  }
+
+  const { upload_url } = await uploadRes.json()
+
+  // Submit transcription job
   const res = await fetch("https://api.assemblyai.com/v2/transcript", {
     method: "POST",
     headers: {
@@ -109,7 +171,7 @@ async function handleSubmit(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      audio_url: signedUrlData.signedUrl,
+      audio_url: upload_url,
       language_code: "sr",
       speaker_labels: speaker_labels ?? true,
     }),
@@ -125,6 +187,9 @@ async function handleSubmit(
 
   const data = await res.json()
 
+  // Delete encrypted audio from storage immediately
+  supabase.storage.from("audio-uploads").remove([storage_path]).catch(() => {})
+
   return new Response(JSON.stringify({ assemblyai_id: data.id }), {
     status: 200,
     headers: { ...headers, "Content-Type": "application/json" },
@@ -133,6 +198,14 @@ async function handleSubmit(
 
 async function handleStatus(req: Request, headers: Record<string, string>) {
   const { id } = await req.json()
+
+  // Validate transcript ID format (alphanumeric AssemblyAI IDs only)
+  if (typeof id !== "string" || !/^[a-z0-9_-]+$/i.test(id) || id.length > 64) {
+    return new Response(JSON.stringify({ error: "Invalid transcript ID" }), {
+      status: 400,
+      headers: { ...headers, "Content-Type": "application/json" },
+    })
+  }
 
   const res = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
     headers: { authorization: ASSEMBLYAI_API_KEY },

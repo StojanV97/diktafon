@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AppState,
   Keyboard,
   Pressable,
   ScrollView,
@@ -21,7 +22,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 // expo-file-system legacy API (cacheDirectory, writeAsStringAsync, EncodingType)
 const FileSystemLegacy = require("expo-file-system") as { cacheDirectory: string; writeAsStringAsync: any; EncodingType: any };
 import * as Sharing from "expo-sharing";
-import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, downloadAudioFromICloud } from "../../../services/journalStorage";
+import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, cleanupDecryptedFile, downloadAudioFromICloud } from "../../../services/journalStorage";
 import { fileExistsOnICloud } from "../../../services/icloudSyncService";
 import useAutoSave from "../../../hooks/useAutoSave";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
@@ -91,6 +92,21 @@ export default function EntryScreen({ route, navigation }: any) {
     const hideSub = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+
+  // Wipe decrypted temp audio when app leaves foreground; re-decrypt on return
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "background" || nextState === "inactive") {
+        cleanupDecryptedFile(id);
+        setDecryptedAudioUri(null);
+      } else if (nextState === "active" && record?.audio_file && !audioMissing) {
+        getDecryptedAudioUri(id).then((uri) => {
+          if (uri) setDecryptedAudioUri(uri);
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [id, record, audioMissing]);
 
   useEffect(() => {
     return navigation.addListener("beforeRemove", () => { flush(); });

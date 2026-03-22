@@ -41,6 +41,13 @@ export function cleanupDecryptedAudio(): void {
   } catch {}
 }
 
+export function cleanupDecryptedFile(entryId: string): void {
+  try {
+    const tempFile = new File(tempAudioDir, `${entryId}.wav`);
+    if (tempFile.exists) tempFile.delete();
+  } catch {}
+}
+
 export function entryAudioUri(entryId: string): string {
   const file = new File(audioDir, `${entryId}.wav`);
   return file.uri;

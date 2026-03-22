@@ -37,6 +37,7 @@ export {
 export {
   getDecryptedAudioUri,
   cleanupDecryptedAudio,
+  cleanupDecryptedFile,
   entryAudioUri,
   entryAudioExists,
   deleteEntryAudio,

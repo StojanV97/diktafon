@@ -1,6 +1,7 @@
 import { Alert } from "react-native"
 import { talsecStart, setThreatListeners } from "freerasp-react-native"
 import * as Sentry from "@sentry/react-native"
+import Constants from "expo-constants"
 import { clearCachedKey } from "./cryptoService"
 
 export async function initRuntimeProtection() {
@@ -36,16 +37,30 @@ export async function initRuntimeProtection() {
     },
   })
 
+  const {
+    FREERASP_APPLE_TEAM_ID,
+    FREERASP_ANDROID_CERT_HASH,
+    FREERASP_WATCHER_MAIL,
+  } = Constants.expoConfig?.extra ?? {}
+
+  if (!FREERASP_APPLE_TEAM_ID && !FREERASP_ANDROID_CERT_HASH) {
+    if (__DEV__) console.warn("freeRASP: config not set, skipping in dev")
+    if (!__DEV__) Sentry.captureMessage("freeRASP: missing config in production", "error")
+    return
+  }
+
   await talsecStart({
     iosConfig: {
       appBundleId: "com.diktafon.app",
-      appTeamId: "YOUR_TEAM_ID", // TODO: Replace with your Apple Team ID
+      appTeamId: FREERASP_APPLE_TEAM_ID || "",
     },
     androidConfig: {
       packageName: "com.diktafon.app",
-      certificateHashes: ["YOUR_CERT_HASH"], // TODO: Replace with your signing cert SHA-256
+      certificateHashes: FREERASP_ANDROID_CERT_HASH
+        ? [FREERASP_ANDROID_CERT_HASH]
+        : [],
     },
-    watcherMail: "security@diktafon.app", // TODO: Replace with your email
+    watcherMail: FREERASP_WATCHER_MAIL || "security@diktafon.app",
     isProd: !__DEV__,
   })
 }
