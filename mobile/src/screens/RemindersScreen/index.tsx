@@ -41,7 +41,7 @@ import type { Reminder, Recurrence, ParsedReminderResult } from "../../types/rem
 
 type PipelineState = "idle" | "recording" | "transcribing" | "parsing" | "confirming";
 
-const OFFSET_MINUTES = 10;
+const OFFSET_MINUTES = 0;
 
 export default function RemindersScreen({ navigation, route }: any) {
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();

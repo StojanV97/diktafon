@@ -12,7 +12,7 @@ export interface Reminder {
   action: string;
   raw_transcript: string;
   reminder_time: string; // ISO datetime
-  notification_time: string; // 10min before reminder_time
+  notification_time: string; // same as reminder_time
   recurrence: Recurrence | null;
   status: ReminderStatus;
   notification_id: string | null;

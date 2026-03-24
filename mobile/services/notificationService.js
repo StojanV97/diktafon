@@ -11,7 +11,7 @@ import {
 
 const REMINDER_CATEGORY = "reminder"
 const SNOOZE_MINUTES = 5
-const OFFSET_MINUTES = 10
+const OFFSET_MINUTES = 0
 
 export function initNotifications() {
   Notifications.setNotificationHandler({

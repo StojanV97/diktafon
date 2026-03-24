@@ -51,16 +51,25 @@ async function parseDirect(text, currentDatetime) {
     })
 
     if (!res.ok) {
-      if (__DEV__) console.warn("Anthropic error:", await res.text())
-      throw new Error(t("reminders.parseFailed"))
+      const body = await res.text()
+      if (__DEV__) console.error("[parseDirect] API error:", res.status, body)
+      throw new Error(`Anthropic API error: ${res.status}`)
     }
 
     const result = await res.json()
     const content = result.content?.[0]?.text
-    if (!content) throw new Error(t("reminders.parseFailed"))
+    if (!content) {
+      if (__DEV__) console.error("[parseDirect] Empty content:", JSON.stringify(result))
+      throw new Error("Empty response from LLM")
+    }
 
     const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-    return JSON.parse(cleaned)
+    try {
+      return JSON.parse(cleaned)
+    } catch (parseErr) {
+      if (__DEV__) console.error("[parseDirect] JSON parse failed:", cleaned)
+      throw new Error("Failed to parse LLM response as JSON")
+    }
   } finally {
     clearTimeout(timer)
   }
@@ -96,15 +105,20 @@ export async function parseReminder(text) {
 
   let raw
   if (DEV_ANTHROPIC_KEY) {
+    if (__DEV__) console.log("[parseReminder] using direct Anthropic API")
     raw = await parseDirect(text, currentDatetime)
   } else {
+    if (__DEV__) console.log("[parseReminder] using Supabase edge function")
     const { data, error } = await withTimeout(
       supabase.functions.invoke("parse-reminder", {
         body: { text, current_datetime: currentDatetime },
       }),
       PARSE_TIMEOUT_MS
     )
-    if (error) throw error
+    if (error) {
+      if (__DEV__) console.error("[parseReminder] Supabase error:", error)
+      throw new Error(error.message || "Supabase function failed")
+    }
     raw = data
   }
 

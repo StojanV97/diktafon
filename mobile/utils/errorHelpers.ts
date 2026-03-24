@@ -5,6 +5,8 @@ const SAFE_PATTERNS = [
   "Neispravan", "Pogresna lozinka", "ostecen", "nedostaje",
   "nije preuzet", "nije uspelo", "nije dostupno", "nije pronadjen",
   "SAFETY_BACKUP_FAILED", "AUTH_REQUIRED",
+  "Anthropic API error", "Empty response from LLM",
+  "Failed to parse LLM", "Supabase function failed",
 ]
 
 export function safeErrorMessage(e: unknown, fallback = t('errors.generic')): string {
