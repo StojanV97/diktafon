@@ -1,4 +1,5 @@
 import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sentry from "@sentry/react-native";
 import {
   foldersFile, entriesFile, audioDir, textsDir,
@@ -41,9 +42,8 @@ export function createDailyLogEntry(audioSourceUri: string, durationSeconds = 0)
     ensureDirs();
     const id = generateUUID();
 
-    const source = new File(audioSourceUri);
     const dest = new File(audioDir, `${id}.wav`);
-    source.copy(dest);
+    await FileSystem.copyAsync({ from: audioSourceUri, to: dest.uri });
 
     await encryptAudioFile(dest);
 
