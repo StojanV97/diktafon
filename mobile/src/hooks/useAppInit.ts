@@ -18,12 +18,20 @@ import { syncWidgetData } from "../../services/widgetDataService";
 import { runAutoMove } from "../../services/autoMoveService";
 import { initPurchases } from "../../services/subscriptionService";
 import {
-  pullAndMerge,
-  isSyncEnabled,
+  pullAndMerge as iCloudPullAndMerge,
+  isSyncEnabled as isICloudSyncEnabled,
   checkICloudDataExists,
   restoreFromICloud,
-  enableSync,
+  enableSync as enableICloudSync,
 } from "../../services/icloudSyncService";
+import {
+  pullAndMerge as googleDrivePullAndMerge,
+  isSyncEnabled as isGoogleDriveSyncEnabled,
+  checkGoogleDriveDataExists,
+  restoreFromGoogleDrive,
+  enableSync as enableGoogleDriveSync,
+} from "../../services/googleDriveSyncService";
+import { Platform } from "react-native";
 import { setupSslPinning } from "../../services/sslPinningService";
 import { initRuntimeProtection } from "../../services/runtimeProtectionService";
 
@@ -70,12 +78,16 @@ export function useAppInit() {
         ]);
       }
 
-      // iCloud sync BEFORE setReady — prevents races with user operations
+      // Cloud sync BEFORE setReady — prevents races with user operations
       try {
-        const syncEnabled = await isSyncEnabled();
+        const isIOS = Platform.OS === "ios";
+        const syncEnabled = isIOS
+          ? await isICloudSyncEnabled()
+          : await isGoogleDriveSyncEnabled();
         if (syncEnabled) {
           const localFolders = await getRawFolders();
           const localEntries = await getRawEntries();
+          const pullAndMerge = isIOS ? iCloudPullAndMerge : googleDrivePullAndMerge;
           const result = await pullAndMerge(localFolders, localEntries);
           if (result.changed) {
             await overwriteFolders(result.folders);
@@ -83,32 +95,44 @@ export function useAppInit() {
           }
         }
       } catch (e: any) {
-        if (__DEV__) console.warn("iCloud sync on launch failed:", e.message);
+        if (__DEV__) console.warn("Cloud sync on launch failed:", e.message);
       }
 
-      // Fresh install restore: detect empty local + iCloud data exists
+      // Fresh install restore: detect empty local + cloud data exists
       try {
         const localFolders = await getRawFolders();
         const localEntries = await getRawEntries();
         if (localFolders.length === 0 && localEntries.length === 0) {
-          const hasICloudData = await checkICloudDataExists();
-          if (hasICloudData) {
+          const isIOS = Platform.OS === "ios";
+          const hasCloudData = isIOS
+            ? await checkICloudDataExists()
+            : await checkGoogleDriveDataExists();
+          if (hasCloudData) {
+            const titleKey = isIOS ? "app.icloudRestoreTitle" : "app.googleDriveRestoreTitle";
+            const messageKey = isIOS ? "app.icloudRestoreMessage" : "app.googleDriveRestoreMessage";
+            const buttonKey = isIOS ? "app.icloudRestoreButton" : "app.googleDriveRestoreButton";
             await new Promise<void>((resolve) => {
               Alert.alert(
-                t("app.icloudRestoreTitle"),
-                t("app.icloudRestoreMessage"),
+                t(titleKey),
+                t(messageKey),
                 [
                   { text: t("common.no"), onPress: () => resolve() },
                   {
-                    text: t("app.icloudRestoreButton"),
+                    text: t(buttonKey),
                     onPress: async () => {
                       try {
-                        const data = await restoreFromICloud();
+                        const data = isIOS
+                          ? await restoreFromICloud()
+                          : await restoreFromGoogleDrive();
                         await importFromICloudRestore(data);
-                        await enableSync();
+                        if (isIOS) {
+                          await enableICloudSync();
+                        } else {
+                          await enableGoogleDriveSync();
+                        }
                       } catch (e: any) {
                         if (__DEV__)
-                          console.warn("iCloud restore failed:", e.message);
+                          console.warn("Cloud restore failed:", e.message);
                       }
                       resolve();
                     },
@@ -120,7 +144,7 @@ export function useAppInit() {
         }
       } catch (e: any) {
         if (__DEV__)
-          console.warn("iCloud restore check failed:", e.message);
+          console.warn("Cloud restore check failed:", e.message);
       }
 
       setReady(true);

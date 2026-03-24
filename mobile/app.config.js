@@ -56,6 +56,15 @@ module.exports = {
       // expo-dev-client only in dev builds — excluded from production
       ...(IS_DEV ? ["expo-dev-client"] : []),
       "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          // TODO: Replace with your Google Cloud Console OAuth Web Client ID
+          webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+          offlineAccess: true,
+          scopes: ["https://www.googleapis.com/auth/drive.appdata"],
+        },
+      ],
       "./plugins/withDisableBackup",
       "expo-apple-authentication",
       "./plugins/withICloud",

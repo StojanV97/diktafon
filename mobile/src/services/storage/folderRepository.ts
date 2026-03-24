@@ -4,7 +4,7 @@ import {
   DEFAULT_FOLDER_COLOR,
 } from "./storageCore";
 import { File } from "expo-file-system";
-import { deleteEntryFilesFromICloud } from "../../../services/icloudSyncService";
+import { deleteEntryFilesFromCloud } from "../../../services/cloudSyncService";
 
 export function createFolder(name: string, color = DEFAULT_FOLDER_COLOR, tags: string[] = []) {
   return withWriteLock(async () => {
@@ -129,7 +129,7 @@ export function deleteFolderWithICloud(folderId: string) {
         const textFile = new File(textsDir, `journal_${e.id}.txt`);
         if (textFile.exists) textFile.delete();
       } catch {}
-      deleteEntryFilesFromICloud(e.id).catch(() => {});
+      deleteEntryFilesFromCloud(e.id).catch(() => {});
     }
 
     folders.splice(idx, 1);

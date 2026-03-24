@@ -7,9 +7,9 @@ import {
 } from "./storageCore";
 import { encryptAudioFile } from "./audioHelpers";
 import {
-  uploadFileToICloud,
-  deleteEntryFilesFromICloud,
-} from "../../../services/icloudSyncService";
+  uploadFileToCloud,
+  deleteEntryFilesFromCloud,
+} from "../../../services/cloudSyncService";
 
 export function createEntry(
   folderId: string,
@@ -46,8 +46,8 @@ export function createEntry(
     entries.unshift(entry);
     await writeJSON(entriesFile, entries);
 
-    uploadFileToICloud(dest.uri, `audio/${id}.wav`).catch((e: Error) =>
-      Sentry.captureMessage("iCloud sync failed: " + e.message, "warning")
+    uploadFileToCloud(dest.uri, `audio/${id}.wav`).catch((e: Error) =>
+      Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
     );
 
     return entry;
@@ -121,7 +121,7 @@ export function deleteEntryWithICloud(entryId: string) {
     const textFile = new File(textsDir, `journal_${entryId}.txt`);
     if (textFile.exists) textFile.delete();
 
-    deleteEntryFilesFromICloud(entryId).catch(() => {});
+    deleteEntryFilesFromCloud(entryId).catch(() => {});
     return true;
   });
 }
@@ -190,8 +190,8 @@ export function completeEntry(entryId: string, text: string, durationSeconds: nu
     const textFile = new File(textsDir, `journal_${entryId}.txt`);
     await writeEncryptedText(textFile, text);
 
-    uploadFileToICloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e: Error) =>
-      Sentry.captureMessage("iCloud sync failed: " + e.message, "warning")
+    uploadFileToCloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e: Error) =>
+      Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
     );
 
     return { ...entry, text };
@@ -212,8 +212,8 @@ export function updateEntryText(entryId: string, newText: string) {
     const textFile = new File(textsDir, `journal_${entryId}.txt`);
     await writeEncryptedText(textFile, newText);
 
-    uploadFileToICloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e: Error) =>
-      Sentry.captureMessage("iCloud sync failed: " + e.message, "warning")
+    uploadFileToCloud(textFile.uri, `texts/journal_${entryId}.txt`).catch((e: Error) =>
+      Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
     );
 
     return { ...entry, text: newText };

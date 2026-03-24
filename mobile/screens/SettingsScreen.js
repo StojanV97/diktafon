@@ -9,6 +9,7 @@ import EncryptionSection from "../components/settings/EncryptionSection"
 import BiometricSection from "../components/settings/BiometricSection"
 import AccountSection from "../components/settings/AccountSection"
 import ICloudSyncSection from "../components/settings/ICloudSyncSection"
+import GoogleDriveSyncSection from "../components/settings/GoogleDriveSyncSection"
 import SubscriptionSection from "../components/settings/SubscriptionSection"
 import { colors, spacing } from "../theme"
 
@@ -31,6 +32,7 @@ export default function SettingsScreen({ navigation }) {
           onUserChanged={setUser}
         />
         <ICloudSyncSection setSnackbar={setSnackbar} />
+        <GoogleDriveSyncSection setSnackbar={setSnackbar} />
         <SubscriptionSection setSnackbar={setSnackbar} user={user} />
       </ScrollView>
 

@@ -31,6 +31,18 @@ const SCHEMA = {
     parse: (v) => v === "true",
     serialize: (v) => (v ? "true" : "false"),
   },
+  googleDriveSyncEnabled: {
+    key: "google_drive_sync_enabled",
+    default: false,
+    parse: (v) => v === "true",
+    serialize: (v) => (v ? "true" : "false"),
+  },
+  googleDriveEmail: {
+    key: "google_drive_email",
+    default: "",
+    parse: (v) => v || "",
+    serialize: (v) => v,
+  },
 }
 
 const NAMES = Object.keys(SCHEMA)

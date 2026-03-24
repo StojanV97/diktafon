@@ -2,8 +2,8 @@ import { File, Directory, Paths } from "expo-file-system";
 import * as Sentry from "@sentry/react-native";
 import crypto from "react-native-quick-crypto";
 import {
-  syncJSONToICloud,
-} from "../../../services/icloudSyncService";
+  syncJSONToCloud,
+} from "../../../services/cloudSyncService";
 import {
   getEncryptionKey,
   encryptText,
@@ -156,12 +156,12 @@ export async function writeJSON(file: InstanceType<typeof File>, data: any[]): P
     else if (file === entriesFile) _entriesCache = data;
 
     if (file === foldersFile) {
-      syncJSONToICloud("folders.json", data).catch((e: Error) =>
-        Sentry.captureMessage("iCloud sync failed: " + e.message, "warning")
+      syncJSONToCloud("folders.json", data).catch((e: Error) =>
+        Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
       );
     } else if (file === entriesFile) {
-      syncJSONToICloud("entries.json", data).catch((e: Error) =>
-        Sentry.captureMessage("iCloud sync failed: " + e.message, "warning")
+      syncJSONToCloud("entries.json", data).catch((e: Error) =>
+        Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
       );
     }
   } catch (e) {
