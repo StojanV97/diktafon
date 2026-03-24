@@ -25,6 +25,9 @@ function getGoogleSignin() {
 const DRIVE_API = "https://www.googleapis.com/drive"
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive"
 
+// In-memory cache: Drive file name → file ID (avoids repeated search queries)
+const _fileIdCache = new Map<string, string>()
+
 async function getAccessToken(): Promise<string | null> {
   const gs = getGoogleSignin()
   if (!gs) return null
@@ -38,21 +41,47 @@ async function getAccessToken(): Promise<string | null> {
 
 /**
  * Find a file in appDataFolder by name (path used as name).
- * Returns the Google Drive file ID or null.
+ * Returns the Google Drive file ID or null. Results are cached in-memory.
  */
 async function findFileByName(name: string, token: string): Promise<string | null> {
+  const cached = _fileIdCache.get(name)
+  if (cached) return cached
+
   const q = encodeURIComponent(`name='${name}' and 'appDataFolder' in parents and trashed=false`)
   const res = await fetch(`${DRIVE_API}/v3/files?spaces=appDataFolder&q=${q}&fields=files(id)`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) return null
   const data = await res.json()
-  return data.files?.[0]?.id ?? null
+  const fileId = data.files?.[0]?.id ?? null
+  if (fileId) _fileIdCache.set(name, fileId)
+  return fileId
+}
+
+/**
+ * Preload the file ID cache by listing all files in appDataFolder.
+ * Call before bulk operations to avoid N+1 search queries.
+ */
+async function preloadFileIdCache(token: string): Promise<void> {
+  let pageToken: string | undefined
+  do {
+    const params = `spaces=appDataFolder&fields=files(id,name),nextPageToken&pageSize=100${pageToken ? `&pageToken=${pageToken}` : ""}`
+    const res = await fetch(`${DRIVE_API}/v3/files?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    for (const f of data.files || []) {
+      _fileIdCache.set(f.name, f.id)
+    }
+    pageToken = data.nextPageToken
+  } while (pageToken)
 }
 
 /**
  * Upload or update a text/binary file in appDataFolder.
- * If a file with the same name exists, it is updated. Otherwise created.
+ * Text uses multipart upload. Binary uses two-step (create metadata + media PATCH)
+ * to avoid Content-Transfer-Encoding issues with Google Drive REST API.
  */
 async function upsertFile(
   name: string,
@@ -62,48 +91,69 @@ async function upsertFile(
 ): Promise<boolean> {
   try {
     const existingId = await findFileByName(name, token)
-    const body = typeof content === "string" ? content : content
-    const boundary = "diktafon_boundary_" + Date.now()
     const isText = typeof content === "string"
 
-    const metadata = existingId
-      ? { name }
-      : { name, parents: ["appDataFolder"] }
-
-    // Multipart upload (metadata + content)
-    const metaPart = JSON.stringify(metadata)
-    const parts = [
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaPart}\r\n`,
-    ]
-
     if (isText) {
-      parts.push(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n${content}\r\n`)
+      // Text: multipart upload (metadata + content in one request)
+      const boundary = "diktafon_boundary_" + Date.now()
+      const metadata = existingId ? { name } : { name, parents: ["appDataFolder"] }
+      const metaPart = JSON.stringify(metadata)
+      const multipartBody = [
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaPart}\r\n`,
+        `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n${content}\r\n`,
+        `--${boundary}--`,
+      ].join("")
+
+      const url = existingId
+        ? `${DRIVE_UPLOAD_API}/v3/files/${existingId}?uploadType=multipart`
+        : `${DRIVE_UPLOAD_API}/v3/files?uploadType=multipart`
+
+      const res = await fetch(url, {
+        method: existingId ? "PATCH" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+        },
+        body: multipartBody,
+      })
+
+      if (res.ok && !existingId) {
+        const data = await res.json()
+        if (data.id) _fileIdCache.set(name, data.id)
+      }
+      return res.ok
     } else {
-      // For binary: encode as base64 in the multipart body
-      const b64 = Buffer.from(content).toString("base64")
-      parts.push(
-        `--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n`
+      // Binary: two-step upload to send raw bytes (avoids CTE base64 issues)
+      let fileId = existingId
+      if (!fileId) {
+        // Step 1: Create file with metadata only
+        const createRes = await fetch(`${DRIVE_API}/v3/files`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name, parents: ["appDataFolder"] }),
+        })
+        if (!createRes.ok) return false
+        const createData = await createRes.json()
+        fileId = createData.id
+        if (fileId) _fileIdCache.set(name, fileId)
+      }
+      // Step 2: Upload raw binary content
+      const uploadRes = await fetch(
+        `${DRIVE_UPLOAD_API}/v3/files/${fileId}?uploadType=media`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": mimeType,
+          },
+          body: content,
+        }
       )
+      return uploadRes.ok
     }
-    parts.push(`--${boundary}--`)
-    const multipartBody = parts.join("")
-
-    const url = existingId
-      ? `${DRIVE_UPLOAD_API}/v3/files/${existingId}?uploadType=multipart`
-      : `${DRIVE_UPLOAD_API}/v3/files?uploadType=multipart`
-
-    const method = existingId ? "PATCH" : "POST"
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body: multipartBody,
-    })
-
-    return res.ok
   } catch (e) {
     if (__DEV__) console.warn(`Google Drive upsert failed for ${name}:`, e)
     Sentry.captureException(e)
@@ -150,7 +200,11 @@ async function deleteFileByName(name: string, token: string): Promise<boolean> {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   })
-  return res.ok || res.status === 404
+  if (res.ok || res.status === 404) {
+    _fileIdCache.delete(name)
+    return true
+  }
+  return false
 }
 
 // ── Auth ──────────────────────────────────────────────
@@ -178,7 +232,8 @@ export async function signOutFromGoogle(): Promise<void> {
   if (!gs) return
   try {
     await gs.signOut()
-    await updateSettings({ googleDriveSyncEnabled: false, googleDriveEmail: "" })
+    _fileIdCache.clear()
+    await updateSettings({ googleDriveSyncEnabled: false, googleDriveEmail: "", googleDriveInitialUploadDone: false })
   } catch (e) {
     if (__DEV__) console.warn("Google Sign-Out failed:", e)
   }
@@ -336,6 +391,9 @@ export async function pullAndMerge(
   const available = await isGoogleDriveAvailable()
   if (!available) return { folders: localFolders, entries: localEntries, changed: false }
 
+  const token = await getAccessToken()
+  if (token) await preloadFileIdCache(token)
+
   const cloudFolders = await readJSONFromGoogleDrive("folders.json")
   const cloudEntries = await readJSONFromGoogleDrive("entries.json")
 
@@ -389,6 +447,9 @@ export async function restoreFromGoogleDrive(): Promise<{
   entries: any[]
   texts: Record<string, string>
 }> {
+  const token = await getAccessToken()
+  if (token) await preloadFileIdCache(token)
+
   const folders = await readJSONFromGoogleDrive("folders.json") || []
   const entries = await readJSONFromGoogleDrive("entries.json") || []
 
@@ -415,6 +476,9 @@ export async function uploadAllExistingData(
   audioDir: InstanceType<typeof File>[],
   textsDir: InstanceType<typeof File>[]
 ): Promise<{ uploaded: number }> {
+  const token = await getAccessToken()
+  if (token) await preloadFileIdCache(token)
+
   let uploaded = 0
 
   // Upload metadata

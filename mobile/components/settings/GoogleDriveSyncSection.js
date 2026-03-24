@@ -22,7 +22,7 @@ import {
   overwriteEntries,
 } from "../../services/journalStorage"
 import { audioDir, textsDir } from "../../src/services/storage/storageCore"
-import { getSettings } from "../../services/settingsService"
+import { getSettings, updateSettings } from "../../services/settingsService"
 import { colors, spacing, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 import { t } from "../../src/i18n"
@@ -112,24 +112,28 @@ export default function GoogleDriveSyncSection({ setSnackbar }) {
       if (value) {
         await enableSync()
         setSnackbar(t('settings.googleDrive.enabled'))
-        // Upload all existing data on first enable
-        setUploading(true)
-        try {
-          const folders = await getRawFolders()
-          const entries = await getRawEntries()
-          const audioFiles = audioDir.exists
-            ? audioDir.list().filter(f => f.name.endsWith(".wav"))
-            : []
-          const textFiles = textsDir.exists
-            ? textsDir.list().filter(f => f.name.endsWith(".txt"))
-            : []
-          await uploadAllExistingData(folders, entries, audioFiles, textFiles)
-          setSnackbar(t('settings.googleDrive.uploadComplete'))
-        } catch (e) {
-          if (__DEV__) console.warn("Initial upload failed:", e)
-          setSnackbar(t('settings.googleDrive.uploadFailed'))
-        } finally {
-          setUploading(false)
+        // Upload all existing data on first enable only
+        const settings = await getSettings()
+        if (!settings.googleDriveInitialUploadDone) {
+          setUploading(true)
+          try {
+            const folders = await getRawFolders()
+            const entries = await getRawEntries()
+            const audioFiles = audioDir.exists
+              ? audioDir.list().filter(f => f.name.endsWith(".wav"))
+              : []
+            const textFiles = textsDir.exists
+              ? textsDir.list().filter(f => f.name.endsWith(".txt"))
+              : []
+            await uploadAllExistingData(folders, entries, audioFiles, textFiles)
+            await updateSettings({ googleDriveInitialUploadDone: true })
+            setSnackbar(t('settings.googleDrive.uploadComplete'))
+          } catch (e) {
+            if (__DEV__) console.warn("Initial upload failed:", e)
+            setSnackbar(t('settings.googleDrive.uploadFailed'))
+          } finally {
+            setUploading(false)
+          }
         }
       } else {
         await disableSync()

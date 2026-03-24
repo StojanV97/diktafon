@@ -43,6 +43,12 @@ const SCHEMA = {
     parse: (v) => v || "",
     serialize: (v) => v,
   },
+  googleDriveInitialUploadDone: {
+    key: "google_drive_initial_upload_done",
+    default: false,
+    parse: (v) => v === "true",
+    serialize: (v) => (v ? "true" : "false"),
+  },
 }
 
 const NAMES = Object.keys(SCHEMA)
