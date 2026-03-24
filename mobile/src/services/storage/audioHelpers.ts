@@ -31,7 +31,7 @@ export async function getDecryptedAudioUri(entryId: string): Promise<string | nu
     tempFile.write(decrypted);
     return tempFile.uri;
   } catch {
-    return audioFile.uri;
+    return null;
   }
 }
 

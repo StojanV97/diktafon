@@ -114,13 +114,28 @@ export async function restoreFromBackup(fileUri, password) {
   }
 
   // Create a safety backup before overwriting current data
+  let safetyBackupUri;
   try {
-    await createBackup(null);
+    safetyBackupUri = await createBackup(null);
   } catch (e) {
     if (__DEV__) console.warn("Pre-restore backup failed:", e);
     throw new Error("SAFETY_BACKUP_FAILED: " + e.message);
   }
 
-  const stats = await importAllData({ folders, entries, audioFiles, textFiles });
-  return { ...stats, skippedFiles };
+  try {
+    const stats = await importAllData({ folders, entries, audioFiles, textFiles });
+    // Clean up plaintext safety backup after successful restore
+    try {
+      const safetyFile = new File(safetyBackupUri);
+      if (safetyFile.exists) safetyFile.delete();
+    } catch {}
+    return { ...stats, skippedFiles };
+  } catch (e) {
+    // Clean up plaintext safety backup on failure too
+    try {
+      const safetyFile = new File(safetyBackupUri);
+      if (safetyFile.exists) safetyFile.delete();
+    } catch {}
+    throw e;
+  }
 }

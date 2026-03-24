@@ -58,7 +58,27 @@ export async function readJSON(file: InstanceType<typeof File>): Promise<any[]> 
   let result: any[];
   try {
     if (!file.exists) {
-      result = [];
+      const bakFile = new File(file.parentDirectory, file.name + ".bak");
+      if (bakFile.exists) {
+        const key = await getEncryptionKey();
+        if (key) {
+          try {
+            const bytes = bakFile.bytesSync();
+            const decrypted = decryptText(bytes, key);
+            result = JSON.parse(decrypted);
+          } catch {
+            const bakRaw = await bakFile.text();
+            result = JSON.parse(bakRaw);
+          }
+        } else {
+          const bakRaw = await bakFile.text();
+          result = JSON.parse(bakRaw);
+        }
+        if (__DEV__) console.warn(`readJSON: ${file.name} missing, recovered from .bak`);
+        await writeJSON(file, result);
+      } else {
+        result = [];
+      }
     } else {
       const key = await getEncryptionKey();
       if (key) {
@@ -130,7 +150,6 @@ export async function writeJSON(file: InstanceType<typeof File>, data: any[]): P
       if (bakFile.exists) bakFile.delete();
       file.copy(bakFile);
     }
-    if (file.exists) file.delete();
     tmpFile.move(file);
 
     if (file === foldersFile) _foldersCache = data;
