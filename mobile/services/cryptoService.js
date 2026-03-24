@@ -133,7 +133,9 @@ export function encryptText(plaintext, key) {
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()])
   const authTag = cipher.getAuthTag()
   // Format: [12-byte IV][ciphertext][16-byte auth tag]
-  return Buffer.concat([Buffer.from(iv), encrypted, authTag])
+  // Wrap in Uint8Array — quick-crypto's Buffer subclass is not recognized
+  // by expo-file-system's JSI File.write(), which expects standard Uint8Array.
+  return new Uint8Array(Buffer.concat([Buffer.from(iv), encrypted, authTag]))
 }
 
 export function decryptText(encryptedBuf, key) {
@@ -159,7 +161,7 @@ export function encryptBytes(data, key) {
   const encrypted = Buffer.concat([cipher.update(Buffer.from(data)), cipher.final()])
   const authTag = cipher.getAuthTag()
   // Same format as encryptText: [12-byte IV][ciphertext][16-byte auth tag]
-  return Buffer.concat([Buffer.from(iv), encrypted, authTag])
+  return new Uint8Array(Buffer.concat([Buffer.from(iv), encrypted, authTag]))
 }
 
 export function decryptBytes(encryptedBuf, key) {
@@ -192,7 +194,7 @@ export function encryptBlob(data, password) {
   const authTag = cipher.getAuthTag()
 
   // Format: [16-byte salt][12-byte IV][encrypted data][16-byte auth tag]
-  return Buffer.concat([Buffer.from(salt), Buffer.from(iv), encrypted, authTag])
+  return new Uint8Array(Buffer.concat([Buffer.from(salt), Buffer.from(iv), encrypted, authTag]))
 }
 
 export function decryptBlob(encryptedBuf, password) {
