@@ -1,4 +1,5 @@
 import { File, Directory, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   getEncryptionKey,
   encryptBytes,
@@ -13,7 +14,10 @@ export async function encryptAudioFile(audioFile: InstanceType<typeof File>): Pr
   if (!key) return;
   const rawBytes = audioFile.bytesSync();
   const encrypted = encryptBytes(rawBytes, key);
-  audioFile.write(encrypted);
+  const base64 = Buffer.from(encrypted).toString("base64");
+  await FileSystem.writeAsStringAsync(audioFile.uri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 }
 
 export async function getDecryptedAudioUri(entryId: string): Promise<string | null> {
@@ -28,7 +32,10 @@ export async function getDecryptedAudioUri(entryId: string): Promise<string | nu
     const decrypted = decryptBytes(encBytes, key);
     tempAudioDir.create({ idempotent: true });
     const tempFile = new File(tempAudioDir, `${entryId}.wav`);
-    tempFile.write(decrypted);
+    const base64 = Buffer.from(decrypted).toString("base64");
+    await FileSystem.writeAsStringAsync(tempFile.uri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
     return tempFile.uri;
   } catch {
     return null;

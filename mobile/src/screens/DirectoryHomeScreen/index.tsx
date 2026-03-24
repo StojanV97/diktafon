@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -28,8 +28,8 @@ import {
   tombstoneFolder,
   deleteFolderWithICloud,
 } from "../../../services/journalStorage";
-import { getPendingReminders } from "../../services/storage";
 import { isSyncEnabled } from "../../../services/icloudSyncService";
+import { processReminderRecording } from "../../../services/reminderPipelineService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import RecordingOverlay from "../../../components/RecordingOverlay";
 import BottomActionBar from "../../../components/BottomActionBar";
@@ -38,6 +38,7 @@ import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
 import { formatDate, formatDuration } from "../../utils/formatters";
 import { t } from "../../i18n";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import FolderDialog from "./FolderDialog";
@@ -50,7 +51,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dailyStats, setDailyStats] = useState({ clipCount: 0, totalDuration: 0, latestTimestamp: null });
-  const [pendingReminderCount, setPendingReminderCount] = useState(0);
 
   // Folder dialog state
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -71,38 +71,98 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   // Menu state
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
 
-  // Recording
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+  // Recording — single recorder shared between Quick Record and Reminder flows
+  type RecordingMode = "quickRecord" | "reminder";
+  type ReminderPipelineState = "idle" | "recording" | "transcribing" | "parsing";
+  const recordingModeRef = useRef<RecordingMode>("quickRecord");
+  const [reminderPipelineState, setReminderPipelineState] = useState<ReminderPipelineState>("idle");
+
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri: string, durationSeconds: number) => {
-      try {
-        await createDailyLogEntry(uri, durationSeconds);
-        const stats = await fetchDailyLogStats();
-        setDailyStats(stats);
-      } catch (e) {
-        setSnackbar(safeErrorMessage(e, t("errors.saveFailed")));
+      if (recordingModeRef.current === "quickRecord") {
+        try {
+          await createDailyLogEntry(uri, durationSeconds);
+          const stats = await fetchDailyLogStats();
+          setDailyStats(stats);
+        } catch (e) {
+          console.error("[Quick Record save]", e);
+          setSnackbar(safeErrorMessage(e, t("errors.saveFailed")));
+        }
+      } else {
+        try {
+          const result = await processReminderRecording(
+            uri,
+            (state: string) => setReminderPipelineState(state as ReminderPipelineState)
+          );
+          setReminderPipelineState("idle");
+          navigation.navigate("Reminders", { pendingResult: result });
+        } catch (e: any) {
+          console.error("[Reminder pipeline]", e);
+          setReminderPipelineState("idle");
+          setSnackbar(safeErrorMessage(e, t("reminders.parseFailed")));
+        } finally {
+          try {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          } catch {}
+        }
       }
     },
   });
 
+  const isReminderMode = recordingModeRef.current === "reminder";
+  const isReminderRecording = (isRecording || isPaused) && isReminderMode;
+  const isReminderProcessing = reminderPipelineState === "transcribing" || reminderPipelineState === "parsing";
+
   const handleRecordPress = useCallback(async () => {
     try {
-      if (isRecording) await stopRecording();
-      else await startRecording();
+      if (isRecording) {
+        await stopRecording();
+      } else {
+        recordingModeRef.current = "quickRecord";
+        await startRecording();
+      }
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     }
   }, [isRecording, stopRecording, startRecording, setSnackbar]);
 
+  const handleReminderRecordPress = useCallback(async () => {
+    try {
+      recordingModeRef.current = "reminder";
+      setReminderPipelineState("recording");
+      await startRecording();
+    } catch (e) {
+      setReminderPipelineState("idle");
+      setSnackbar(safeErrorMessage(e));
+    }
+  }, [startRecording, setSnackbar]);
+
+  const handleReminderStop = useCallback(async () => {
+    try {
+      await stopRecording();
+    } catch (e) {
+      setReminderPipelineState("idle");
+      setSnackbar(safeErrorMessage(e));
+    }
+  }, [stopRecording, setSnackbar]);
+
+  const handleReminderCancel = useCallback(async () => {
+    try {
+      await cancelRecording();
+      setReminderPipelineState("idle");
+    } catch (e) {
+      setSnackbar(safeErrorMessage(e));
+    }
+  }, [cancelRecording, setSnackbar]);
+
   const load = useCallback(async () => {
     try {
-      const [data, stats, pending] = await Promise.all([
+      const [data, stats] = await Promise.all([
         fetchFolders(),
         fetchDailyLogStats(),
-        getPendingReminders(),
       ]);
       setFolders(data);
       setDailyStats(stats);
-      setPendingReminderCount(pending.length);
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     } finally {
@@ -270,28 +330,8 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate("Reminders")}
-        style={[styles.danasCard, elevation.sm]}
-      >
-        <View style={styles.danasIconWrap}>
-          <MaterialCommunityIcons name="bell-outline" size={24} color={colors.primary} />
-        </View>
-        <View style={styles.danasBody}>
-          <Text style={styles.danasTitle}>{t("nav.reminders")}</Text>
-          {pendingReminderCount > 0 ? (
-            <Text style={[typography.caption, { marginTop: 2 }]}>
-              {pendingReminderCount} {pendingReminderCount === 1 ? t("reminders.pending").toLowerCase() : t("reminders.active").toLowerCase()}
-            </Text>
-          ) : (
-            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>{t("reminders.noReminders").split(".")[0]}</Text>
-          )}
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-      </TouchableOpacity>
     </View>
-  ), [insets.top, dailyStats, pendingReminderCount, navigation]);
+  ), [insets.top, dailyStats, navigation]);
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
@@ -382,20 +422,22 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         }
       />
 
-      <BottomActionBar
-        extraLeftIcon={undefined}
-        extraLeftLabel={undefined}
-        onExtraLeftPress={undefined}
-        leftIcon="folder-plus-outline"
-        leftLabel={t("home.newFolder")}
-        onLeftPress={() => openDialog("create")}
-        centerIcon={undefined}
-        centerLabel={undefined}
-        onCenterPress={undefined}
-        centerDisabled={undefined}
-        onRightPress={handleRecordPress}
-        isRecording={isRecording}
-      />
+      {!isRecording && !isPaused && !isReminderProcessing && (
+        <BottomActionBar
+          extraLeftIcon={undefined}
+          extraLeftLabel={undefined}
+          onExtraLeftPress={undefined}
+          leftIcon="folder-plus-outline"
+          leftLabel={t("home.newFolder")}
+          onLeftPress={() => openDialog("create")}
+          centerIcon="bell-outline"
+          centerLabel={t("home.reminder")}
+          onCenterPress={handleReminderRecordPress}
+          centerDisabled={false}
+          onRightPress={handleRecordPress}
+          isRecording={false}
+        />
+      )}
 
       <Portal>
         <FolderDialog
@@ -426,16 +468,27 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         />
       </Portal>
 
-      {isRecording && (
+      {(isRecording || isPaused) && (
         <RecordingOverlay
           meteringHistory={meteringHistory}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
           onResume={resumeRecording}
-          onStop={stopRecording}
-          onCancel={undefined}
+          onStop={isReminderMode ? handleReminderStop : stopRecording}
+          onCancel={isReminderMode ? handleReminderCancel : undefined}
         />
+      )}
+
+      {isReminderProcessing && (
+        <View style={styles.processingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.processingText}>
+            {reminderPipelineState === "transcribing"
+              ? t("reminders.transcribing")
+              : t("reminders.parsing")}
+          </Text>
+        </View>
       )}
 
       <Snackbar visible={!!snackbar} onDismiss={dismissSnackbar} duration={3000}>
@@ -537,5 +590,17 @@ const styles = StyleSheet.create({
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
     color: colors.primary,
+  },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  processingText: {
+    ...typography.body,
+    color: colors.muted,
+    marginTop: spacing.md,
   },
 });

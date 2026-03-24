@@ -31,7 +31,7 @@ import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, typography } from "../../../theme";
 import { t } from "../../i18n";
-import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useRemindersData } from "./useRemindersData";
@@ -43,7 +43,7 @@ type PipelineState = "idle" | "recording" | "transcribing" | "parsing" | "confir
 
 const OFFSET_MINUTES = 10;
 
-export default function RemindersScreen({ navigation }: any) {
+export default function RemindersScreen({ navigation, route }: any) {
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
   const {
     loading,
@@ -62,6 +62,17 @@ export default function RemindersScreen({ navigation }: any) {
     parsed: ParsedReminderResult;
   } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // --- Accept pending result from Home screen ---
+  useEffect(() => {
+    const pending = route.params?.pendingResult;
+    if (pending) {
+      setPipelineResult(pending);
+      setPipelineState("confirming");
+      // Clear param so it doesn't re-trigger on back navigation
+      navigation.setParams({ pendingResult: undefined });
+    }
+  }, [route.params?.pendingResult, navigation]);
 
   // --- Recording ---
   const {
@@ -88,8 +99,7 @@ export default function RemindersScreen({ navigation }: any) {
         setSnackbar(safeErrorMessage(e, t("reminders.parseFailed")));
       } finally {
         try {
-          const audioFile = new File(uri);
-          if (audioFile.exists) audioFile.delete();
+          await FileSystem.deleteAsync(uri, { idempotent: true });
         } catch {}
       }
     },

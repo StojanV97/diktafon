@@ -1,4 +1,5 @@
 import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sentry from "@sentry/react-native";
 import {
   foldersFile, entriesFile, audioDir, textsDir,
@@ -77,7 +78,10 @@ export function migrateData() {
               try {
                 const plaintext = await textFile.text();
                 const encrypted = encryptText(plaintext, key);
-                textFile.write(encrypted);
+                const base64 = Buffer.from(encrypted).toString("base64");
+                await FileSystem.writeAsStringAsync(textFile.uri, base64, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
                 entry.text = "";
                 entry.encrypted = true;
                 encryptionMigrated = true;
@@ -105,7 +109,10 @@ export function migrateData() {
           try {
             const raw = audioFile.bytes();
             const encrypted = encryptBytes(raw, key);
-            audioFile.write(encrypted);
+            const base64 = Buffer.from(encrypted).toString("base64");
+            await FileSystem.writeAsStringAsync(audioFile.uri, base64, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
           } catch (encErr: any) {
             Sentry.captureMessage(
               `Audio encryption migration failed for ${entry.id}: ${encErr.message}`,

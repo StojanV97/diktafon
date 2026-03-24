@@ -1,4 +1,5 @@
 import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   foldersFile, entriesFile, audioDir, textsDir,
   readJSON, writeJSON, withWriteLock, ensureDirs,
@@ -71,9 +72,16 @@ export function importAllData(data: {
     for (const { id, data: audioData } of data.audioFiles) {
       const dest = new File(audioDir, `${id}.wav`);
       if (key) {
-        dest.write(encryptBytes(audioData, key));
+        const encrypted = encryptBytes(audioData, key);
+        const base64 = Buffer.from(encrypted).toString("base64");
+        await FileSystem.writeAsStringAsync(dest.uri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       } else {
-        dest.write(audioData);
+        const base64 = Buffer.from(audioData).toString("base64");
+        await FileSystem.writeAsStringAsync(dest.uri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       }
       audioCount++;
     }
@@ -81,9 +89,13 @@ export function importAllData(data: {
     for (const { id, text } of data.textFiles) {
       const dest = new File(textsDir, `journal_${id}.txt`);
       if (key) {
-        dest.write(encryptText(text, key));
+        const encrypted = encryptText(text, key);
+        const base64 = Buffer.from(encrypted).toString("base64");
+        await FileSystem.writeAsStringAsync(dest.uri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       } else {
-        dest.write(text);
+        await FileSystem.writeAsStringAsync(dest.uri, text);
       }
       textCount++;
     }
@@ -109,7 +121,7 @@ export function importFromICloudRestore(data: {
 
     for (const [entryId, content] of Object.entries(data.texts)) {
       const textFile = new File(textsDir, `journal_${entryId}.txt`);
-      textFile.write(content);
+      await FileSystem.writeAsStringAsync(textFile.uri, content as string);
     }
   });
 }

@@ -1,4 +1,5 @@
 import { File, Directory, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sentry from "@sentry/react-native";
 import crypto from "react-native-quick-crypto";
 import {
@@ -141,14 +142,19 @@ export async function writeJSON(file: InstanceType<typeof File>, data: any[]): P
     const key = await getEncryptionKey();
     const tmpFile = new File(file.parentDirectory, file.name + ".tmp");
     if (key) {
-      tmpFile.write(encryptText(json, key));
+      const encrypted = encryptText(json, key);
+      const base64 = Buffer.from(encrypted).toString("base64");
+      await FileSystem.writeAsStringAsync(tmpFile.uri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
     } else {
-      tmpFile.write(json);
+      await FileSystem.writeAsStringAsync(tmpFile.uri, json);
     }
     if (file.exists) {
       const bakFile = new File(file.parentDirectory, file.name + ".bak");
       if (bakFile.exists) bakFile.delete();
       file.copy(bakFile);
+      file.delete();
     }
     tmpFile.move(file);
 
@@ -186,9 +192,12 @@ export async function writeEncryptedText(textFile: InstanceType<typeof File>, pl
   const key = await getEncryptionKey();
   if (key) {
     const encrypted = encryptText(plaintext, key);
-    textFile.write(encrypted);
+    const base64 = Buffer.from(encrypted).toString("base64");
+    await FileSystem.writeAsStringAsync(textFile.uri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
   } else {
-    textFile.write(plaintext);
+    await FileSystem.writeAsStringAsync(textFile.uri, plaintext);
   }
 }
 

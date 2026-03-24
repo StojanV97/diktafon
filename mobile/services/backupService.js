@@ -1,4 +1,5 @@
 import { File, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import JSZip from "jszip";
 import crypto from "react-native-quick-crypto";
 import { exportAllData, importAllData } from "./journalStorage";
@@ -32,30 +33,39 @@ export async function createBackup(password) {
   if (password) {
     const encrypted = encryptBlob(zipData, password);
     const backupFile = new File(Paths.cache, `diktafon-backup-${date}.enc`);
-    backupFile.write(encrypted);
+    const base64 = Buffer.from(encrypted).toString("base64");
+    await FileSystem.writeAsStringAsync(backupFile.uri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
     return backupFile.uri;
   }
 
   const backupFile = new File(Paths.cache, `diktafon-backup-${date}.zip`);
-  backupFile.write(zipData);
+  const base64 = Buffer.from(zipData).toString("base64");
+  await FileSystem.writeAsStringAsync(backupFile.uri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
   return backupFile.uri;
 }
 
 export async function restoreFromBackup(fileUri, password) {
-  const sourceFile = new File(fileUri);
   let zipData;
 
+  const rawBase64 = await FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const rawBytes = Buffer.from(rawBase64, "base64");
+
   if (password) {
-    const encryptedData = sourceFile.bytesSync();
     try {
-      const decrypted = decryptBlob(encryptedData, password);
+      const decrypted = decryptBlob(rawBytes, password);
       zipData = decrypted;
     } catch (e) {
       if (e.message === "Pogresna lozinka") throw new Error(t("settings.backup.wrongPassword"));
       throw new Error(t("settings.backup.wrongPasswordOrCorrupted"));
     }
   } else {
-    zipData = sourceFile.bytesSync();
+    zipData = rawBytes;
   }
 
   const zip = await JSZip.loadAsync(zipData);
@@ -126,15 +136,13 @@ export async function restoreFromBackup(fileUri, password) {
     const stats = await importAllData({ folders, entries, audioFiles, textFiles });
     // Clean up plaintext safety backup after successful restore
     try {
-      const safetyFile = new File(safetyBackupUri);
-      if (safetyFile.exists) safetyFile.delete();
+      await FileSystem.deleteAsync(safetyBackupUri, { idempotent: true });
     } catch {}
     return { ...stats, skippedFiles };
   } catch (e) {
     // Clean up plaintext safety backup on failure too
     try {
-      const safetyFile = new File(safetyBackupUri);
-      if (safetyFile.exists) safetyFile.delete();
+      await FileSystem.deleteAsync(safetyBackupUri, { idempotent: true });
     } catch {}
     throw e;
   }

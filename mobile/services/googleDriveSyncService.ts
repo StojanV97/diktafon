@@ -1,5 +1,6 @@
 import { Platform } from "react-native"
 import { File, Paths } from "expo-file-system"
+import * as FileSystem from "expo-file-system/legacy"
 import * as Sentry from "@sentry/react-native"
 import { getSettings, updateSettings } from "./settingsService"
 import { getEncryptionKey, encryptText, decryptText } from "./cryptoService"
@@ -296,9 +297,12 @@ export async function uploadFileToGoogleDrive(localUri: string, relativePath: st
   if (!token) return
 
   try {
-    const file = new File(localUri)
-    if (!file.exists) return
-    const bytes = file.bytes()
+    const info = await FileSystem.getInfoAsync(localUri)
+    if (!info.exists) return
+    const base64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    })
+    const bytes = Buffer.from(base64, "base64")
     await upsertFile(drivePath(relativePath), bytes, "application/octet-stream", token)
   } catch (e) {
     if (__DEV__) console.warn(`Google Drive upload failed for ${relativePath}:`, e)
@@ -319,8 +323,10 @@ export async function downloadFileFromGoogleDrive(relativePath: string, localUri
   try {
     const data = await downloadFile(drivePath(relativePath), token)
     if (!data) return false
-    const localFile = new File(localUri)
-    localFile.write(new Uint8Array(data))
+    const base64 = Buffer.from(new Uint8Array(data)).toString("base64")
+    await FileSystem.writeAsStringAsync(localUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    })
     return true
   } catch {
     return false
