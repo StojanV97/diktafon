@@ -1,10 +1,11 @@
-const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog"]);
+const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog", "Reminders"]);
 
 export const linking = {
   prefixes: ["com.diktafon.app://", "diktafon://"],
   config: {
     screens: {
       DailyLog: { path: "dailylog" },
+      Reminders: { path: "reminders" },
     },
   },
   getStateFromPath(path: string, config: any) {

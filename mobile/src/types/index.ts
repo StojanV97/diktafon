@@ -1,3 +1,5 @@
+export * from "./reminder";
+
 export type EntryStatus = "recorded" | "processing" | "error" | "done";
 
 export type RecordingType = "beleshka" | "razgovor";

@@ -5,6 +5,7 @@ import {
   RefreshControl,
   Share,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -27,6 +28,7 @@ import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingOverlay from "../../../components/RecordingOverlay";
 import BottomActionBar from "../../../components/BottomActionBar";
 import { AppHeaderLeft, AppHeaderRight } from "../../../components/AppHeader";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
 import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
@@ -111,8 +113,18 @@ export default function DailyLogScreen({ navigation, route }: any) {
     [navigation]
   );
   const headerRight = useCallback(
-    () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
-    []
+    () => (
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Reminders")}
+          style={{ padding: 8, marginRight: 4 }}
+        >
+          <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <AppHeaderRight onPress={() => setAiDialogVisible(true)} />
+      </View>
+    ),
+    [navigation]
   );
   useEffect(() => {
     navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });

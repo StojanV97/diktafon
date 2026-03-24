@@ -27,6 +27,9 @@ import EntryScreen from "./screens/EntryScreen";
 import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
+import RemindersScreen from "./screens/RemindersScreen";
+import * as Notifications from "expo-notifications";
+import { initNotifications, handleNotificationResponse } from "./services/notificationService";
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN
 if (SENTRY_DSN) {
@@ -92,6 +95,15 @@ function App() {
     return () => { ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {}); };
   }, []);
 
+  // Initialize notifications
+  useEffect(() => {
+    initNotifications();
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse(navigationRef)
+    );
+    return () => subscription.remove();
+  }, []);
+
   // Auth state listener — link RevenueCat on sign-in
   useEffect(() => {
     const subscription = onAuthStateChange((session) => {
@@ -144,6 +156,7 @@ function App() {
               <Stack.Screen name="DailyLog" component={DailyLogScreen} options={{ title: t('nav.dailyLog') }} />
               <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('nav.settings') }} />
               <Stack.Screen name="Auth" component={AuthScreen} options={{ title: t('nav.auth') }} />
+              <Stack.Screen name="Reminders" component={RemindersScreen} options={{ title: t('nav.reminders') }} />
             </Stack.Navigator>
           </NavigationContainer>
         </View>

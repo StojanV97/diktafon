@@ -30,7 +30,7 @@ module.exports = {
         backgroundColor: "#FFFFFF",
       },
       package: "com.diktafon.app",
-      permissions: ["READ_EXTERNAL_STORAGE", "RECORD_AUDIO"],
+      permissions: ["READ_EXTERNAL_STORAGE", "RECORD_AUDIO", "POST_NOTIFICATIONS"],
     },
     plugins: [
       [
@@ -61,6 +61,7 @@ module.exports = {
         {
           // TODO: Replace with your Google Cloud Console OAuth Web Client ID
           webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+          iosUrlScheme: "com.googleusercontent.apps.YOUR_WEB_CLIENT_ID",
           offlineAccess: true,
           scopes: ["https://www.googleapis.com/auth/drive.appdata"],
         },
@@ -77,6 +78,8 @@ module.exports = {
         },
       ],
       "./plugins/withWidgetFix",
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
       [
         "@sentry/react-native/expo",
         {

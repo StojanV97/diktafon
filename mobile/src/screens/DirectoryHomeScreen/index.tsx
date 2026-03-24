@@ -28,6 +28,7 @@ import {
   tombstoneFolder,
   deleteFolderWithICloud,
 } from "../../../services/journalStorage";
+import { getPendingReminders } from "../../services/storage";
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import RecordingOverlay from "../../../components/RecordingOverlay";
@@ -49,6 +50,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dailyStats, setDailyStats] = useState({ clipCount: 0, totalDuration: 0, latestTimestamp: null });
+  const [pendingReminderCount, setPendingReminderCount] = useState(0);
 
   // Folder dialog state
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -93,9 +95,14 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     try {
-      const [data, stats] = await Promise.all([fetchFolders(), fetchDailyLogStats()]);
+      const [data, stats, pending] = await Promise.all([
+        fetchFolders(),
+        fetchDailyLogStats(),
+        getPendingReminders(),
+      ]);
       setFolders(data);
       setDailyStats(stats);
+      setPendingReminderCount(pending.length);
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     } finally {
@@ -262,8 +269,29 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         </View>
         <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
       </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("Reminders")}
+        style={[styles.danasCard, elevation.sm]}
+      >
+        <View style={styles.danasIconWrap}>
+          <MaterialCommunityIcons name="bell-outline" size={24} color={colors.primary} />
+        </View>
+        <View style={styles.danasBody}>
+          <Text style={styles.danasTitle}>{t("nav.reminders")}</Text>
+          {pendingReminderCount > 0 ? (
+            <Text style={[typography.caption, { marginTop: 2 }]}>
+              {pendingReminderCount} {pendingReminderCount === 1 ? t("reminders.pending").toLowerCase() : t("reminders.active").toLowerCase()}
+            </Text>
+          ) : (
+            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>{t("reminders.noReminders").split(".")[0]}</Text>
+          )}
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+      </TouchableOpacity>
     </View>
-  ), [insets.top, dailyStats, navigation]);
+  ), [insets.top, dailyStats, pendingReminderCount, navigation]);
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
