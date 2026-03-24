@@ -66,20 +66,47 @@ async function parseDirect(text, currentDatetime) {
   }
 }
 
+const VALID_RECURRENCE_TYPES = ["daily", "weekly", "monthly"]
+
+function validateParsedResult(parsed, fallbackAction) {
+  const result = {
+    action: typeof parsed?.action === "string" && parsed.action.trim()
+      ? parsed.action.trim()
+      : fallbackAction,
+    datetime: null,
+    recurrence: null,
+  }
+  if (typeof parsed?.datetime === "string" && !isNaN(new Date(parsed.datetime).getTime())) {
+    result.datetime = parsed.datetime
+  }
+  if (parsed?.recurrence && VALID_RECURRENCE_TYPES.includes(parsed.recurrence.type)) {
+    const rec = { type: parsed.recurrence.type }
+    if (parsed.recurrence.type === "weekly" && Array.isArray(parsed.recurrence.days_of_week)) {
+      rec.days_of_week = parsed.recurrence.days_of_week.filter(
+        (d) => typeof d === "number" && d >= 0 && d <= 6
+      )
+    }
+    result.recurrence = rec
+  }
+  return result
+}
+
 export async function parseReminder(text) {
   const currentDatetime = new Date().toISOString()
 
+  let raw
   if (DEV_ANTHROPIC_KEY) {
-    return parseDirect(text, currentDatetime)
+    raw = await parseDirect(text, currentDatetime)
+  } else {
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke("parse-reminder", {
+        body: { text, current_datetime: currentDatetime },
+      }),
+      PARSE_TIMEOUT_MS
+    )
+    if (error) throw error
+    raw = data
   }
 
-  const { data, error } = await withTimeout(
-    supabase.functions.invoke("parse-reminder", {
-      body: { text, current_datetime: currentDatetime },
-    }),
-    PARSE_TIMEOUT_MS
-  )
-
-  if (error) throw error
-  return data
+  return validateParsedResult(raw, text)
 }

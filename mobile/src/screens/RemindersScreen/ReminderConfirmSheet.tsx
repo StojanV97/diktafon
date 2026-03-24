@@ -133,13 +133,15 @@ export default function ReminderConfirmSheet({
               onChange={(_e, selectedDate) => {
                 if (Platform.OS === "android") setShowDatePicker(false);
                 if (selectedDate) {
-                  const updated = new Date(date);
-                  updated.setFullYear(
-                    selectedDate.getFullYear(),
-                    selectedDate.getMonth(),
-                    selectedDate.getDate()
-                  );
-                  setDate(updated);
+                  setDate(prev => {
+                    const updated = new Date(prev);
+                    updated.setFullYear(
+                      selectedDate.getFullYear(),
+                      selectedDate.getMonth(),
+                      selectedDate.getDate()
+                    );
+                    return updated;
+                  });
                 }
               }}
               minimumDate={new Date()}
@@ -155,12 +157,14 @@ export default function ReminderConfirmSheet({
               onChange={(_e, selectedDate) => {
                 if (Platform.OS === "android") setShowTimePicker(false);
                 if (selectedDate) {
-                  const updated = new Date(date);
-                  updated.setHours(
-                    selectedDate.getHours(),
-                    selectedDate.getMinutes()
-                  );
-                  setDate(updated);
+                  setDate(prev => {
+                    const updated = new Date(prev);
+                    updated.setHours(
+                      selectedDate.getHours(),
+                      selectedDate.getMinutes()
+                    );
+                    return updated;
+                  });
                 }
               }}
             />

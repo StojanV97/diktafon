@@ -101,9 +101,9 @@ serve(async (req) => {
     })
 
     if (!response.ok) {
-      const errBody = await response.text()
+      console.error("Anthropic API error:", response.status, await response.text())
       return new Response(
-        JSON.stringify({ error: `Anthropic API error: ${errBody}` }),
+        JSON.stringify({ error: "LLM service error" }),
         {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,12 +127,35 @@ serve(async (req) => {
     const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
     const parsed = JSON.parse(cleaned)
 
-    return new Response(JSON.stringify(parsed), {
+    // Validate LLM output schema
+    const VALID_RECURRENCE_TYPES = ["daily", "weekly", "monthly"]
+    const validated: Record<string, unknown> = {
+      action: typeof parsed.action === "string" && parsed.action.trim()
+        ? parsed.action.trim()
+        : text, // fallback to original transcript
+      datetime: null,
+      recurrence: null,
+    }
+    if (typeof parsed.datetime === "string" && !isNaN(new Date(parsed.datetime).getTime())) {
+      validated.datetime = parsed.datetime
+    }
+    if (parsed.recurrence && VALID_RECURRENCE_TYPES.includes(parsed.recurrence.type)) {
+      const rec: Record<string, unknown> = { type: parsed.recurrence.type }
+      if (parsed.recurrence.type === "weekly" && Array.isArray(parsed.recurrence.days_of_week)) {
+        rec.days_of_week = parsed.recurrence.days_of_week.filter(
+          (d: unknown) => typeof d === "number" && d >= 0 && d <= 6
+        )
+      }
+      validated.recurrence = rec
+    }
+
+    return new Response(JSON.stringify(validated), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    console.error("parse-reminder error:", e)
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     })

@@ -393,6 +393,9 @@ export default {
     completed: "Zavrseni",
     today: "Danas",
     tomorrow: "Sutra",
+    notificationTitle: "Podsetnik",
+    snoozeAction: "Odloži 5 min",
+    doneAction: "Gotovo",
   },
 
   whisper: {

@@ -393,6 +393,9 @@ export default {
     completed: "Completed",
     today: "Today",
     tomorrow: "Tomorrow",
+    notificationTitle: "Reminder",
+    snoozeAction: "Snooze 5 min",
+    doneAction: "Done",
   },
 
   whisper: {

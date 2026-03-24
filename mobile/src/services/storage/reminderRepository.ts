@@ -47,7 +47,7 @@ export function createReminder(
       created_at: now,
       updated_at: now,
     };
-    const reminders = await readReminders();
+    const reminders = [...await readReminders()];
     reminders.unshift(reminder);
     await writeReminders(reminders);
     return reminder;
@@ -59,7 +59,7 @@ export function updateReminder(
   patch: Partial<Reminder>
 ): Promise<Reminder | null> {
   return withWriteLock(async () => {
-    const reminders = await readReminders();
+    const reminders = [...await readReminders()];
     const idx = reminders.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     reminders[idx] = {
@@ -88,7 +88,7 @@ export function markReminderDone(id: string): Promise<Reminder | null> {
 
 export function snoozeReminder(id: string): Promise<Reminder | null> {
   return withWriteLock(async () => {
-    const reminders = await readReminders();
+    const reminders = [...await readReminders()];
     const idx = reminders.findIndex((r) => r.id === id);
     if (idx === -1) return null;
     reminders[idx] = {

@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications"
 import * as Sentry from "@sentry/react-native"
+import { t } from "../src/i18n"
 import {
   fetchReminder,
   markReminderDone,
@@ -24,12 +25,12 @@ export function initNotifications() {
   Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [
     {
       identifier: "snooze",
-      buttonTitle: "Odloži 5 min",
+      buttonTitle: t("reminders.snoozeAction"),
       options: { isDestructive: false },
     },
     {
       identifier: "done",
-      buttonTitle: "Gotovo",
+      buttonTitle: t("reminders.doneAction"),
       options: { isDestructive: false },
     },
   ]).catch((e) => {
@@ -53,7 +54,7 @@ export async function scheduleReminderNotification(reminder) {
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: "Podsetnik",
+      title: t("reminders.notificationTitle"),
       body: reminder.action,
       data: { reminderId: reminder.id },
       categoryIdentifier: REMINDER_CATEGORY,
