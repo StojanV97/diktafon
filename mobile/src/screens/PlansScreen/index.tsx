@@ -118,12 +118,14 @@ export default function PlansScreen({ navigation }: any) {
       {(isRecording || isPaused) ? (
         <RecordingView
           saveLabel={t("tabs.plans")}
+          title={t("recording.newPlan")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
           onCancel={stopRecording}
+          onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
         <>

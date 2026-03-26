@@ -317,12 +317,14 @@ export default function RemindersScreen({ navigation, route }: any) {
       {isActiveSession ? (
         <RecordingView
           saveLabel={t("tabs.reminders")}
+          title={t("recording.newReminder")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={handleStop}
           onCancel={handleCancel}
+          onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
         <>

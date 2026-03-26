@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "expo-haptics";
 import Svg, { Circle } from "react-native-svg";
@@ -10,6 +11,7 @@ import Animated, {
   useAnimatedProps,
   withRepeat,
   withTiming,
+  cancelAnimation,
   Easing,
 } from "react-native-reanimated";
 import { colors, spacing, radii, iconSize, typography } from "../theme";
@@ -28,13 +30,14 @@ function TimerRing({ elapsed, isPaused }) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    if (isPaused) return;
-    // Reset and animate over 60 seconds, looping
-    progress.value = 0;
+    if (isPaused) {
+      cancelAnimation(progress);
+      return;
+    }
     progress.value = withRepeat(
       withTiming(1, { duration: 60000, easing: Easing.linear }),
-      -1, // infinite
-      false // no reverse
+      -1,
+      false
     );
   }, [isPaused]);
 
@@ -90,7 +93,10 @@ function WaveformBar({ index, isPaused }) {
   const height = useSharedValue(BAR_MIN);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused) {
+      cancelAnimation(height);
+      return;
+    }
     const baseHeight = BAR_MIN + Math.random() * (BAR_MAX - BAR_MIN) * 0.5;
     const duration = 800 + Math.random() * 600; // 0.8-1.4s
 
@@ -129,7 +135,8 @@ function RecordingDot({ isPaused }) {
 
   useEffect(() => {
     if (isPaused) {
-      scale.value = 1;
+      cancelAnimation(scale);
+      scale.value = withTiming(1, { duration: 200 });
       return;
     }
     scale.value = withRepeat(
@@ -149,17 +156,36 @@ function RecordingDot({ isPaused }) {
 // ── Main Component ────────────────────────────────────
 export default function RecordingView({
   saveLabel,
+  title,
   elapsed,
   isPaused,
   onPause,
   onResume,
   onStop,
   onCancel,
+  onSettings,
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.container}>
-      {/* Save-to card */}
-      <View style={styles.saveCard}>
+      {/* Header + Save card — pinned to top with safe area */}
+      <View style={[styles.topArea, { paddingTop: insets.top + spacing.md }]}>
+        {/* App header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerLabel}>DIKTAPHONE</Text>
+            <Text style={styles.headerTitle}>{title}</Text>
+          </View>
+          {onSettings && (
+            <TouchableOpacity style={styles.settingsBtn} onPress={onSettings} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="cog-outline" size={iconSize.md} color={colors.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Save-to card */}
+        <View style={styles.saveCard}>
         <View style={styles.saveCardAccent} />
         <MaterialCommunityIcons
           name="folder-outline"
@@ -177,6 +203,10 @@ export default function RecordingView({
         </View>
         <RecordingDot isPaused={isPaused} />
       </View>
+      </View>
+
+      {/* Centered content area */}
+      <View style={styles.centeredContent}>
 
       {/* Circular timer */}
       <TimerRing elapsed={elapsed} isPaused={isPaused} />
@@ -231,6 +261,8 @@ export default function RecordingView({
           <Text style={styles.controlLabel}>{t("recording.save")}</Text>
         </View>
       </View>
+
+      </View>
     </View>
   );
 }
@@ -238,10 +270,41 @@ export default function RecordingView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
     backgroundColor: colors.background,
+  },
+  topArea: {
+    paddingHorizontal: spacing.lg,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing.lg,
+  },
+  headerLabel: {
+    ...typography.monoLabel,
+    color: colors.danger,
+    marginBottom: spacing.xs,
+  },
+  headerTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: colors.foreground,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xs,
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
   },
 
   // Save-to card
@@ -250,9 +313,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
-    width: "100%",
-    marginBottom: spacing.xxl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.sm,
     overflow: "hidden",
   },
   saveCardAccent: {

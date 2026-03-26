@@ -421,12 +421,14 @@ export default function DirectoryScreen({ route, navigation }: any) {
       {isActiveSession ? (
         <RecordingView
           saveLabel={folderName || t("nav.directory")}
+          title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}
           onCancel={handleCancel}
+          onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
         <>

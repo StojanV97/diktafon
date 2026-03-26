@@ -232,7 +232,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       <View style={styles.headerTitleRow}>
         <View>
           <Text style={typography.monoLabel as any}>APP</Text>
-          <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktafon</Text>
+          <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktaphone</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigation.navigate("Settings")}
@@ -318,12 +318,14 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       {isActiveSession ? (
         <RecordingView
           saveLabel={t("tabs.dailyLogs")}
+          title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
           onCancel={stopRecording}
+          onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
         <>

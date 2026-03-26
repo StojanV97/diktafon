@@ -491,12 +491,14 @@ export default function DailyLogScreen({ navigation, route }: any) {
       {isActiveSession ? (
         <RecordingView
           saveLabel={t("tabs.dailyLogs")}
+          title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}
           onCancel={handleCancel}
+          onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
         <>
