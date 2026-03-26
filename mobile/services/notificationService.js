@@ -137,7 +137,7 @@ export function handleNotificationResponse(navigationRef) {
 
       // Default tap — navigate to Reminders screen
       if (navigationRef?.isReady()) {
-        navigationRef.navigate("Reminders")
+        navigationRef.navigate("RemindersTab", { screen: "RemindersRoot" })
       }
     } catch (e) {
       Sentry.captureException(e)

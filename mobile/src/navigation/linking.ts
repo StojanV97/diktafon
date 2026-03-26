@@ -1,11 +1,18 @@
-const VALID_DEEP_LINK_SCREENS = new Set(["DailyLog", "Reminders"]);
-
 export const linking = {
   prefixes: ["com.diktafon.app://", "diktafon://"],
   config: {
     screens: {
-      DailyLog: { path: "dailylog" },
-      Reminders: { path: "reminders" },
+      DailyLogsTab: {
+        screens: {
+          DailyLogsRoot: { path: "dailylog" },
+        },
+      },
+      PlansTab: { path: "plans" },
+      RemindersTab: {
+        screens: {
+          RemindersRoot: { path: "reminders" },
+        },
+      },
     },
   },
   getStateFromPath(path: string, config: any) {
@@ -15,14 +22,14 @@ export const linking = {
     const normalized = path.replace(/^\/+/, "");
     if (normalized === "record") {
       return {
-        routes: [{ name: "DailyLog", params: { action: "record" } }],
+        routes: [{
+          name: "DailyLogsTab",
+          state: {
+            routes: [{ name: "DailyLogsRoot", params: { action: "record" } }],
+          },
+        }],
       };
     }
-    const state = defaultGetState(path, config);
-    if (!state?.routes?.length) return undefined;
-    const allValid = state.routes.every((r: any) =>
-      VALID_DEEP_LINK_SCREENS.has(r.name)
-    );
-    return allValid ? state : undefined;
+    return defaultGetState(path, config);
   },
 };

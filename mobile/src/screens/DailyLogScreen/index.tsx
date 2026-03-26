@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import {
   ActivityIndicator,
+  Menu,
   Portal,
   Snackbar,
   Text,
@@ -26,8 +27,7 @@ import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingOverlay from "../../../components/RecordingOverlay";
-import BottomActionBar from "../../../components/BottomActionBar";
-import { AppHeaderLeft, AppHeaderRight } from "../../../components/AppHeader";
+import { AppHeaderRight } from "../../../components/AppHeader";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
 import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
@@ -36,7 +36,7 @@ import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { syncWidgetData } from "../../../services/widgetDataService";
 import { formatSectionDate } from "../../utils/formatters";
-import { colors, spacing, typography } from "../../../theme";
+import { colors, spacing, elevation, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -108,27 +108,42 @@ export default function DailyLogScreen({ navigation, route }: any) {
   // --- Header ---
   const [aiDialogVisible, setAiDialogVisible] = useState(false);
 
-  const headerLeft = useCallback(
-    () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
-    [navigation]
-  );
+  const [headerMenuVisible, setHeaderMenuVisible] = useState(false);
+  const hasRecordedEntries = entries.some((e: any) => e.status === "recorded" || e.status === "error");
+
   const headerRight = useCallback(
     () => (
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Reminders")}
-          style={{ padding: 8, marginRight: 4 }}
+        <Menu
+          visible={headerMenuVisible}
+          onDismiss={() => setHeaderMenuVisible(false)}
+          anchor={
+            <TouchableOpacity onPress={() => setHeaderMenuVisible(true)} style={{ padding: 8, marginRight: 4 }}>
+              <MaterialCommunityIcons name="dots-vertical" size={20} color={colors.foreground} />
+            </TouchableOpacity>
+          }
         >
-          <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
-        </TouchableOpacity>
+          <Menu.Item
+            leadingIcon="text-recognition"
+            onPress={() => { setHeaderMenuVisible(false); openForBatch(null); }}
+            title={t("dailyLog.allToText")}
+            disabled={!hasRecordedEntries}
+          />
+          <Menu.Item
+            leadingIcon="delete-sweep-outline"
+            onPress={() => { setHeaderMenuVisible(false); if (entries.length > 0) setDeleteAllDialogVisible(true); }}
+            title={t("dailyLog.deleteAll")}
+            disabled={entries.length === 0}
+          />
+        </Menu>
         <AppHeaderRight onPress={() => setAiDialogVisible(true)} />
       </View>
     ),
-    [navigation]
+    [headerMenuVisible, hasRecordedEntries, entries.length, openForBatch]
   );
   useEffect(() => {
-    navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
-  }, [navigation, headerLeft, headerRight]);
+    navigation.setOptions({ headerRight });
+  }, [navigation, headerRight]);
 
   // --- Auto-record via deep link ---
   const isRecordingRef = useRef(false);
@@ -511,20 +526,13 @@ export default function DailyLogScreen({ navigation, route }: any) {
       )}
 
       {!isActiveSession && (
-        <BottomActionBar
-          extraLeftIcon="home-outline"
-          extraLeftLabel={t("dailyLog.home")}
-          onExtraLeftPress={() => navigation.navigate("Home")}
-          leftIcon="delete-sweep-outline"
-          leftLabel={t("dailyLog.deleteAll")}
-          onLeftPress={() => entries.length > 0 ? setDeleteAllDialogVisible(true) : undefined}
-          centerIcon="text-recognition"
-          centerLabel={t("dailyLog.allToText")}
-          onCenterPress={() => openForBatch(null)}
-          centerDisabled={!entries.some((e: any) => e.status === "recorded" || e.status === "error")}
-          onRightPress={handleStartRecording}
-          isRecording={false}
-        />
+        <TouchableOpacity
+          style={[styles.fab, elevation.md]}
+          onPress={handleStartRecording}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+        </TouchableOpacity>
       )}
 
       <Portal>
@@ -585,4 +593,15 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

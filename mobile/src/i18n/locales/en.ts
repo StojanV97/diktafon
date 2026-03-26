@@ -37,6 +37,19 @@ export default {
     settings: "Settings",
     auth: "Sign in",
     reminders: "Reminders",
+    plans: "Plans",
+  },
+
+  tabs: {
+    home: "Home",
+    dailyLogs: "Daily Logs",
+    plans: "Plans",
+    reminders: "Reminders",
+  },
+
+  plans: {
+    emptyTitle: "No plans yet",
+    emptyMessage: "Plans are automatically created when you mention tomorrow's plans in your recordings.",
   },
 
   errors: {
@@ -124,6 +137,7 @@ export default {
     deleteFolderTitle: "Delete directory",
     deleteFolderMessage: "Delete \"%{name}\" and all entries in it?",
     nameTooLong: "Name cannot be longer than 100 characters.",
+    recordingSaved: "Recording saved to Daily Logs.",
   },
 
   entry: {

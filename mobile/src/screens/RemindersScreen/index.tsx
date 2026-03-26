@@ -4,6 +4,7 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -26,10 +27,10 @@ import {
   markReminderDone,
 } from "../../services/storage";
 import RecordingOverlay from "../../../components/RecordingOverlay";
-import BottomActionBar from "../../../components/BottomActionBar";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, typography } from "../../../theme";
+import { colors, spacing, elevation, typography } from "../../../theme";
 import { t } from "../../i18n";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -341,22 +342,15 @@ export default function RemindersScreen({ navigation, route }: any) {
         />
       )}
 
-      {/* Bottom bar */}
+      {/* Record reminder FAB */}
       {!isActiveSession && !isProcessing && pipelineState !== "confirming" && (
-        <BottomActionBar
-          extraLeftIcon={undefined}
-          extraLeftLabel={undefined}
-          onExtraLeftPress={undefined}
-          leftIcon="home-outline"
-          leftLabel={t("dailyLog.home")}
-          onLeftPress={() => navigation.navigate("Home")}
-          centerIcon={undefined}
-          centerLabel={undefined}
-          onCenterPress={undefined}
-          centerDisabled={undefined}
-          onRightPress={handleStartRecording}
-          isRecording={false}
-        />
+        <TouchableOpacity
+          style={[styles.fab, elevation.md]}
+          onPress={handleStartRecording}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+        </TouchableOpacity>
       )}
 
       {/* Confirmation sheet */}
@@ -439,5 +433,16 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     marginBottom: 80,
+  },
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

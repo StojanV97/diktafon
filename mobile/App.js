@@ -7,6 +7,8 @@ import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
@@ -28,6 +30,7 @@ import DailyLogScreen from "./screens/DailyLogScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import AuthScreen from "./screens/AuthScreen";
 import RemindersScreen from "./screens/RemindersScreen";
+import PlansScreen from "./screens/PlansScreen";
 import * as Notifications from "expo-notifications";
 import { initNotifications, handleNotificationResponse } from "./services/notificationService";
 
@@ -61,8 +64,81 @@ if (SENTRY_DSN) {
 
 SplashScreen.preventAutoHideAsync();
 
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 const navigationRef = createNavigationContainerRef();
+
+const TAB_ICONS = {
+  HomeTab: "home-outline",
+  DailyLogsTab: "microphone-outline",
+  PlansTab: "clipboard-text-outline",
+  RemindersTab: "bell-outline",
+};
+
+// Shared stack screen options
+const sharedScreens = (Stack) => (
+  <>
+    <Stack.Screen name="Entry" component={EntryScreen} options={{ title: t('nav.entry') }} />
+    <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('nav.settings') }} />
+    <Stack.Screen name="Auth" component={AuthScreen} options={{ title: t('nav.auth') }} />
+  </>
+);
+
+function HomeStack() {
+  const Stack = createNativeStackNavigator();
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="HomeRoot" component={DirectoryHomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Directory" component={DirectoryScreen} options={({ route }) => ({ title: route.params?.name || t('nav.directory') })} />
+      {sharedScreens(Stack)}
+    </Stack.Navigator>
+  );
+}
+
+function DailyLogsStack() {
+  const Stack = createNativeStackNavigator();
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="DailyLogsRoot" component={DailyLogScreen} options={{ title: t("tabs.dailyLogs") }} />
+      {sharedScreens(Stack)}
+    </Stack.Navigator>
+  );
+}
+
+function RemindersStack() {
+  const Stack = createNativeStackNavigator();
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="RemindersRoot" component={RemindersScreen} options={{ title: t("tabs.reminders") }} />
+      {sharedScreens(Stack)}
+    </Stack.Navigator>
+  );
+}
+
+function RootTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: route.name === "PlansTab",
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.foreground,
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontWeight: "600" },
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name={TAB_ICONS[route.name]} size={size} color={color} />
+        ),
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.background },
+      })}
+    >
+      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} />
+      <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} />
+      <Tab.Screen name="PlansTab" component={PlansScreen} options={{ title: t("tabs.plans") }} />
+      <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} />
+    </Tab.Navigator>
+  );
+}
 
 function App() {
   const { ready, initialRoute } = useAppInit();
@@ -147,17 +223,14 @@ function App() {
     <PaperProvider theme={theme}>
       <ErrorBoundary>
         <View style={styles.flex1} onLayout={onLayoutRootView}>
-          <NavigationContainer linking={linking} ref={navigationRef} onReady={checkPendingControlAction}>
+          <NavigationContainer linking={linking} ref={navigationRef} onReady={() => {
+            checkPendingControlAction();
+            if (initialRoute === "Auth") {
+              navigationRef.current?.navigate("HomeTab", { screen: "Auth" });
+            }
+          }}>
             <StatusBar style="dark" />
-            <Stack.Navigator initialRouteName={initialRoute} screenOptions={stackScreenOptions}>
-              <Stack.Screen name="Home" component={DirectoryHomeScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="Directory" component={DirectoryScreen} options={({ route }) => ({ title: route.params?.name || t('nav.directory') })} />
-              <Stack.Screen name="Entry" component={EntryScreen} options={{ title: t('nav.entry') }} />
-              <Stack.Screen name="DailyLog" component={DailyLogScreen} options={{ title: t('nav.dailyLog') }} />
-              <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('nav.settings') }} />
-              <Stack.Screen name="Auth" component={AuthScreen} options={{ title: t('nav.auth') }} />
-              <Stack.Screen name="Reminders" component={RemindersScreen} options={{ title: t('nav.reminders') }} />
-            </Stack.Navigator>
+            <RootTabs />
           </NavigationContainer>
         </View>
       </ErrorBoundary>

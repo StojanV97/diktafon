@@ -37,6 +37,19 @@ export default {
     settings: "Podesavanja",
     auth: "Prijava",
     reminders: "Podsetnici",
+    plans: "Planovi",
+  },
+
+  tabs: {
+    home: "Pocetna",
+    dailyLogs: "Dnevni Zapisi",
+    plans: "Planovi",
+    reminders: "Podsetnici",
+  },
+
+  plans: {
+    emptyTitle: "Nema planova",
+    emptyMessage: "Planovi se automatski kreiraju kada pomenete planove za sutra u snimcima.",
   },
 
   errors: {
@@ -124,6 +137,7 @@ export default {
     deleteFolderTitle: "Obrisi direktorijum",
     deleteFolderMessage: "Obrisati \"%{name}\" i sve zapise u njemu?",
     nameTooLong: "Naziv ne moze biti duzi od 100 karaktera.",
+    recordingSaved: "Snimak sacuvan u Dnevne Zapise.",
   },
 
   entry: {

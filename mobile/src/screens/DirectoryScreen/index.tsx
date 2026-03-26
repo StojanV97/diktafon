@@ -28,7 +28,6 @@ import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingOverlay from "../../../components/RecordingOverlay";
-import BottomActionBar from "../../../components/BottomActionBar";
 import CalendarStrip from "../../../components/CalendarStrip";
 import { AppHeaderLeft, AppHeaderRight } from "../../../components/AppHeader";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
@@ -117,12 +116,19 @@ export default function DirectoryScreen({ route, navigation }: any) {
 
   // Header
   const headerLeft = useCallback(
-    () => <AppHeaderLeft onPress={() => navigation.navigate("Home")} />,
+    () => <AppHeaderLeft onPress={() => navigation.goBack()} />,
     [navigation]
   );
   const headerRight = useCallback(
-    () => <AppHeaderRight onPress={() => setAiDialogVisible(true)} />,
-    []
+    () => (
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity onPress={importFile} style={{ padding: 8, marginRight: 4 }}>
+          <MaterialCommunityIcons name="file-upload-outline" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <AppHeaderRight onPress={() => setAiDialogVisible(true)} />
+      </View>
+    ),
+    [importFile]
   );
   useEffect(() => {
     navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
@@ -467,20 +473,13 @@ export default function DirectoryScreen({ route, navigation }: any) {
       )}
 
       {!isActiveSession && (
-        <BottomActionBar
-          extraLeftIcon={undefined}
-          extraLeftLabel={undefined}
-          onExtraLeftPress={undefined}
-          leftIcon="home-outline"
-          leftLabel={t("directory.home")}
-          onLeftPress={() => navigation.navigate("Home")}
-          centerIcon="file-upload-outline"
-          centerLabel={t("directory.import")}
-          onCenterPress={importFile}
-          centerDisabled={false}
-          onRightPress={handleStartRecording}
-          isRecording={false}
-        />
+        <TouchableOpacity
+          style={[styles.fab, elevation.md]}
+          onPress={handleStartRecording}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+        </TouchableOpacity>
       )}
 
       <Portal>
@@ -610,5 +609,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: colors.primary,
+  },
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

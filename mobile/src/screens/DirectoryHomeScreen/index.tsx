@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -23,22 +23,18 @@ import {
   deleteFolder,
   updateFolder,
   getAllTags,
-  fetchDailyLogStats,
-  createDailyLogEntry,
   tombstoneFolder,
   deleteFolderWithICloud,
+  createDailyLogEntry,
 } from "../../../services/journalStorage";
 import { isSyncEnabled } from "../../../services/icloudSyncService";
-import { processReminderRecording } from "../../../services/reminderPipelineService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import RecordingOverlay from "../../../components/RecordingOverlay";
-import BottomActionBar from "../../../components/BottomActionBar";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
-import { formatDate, formatDuration } from "../../utils/formatters";
+import { formatDate } from "../../utils/formatters";
 import { t } from "../../i18n";
-import * as FileSystem from "expo-file-system/legacy";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import FolderDialog from "./FolderDialog";
@@ -50,7 +46,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const [folders, setFolders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dailyStats, setDailyStats] = useState({ clipCount: 0, totalDuration: 0, latestTimestamp: null });
 
   // Folder dialog state
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -71,54 +66,23 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   // Menu state
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
 
-  // Recording — single recorder shared between Quick Record and Reminder flows
-  type RecordingMode = "quickRecord" | "reminder";
-  type ReminderPipelineState = "idle" | "recording" | "transcribing" | "parsing";
-  const recordingModeRef = useRef<RecordingMode>("quickRecord");
-  const [reminderPipelineState, setReminderPipelineState] = useState<ReminderPipelineState>("idle");
-
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
+  // Quick recording
+  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
     onRecordingComplete: async (uri: string, durationSeconds: number) => {
-      if (recordingModeRef.current === "quickRecord") {
-        try {
-          await createDailyLogEntry(uri, durationSeconds);
-          const stats = await fetchDailyLogStats();
-          setDailyStats(stats);
-        } catch (e) {
-          console.error("[Quick Record save]", e);
-          setSnackbar(safeErrorMessage(e, t("errors.saveFailed")));
-        }
-      } else {
-        try {
-          const result = await processReminderRecording(
-            uri,
-            (state: string) => setReminderPipelineState(state as ReminderPipelineState)
-          );
-          setReminderPipelineState("idle");
-          navigation.navigate("Reminders", { pendingResult: result });
-        } catch (e: any) {
-          console.error("[Reminder pipeline]", e);
-          setReminderPipelineState("idle");
-          setSnackbar(safeErrorMessage(e, t("reminders.parseFailed")));
-        } finally {
-          try {
-            await FileSystem.deleteAsync(uri, { idempotent: true });
-          } catch {}
-        }
+      try {
+        await createDailyLogEntry(uri, durationSeconds);
+        setSnackbar(t("home.recordingSaved"));
+      } catch (e) {
+        setSnackbar(safeErrorMessage(e, t("errors.saveFailed")));
       }
     },
   });
-
-  const isReminderMode = recordingModeRef.current === "reminder";
-  const isReminderRecording = (isRecording || isPaused) && isReminderMode;
-  const isReminderProcessing = reminderPipelineState === "transcribing" || reminderPipelineState === "parsing";
 
   const handleRecordPress = useCallback(async () => {
     try {
       if (isRecording) {
         await stopRecording();
       } else {
-        recordingModeRef.current = "quickRecord";
         await startRecording();
       }
     } catch (e) {
@@ -126,43 +90,10 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     }
   }, [isRecording, stopRecording, startRecording, setSnackbar]);
 
-  const handleReminderRecordPress = useCallback(async () => {
-    try {
-      recordingModeRef.current = "reminder";
-      setReminderPipelineState("recording");
-      await startRecording();
-    } catch (e) {
-      setReminderPipelineState("idle");
-      setSnackbar(safeErrorMessage(e));
-    }
-  }, [startRecording, setSnackbar]);
-
-  const handleReminderStop = useCallback(async () => {
-    try {
-      await stopRecording();
-    } catch (e) {
-      setReminderPipelineState("idle");
-      setSnackbar(safeErrorMessage(e));
-    }
-  }, [stopRecording, setSnackbar]);
-
-  const handleReminderCancel = useCallback(async () => {
-    try {
-      await cancelRecording();
-      setReminderPipelineState("idle");
-    } catch (e) {
-      setSnackbar(safeErrorMessage(e));
-    }
-  }, [cancelRecording, setSnackbar]);
-
   const load = useCallback(async () => {
     try {
-      const [data, stats] = await Promise.all([
-        fetchFolders(),
-        fetchDailyLogStats(),
-      ]);
+      const data = await fetchFolders();
       setFolders(data);
-      setDailyStats(stats);
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     } finally {
@@ -308,30 +239,8 @@ export default function DirectoryHomeScreen({ navigation }: any) {
           <MaterialCommunityIcons name="cog-outline" size={22} color={colors.muted} />
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate("DailyLog")}
-        style={[styles.danasCard, elevation.sm]}
-      >
-        <View style={styles.danasIconWrap}>
-          <MaterialCommunityIcons name="calendar-today" size={24} color={colors.primary} />
-        </View>
-        <View style={styles.danasBody}>
-          <Text style={styles.danasTitle}>{t("home.quickRecord")}</Text>
-          {dailyStats.clipCount > 0 ? (
-            <Text style={[typography.caption, { marginTop: 2 }]}>
-              {dailyStats.clipCount} {dailyStats.clipCount === 1 ? t("home.entry") : t("home.entries")} · {formatDuration(dailyStats.totalDuration)}
-            </Text>
-          ) : (
-            <Text style={[typography.caption, { marginTop: 2, color: colors.muted }]}>{t("home.noEntries")}</Text>
-          )}
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-      </TouchableOpacity>
-
     </View>
-  ), [insets.top, dailyStats, navigation]);
+  ), [insets.top, navigation]);
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
@@ -422,20 +331,33 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         }
       />
 
-      {!isRecording && !isPaused && !isReminderProcessing && (
-        <BottomActionBar
-          extraLeftIcon={undefined}
-          extraLeftLabel={undefined}
-          onExtraLeftPress={undefined}
-          leftIcon="folder-plus-outline"
-          leftLabel={t("home.newFolder")}
-          onLeftPress={() => openDialog("create")}
-          centerIcon="bell-outline"
-          centerLabel={t("home.reminder")}
-          onCenterPress={handleReminderRecordPress}
-          centerDisabled={false}
-          onRightPress={handleRecordPress}
-          isRecording={false}
+      {!isRecording && !isPaused && (
+        <>
+          <TouchableOpacity
+            style={[styles.fab, styles.fabSecondary, elevation.md]}
+            onPress={() => openDialog("create")}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="folder-plus-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.fab, elevation.md]}
+            onPress={handleRecordPress}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </>
+      )}
+
+      {(isRecording || isPaused) && (
+        <RecordingOverlay
+          meteringHistory={meteringHistory}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
+          onStop={stopRecording}
         />
       )}
 
@@ -468,29 +390,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         />
       </Portal>
 
-      {(isRecording || isPaused) && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
-          elapsed={elapsed}
-          isPaused={isPaused}
-          onPause={pauseRecording}
-          onResume={resumeRecording}
-          onStop={isReminderMode ? handleReminderStop : stopRecording}
-          onCancel={isReminderMode ? handleReminderCancel : undefined}
-        />
-      )}
-
-      {isReminderProcessing && (
-        <View style={styles.processingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.processingText}>
-            {reminderPipelineState === "transcribing"
-              ? t("reminders.transcribing")
-              : t("reminders.parsing")}
-          </Text>
-        </View>
-      )}
-
       <Snackbar visible={!!snackbar} onDismiss={dismissSnackbar} duration={3000}>
         {snackbar}
       </Snackbar>
@@ -522,28 +421,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: spacing.xs,
   },
-  danasCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  danasIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primaryLight,
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: spacing.md,
   },
-  danasBody: { flex: 1 },
-  danasTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: colors.foreground,
+  fabSecondary: {
+    bottom: spacing.lg + 56 + spacing.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    right: spacing.lg + 4,
   },
   card: {
     backgroundColor: colors.surface,
@@ -590,17 +485,5 @@ const styles = StyleSheet.create({
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
     color: colors.primary,
-  },
-  processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  processingText: {
-    ...typography.body,
-    color: colors.muted,
-    marginTop: spacing.md,
   },
 });

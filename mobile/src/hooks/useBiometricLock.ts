@@ -17,7 +17,7 @@ export function useBiometricLock(navigationRef: any) {
     try {
       const action = await getPendingAction();
       if (action === "record" && navigationRef.current) {
-        navigationRef.current.navigate("DailyLog", { action: "record" });
+        navigationRef.current.navigate("DailyLogsTab", { screen: "DailyLogsRoot", params: { action: "record" } });
       }
     } catch {}
   }, [navigationRef]);
