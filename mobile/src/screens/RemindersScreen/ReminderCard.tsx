@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { IconButton, Menu, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors, spacing, radii, elevation, iconSize, typography } from "../../../theme";
@@ -49,13 +49,13 @@ function recurrenceLabel(item: Reminder): string {
 function statusConfig(status: string) {
   switch (status) {
     case "pending":
-      return { label: t("reminders.pending"), bg: colors.badgePending, fg: colors.badgePendingFg, icon: "clock-outline" };
+      return { label: t("reminders.pending"), fg: colors.badgePendingFg, icon: "clock-outline" as const };
     case "snoozed":
-      return { label: t("reminders.snoozed"), bg: colors.badgeSnoozed, fg: colors.badgeSnoozedFg, icon: "alarm-snooze" };
+      return { label: t("reminders.snoozed"), fg: colors.badgeSnoozedFg, icon: "alarm-snooze" as const };
     case "done":
-      return { label: t("reminders.done"), bg: colors.badgeDone, fg: colors.badgeDoneFg, icon: "check-circle-outline" };
+      return { label: t("reminders.done"), fg: colors.badgeDoneFg, icon: "check-circle-outline" as const };
     default:
-      return { label: status, bg: colors.badgeNeutral, fg: colors.muted, icon: "help-circle-outline" };
+      return { label: status, fg: colors.muted, icon: "help-circle-outline" as const };
   }
 }
 
@@ -71,65 +71,50 @@ function ReminderCard({
 
   return (
     <View style={[styles.card, elevation.sm]}>
-      <View style={styles.cardRow}>
-        <View style={styles.cardLeft}>
-          <MaterialCommunityIcons
-            name="bell-outline"
-            size={iconSize.md}
-            color={colors.primary}
-          />
-        </View>
+      {/* Left accent bar */}
+      <View style={[styles.accentBar, { backgroundColor: sc.fg }]} />
 
-        <View style={styles.cardBody}>
-          <Text style={styles.actionText} numberOfLines={2}>
-            {item.action}
-          </Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.timeText}>
-              {formatReminderTime(item.reminder_time)}
-            </Text>
-            <View style={[styles.badge, { backgroundColor: sc.bg }]}>
-              <MaterialCommunityIcons
-                name={sc.icon as any}
-                size={iconSize.xs}
-                color={sc.fg}
-                style={{ marginRight: spacing.xs }}
-              />
-              <Text style={[styles.badgeText, { color: sc.fg }]}>
-                {sc.label}
-              </Text>
-            </View>
+      <View style={styles.cardContent}>
+        {/* Top row: category label + menu */}
+        <View style={styles.topRow}>
+          <View style={styles.categoryRow}>
+            <MaterialCommunityIcons name={sc.icon} size={iconSize.sm} color={sc.fg} style={{ marginRight: spacing.xs }} />
+            <Text style={[styles.categoryLabel, { color: sc.fg }]}>{sc.label}</Text>
+            <Text style={styles.metaText}>{formatReminderTime(item.reminder_time)}</Text>
             <View style={styles.recurrenceBadge}>
               <Text style={styles.recurrenceText}>{recurrenceLabel(item)}</Text>
             </View>
           </View>
+          <Menu
+            visible={isMenuOpen}
+            onDismiss={onMenuClose}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                iconColor={colors.muted}
+                size={iconSize.md}
+                onPress={() => onMenuOpen(item.id)}
+                style={styles.menuBtn}
+              />
+            }
+          >
+            {item.status !== "done" && (
+              <Menu.Item
+                leadingIcon="check-circle-outline"
+                onPress={() => onMarkDone(item.id)}
+                title={t("reminders.markDone")}
+              />
+            )}
+            <Menu.Item
+              leadingIcon="delete-outline"
+              onPress={() => onDelete(item.id)}
+              title={t("reminders.delete")}
+            />
+          </Menu>
         </View>
 
-        <Menu
-          visible={isMenuOpen}
-          onDismiss={onMenuClose}
-          anchor={
-            <IconButton
-              icon="dots-vertical"
-              iconColor={colors.muted}
-              size={18}
-              onPress={() => onMenuOpen(item.id)}
-            />
-          }
-        >
-          {item.status !== "done" && (
-            <Menu.Item
-              leadingIcon="check-circle-outline"
-              onPress={() => onMarkDone(item.id)}
-              title={t("reminders.markDone")}
-            />
-          )}
-          <Menu.Item
-            leadingIcon="delete-outline"
-            onPress={() => onDelete(item.id)}
-            title={t("reminders.delete")}
-          />
-        </Menu>
+        {/* Main content: action text */}
+        <Text style={styles.actionText} numberOfLines={2}>{item.action}</Text>
       </View>
     </View>
   );
@@ -141,48 +126,53 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-  },
-  cardRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  cardLeft: {
+  accentBar: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 2,
+    marginLeft: spacing.md,
+  },
+  cardContent: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingLeft: spacing.md,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    marginRight: spacing.md,
-    marginTop: spacing.xs,
   },
-  cardBody: { flex: 1 },
-  actionText: {
-    ...typography.subheading,
-    marginBottom: spacing.xs,
-  },
-  metaRow: {
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
     flexWrap: "wrap",
     gap: spacing.xs,
   },
-  timeText: {
-    ...typography.mono,
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-  },
-  badgeText: {
-    fontFamily: "JetBrainsMono_500Medium",
+  categoryLabel: {
+    ...typography.monoLabel,
     fontSize: 10,
+    letterSpacing: 1,
+  },
+  metaText: {
+    ...typography.mono,
+    fontSize: 11,
+  },
+  menuBtn: {
+    margin: -spacing.sm,
+  },
+  actionText: {
+    ...typography.subheading,
+    marginTop: spacing.sm,
   },
   recurrenceBadge: {
     backgroundColor: colors.badgeNeutral,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 2,
     borderRadius: radii.full,
   },
   recurrenceText: {

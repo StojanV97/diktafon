@@ -9,7 +9,7 @@ import {
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { statusConfig } from "../../../utils/entryUtils";
 import { formatDuration, formatTime } from "../../utils/formatters";
-import { colors, spacing, radii, elevation, typography } from "../../../theme";
+import { colors, spacing, radii, elevation, iconSize, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 interface Props {
@@ -45,96 +45,70 @@ function DailyLogEntryCard({
       onPress={() => onPress(item.id)}
       style={[styles.card, elevation.sm]}
     >
-      <View style={styles.cardRow}>
-        <View style={styles.cardLeft}>
-          <Text style={styles.timeLabel}>{formatTime(item.created_at)}</Text>
-          {item.duration_seconds > 0 && (
-            <View style={styles.durationBadge}>
-              <Text style={styles.durationText}>
-                {formatDuration(item.duration_seconds)}
-              </Text>
-            </View>
-          )}
-        </View>
+      {/* Left accent bar */}
+      <View style={[styles.accentBar, { backgroundColor: sc.fg }]} />
 
-        <View style={styles.cardBody}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-              {isProcessing ? (
-                <ActivityIndicator
-                  size={10}
-                  color={sc.fg}
-                  style={{ marginRight: 4 }}
-                />
-              ) : (
-                <MaterialCommunityIcons
-                  name={sc.icon as any}
-                  size={12}
-                  color={sc.fg}
-                  style={{ marginRight: 4 }}
-                />
-              )}
-              <Text style={[styles.statusText, { color: sc.fg }]}>
-                {sc.label}
-              </Text>
-            </View>
-            {isRecorded && (
-              <TouchableOpacity
-                style={styles.transcribeLink}
-                onPress={() => onTranscribe(item.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.transcribeLinkText}>
-                  {t("dailyLog.toText")}
-                </Text>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={14}
-                  color={colors.primary}
-                />
-              </TouchableOpacity>
+      <View style={styles.cardContent}>
+        {/* Top row: category label + menu */}
+        <View style={styles.topRow}>
+          <View style={styles.categoryRow}>
+            {isProcessing ? (
+              <ActivityIndicator size={iconSize.xs} color={sc.fg} style={{ marginRight: spacing.xs }} />
+            ) : (
+              <MaterialCommunityIcons name={sc.icon as any} size={iconSize.sm} color={sc.fg} style={{ marginRight: spacing.xs }} />
+            )}
+            <Text style={[styles.categoryLabel, { color: sc.fg }]}>{sc.label}</Text>
+            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+            {item.duration_seconds > 0 && (
+              <Text style={styles.timeText}> · {formatDuration(item.duration_seconds)}</Text>
             )}
           </View>
-          {isDone && item.text ? (
-            <Text
-              style={[typography.body, styles.preview]}
-              numberOfLines={2}
-            >
-              {item.text}
-            </Text>
-          ) : null}
+          <Menu
+            visible={isMenuOpen}
+            onDismiss={onMenuClose}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                iconColor={colors.muted}
+                size={iconSize.md}
+                onPress={() => onMenuOpen(item.id)}
+                style={styles.menuBtn}
+              />
+            }
+          >
+            {isRecorded && (
+              <Menu.Item
+                leadingIcon="text-recognition"
+                onPress={() => onTranscribe(item.id)}
+                title={t("dailyLog.toText")}
+              />
+            )}
+            <Menu.Item
+              leadingIcon="folder-move-outline"
+              onPress={() => onMove(item.id)}
+              title={t("dailyLog.moveToFolder")}
+            />
+            <Menu.Item
+              leadingIcon="delete-outline"
+              onPress={() => onDelete(item.id, item.filename)}
+              title={t("common.delete")}
+            />
+          </Menu>
         </View>
 
-        <Menu
-          visible={isMenuOpen}
-          onDismiss={onMenuClose}
-          anchor={
-            <IconButton
-              icon="dots-vertical"
-              iconColor={colors.muted}
-              size={18}
-              onPress={() => onMenuOpen(item.id)}
-            />
-          }
-        >
-          {isRecorded && (
-            <Menu.Item
-              leadingIcon="text-recognition"
-              onPress={() => onTranscribe(item.id)}
-              title={t("dailyLog.toText")}
-            />
-          )}
-          <Menu.Item
-            leadingIcon="folder-move-outline"
-            onPress={() => onMove(item.id)}
-            title={t("dailyLog.moveToFolder")}
-          />
-          <Menu.Item
-            leadingIcon="delete-outline"
-            onPress={() => onDelete(item.id, item.filename)}
-            title={t("common.delete")}
-          />
-        </Menu>
+        {/* Main content */}
+        {isDone && item.text ? (
+          <Text style={styles.preview} numberOfLines={2}>{item.text}</Text>
+        ) : isRecorded ? (
+          <TouchableOpacity
+            style={styles.transcribeLink}
+            onPress={() => onTranscribe(item.id)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.transcribeLinkText}>{t("dailyLog.toText")}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={iconSize.sm} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -146,60 +120,54 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-  },
-  cardRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  cardLeft: {
-    alignItems: "center",
-    marginRight: spacing.md,
-    minWidth: 44,
+  accentBar: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 2,
+    marginLeft: spacing.md,
   },
-  timeLabel: {
-    ...typography.caption,
-    color: colors.foreground,
+  cardContent: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingLeft: spacing.md,
   },
-  durationBadge: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  durationText: {
-    ...typography.mono,
-    fontSize: 11,
-    color: colors.primary,
-  },
-  cardBody: { flex: 1 },
-  statusRow: {
+  topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: spacing.xs,
   },
-  statusBadge: {
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
+    flex: 1,
   },
-  statusText: {
-    fontFamily: "JetBrainsMono_500Medium",
+  categoryLabel: {
+    ...typography.monoLabel,
     fontSize: 10,
+    letterSpacing: 1,
+    marginRight: spacing.sm,
+  },
+  timeText: {
+    ...typography.mono,
+    fontSize: 11,
+  },
+  menuBtn: {
+    margin: -spacing.sm,
   },
   preview: {
     ...typography.bodySmall,
-    color: colors.muted,
+    color: colors.foreground,
     lineHeight: 20,
+    marginTop: spacing.sm,
   },
   transcribeLink: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: spacing.sm,
   },
   transcribeLinkText: {
     ...typography.label,

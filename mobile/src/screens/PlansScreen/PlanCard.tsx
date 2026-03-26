@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { IconButton, Menu, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors, spacing, radii, elevation, typography } from "../../../theme";
+import { colors, spacing, radii, elevation, iconSize, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 interface Props {
@@ -40,10 +40,15 @@ export default function PlanCard({ plan, onEdit, onDelete }: Props) {
 
   return (
     <View style={[styles.card, elevation.sm]}>
-      <View style={styles.header}>
-        <View style={styles.dateRow}>
-          <MaterialCommunityIcons name="calendar-outline" size={16} color={colors.primary} />
-          <Text style={styles.dateText}>{dateLabel}</Text>
+      {/* Left accent bar */}
+      <View style={styles.accentBar} />
+
+      <View style={styles.cardContent}>
+      {/* Top row: category label + menu */}
+      <View style={styles.topRow}>
+        <View style={styles.categoryRow}>
+          <MaterialCommunityIcons name="calendar-outline" size={iconSize.sm} color={colors.primary} style={{ marginRight: spacing.xs }} />
+          <Text style={styles.categoryLabel}>{dateLabel.toUpperCase()}</Text>
         </View>
         {!editing && (
           <Menu
@@ -53,8 +58,9 @@ export default function PlanCard({ plan, onEdit, onDelete }: Props) {
               <IconButton
                 icon="dots-vertical"
                 iconColor={colors.muted}
-                size={18}
+                size={iconSize.md}
                 onPress={() => setMenuVisible(true)}
+                style={styles.menuBtn}
               />
             }
           >
@@ -117,6 +123,7 @@ export default function PlanCard({ plan, onEdit, onDelete }: Props) {
           ))}
         </View>
       )}
+      </View>
     </View>
   );
 }
@@ -125,22 +132,40 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
     marginBottom: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-  header: {
+  accentBar: {
+    width: 4,
+    alignSelf: "stretch",
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+    marginLeft: spacing.md,
+  },
+  cardContent: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingLeft: spacing.md,
+  },
+  topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: spacing.sm,
   },
-  dateRow: {
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
+    flex: 1,
   },
-  dateText: {
-    ...typography.subheading,
+  categoryLabel: {
+    ...typography.monoLabel,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  menuBtn: {
+    margin: -spacing.sm,
   },
   itemsArea: {
     gap: spacing.xs,

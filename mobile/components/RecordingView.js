@@ -186,23 +186,26 @@ export default function RecordingView({
 
         {/* Save-to card */}
         <View style={styles.saveCard}>
-        <View style={styles.saveCardAccent} />
-        <MaterialCommunityIcons
-          name="folder-outline"
-          size={iconSize.md}
-          color={colors.danger}
-          style={styles.saveCardIcon}
-        />
-        <View style={styles.saveCardBody}>
-          <Text style={styles.saveCardCategory}>
-            {saveLabel.toUpperCase()}
-          </Text>
-          <Text style={styles.saveCardText}>
-            {t("recording.inProgress")}
-          </Text>
+          <View style={styles.saveCardAccent} />
+          <View style={styles.saveCardBody}>
+            <View style={styles.saveCardTopRow}>
+              <MaterialCommunityIcons
+                name="folder-outline"
+                size={iconSize.sm}
+                color={colors.danger}
+                style={styles.saveCardIcon}
+              />
+              <Text style={styles.saveCardCategory}>
+                {saveLabel.toUpperCase()}
+              </Text>
+              <View style={{ flex: 1 }} />
+              <RecordingDot isPaused={isPaused} />
+            </View>
+            <Text style={styles.saveCardText}>
+              {t("recording.inProgress")}
+            </Text>
+          </View>
         </View>
-        <RecordingDot isPaused={isPaused} />
-      </View>
       </View>
 
       {/* Centered content area */}
@@ -310,29 +313,29 @@ const styles = StyleSheet.create({
   // Save-to card
   saveCard: {
     flexDirection: "row",
-    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingRight: spacing.lg,
     marginHorizontal: spacing.sm,
-    overflow: "hidden",
   },
   saveCardAccent: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
     width: 4,
+    alignSelf: "stretch",
     backgroundColor: colors.danger,
-    borderTopLeftRadius: radii.lg,
-    borderBottomLeftRadius: radii.lg,
-  },
-  saveCardIcon: {
+    borderRadius: 2,
+    marginLeft: spacing.md,
     marginRight: spacing.md,
   },
   saveCardBody: {
     flex: 1,
+  },
+  saveCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  saveCardIcon: {
+    marginRight: spacing.xs,
   },
   saveCardCategory: {
     ...typography.monoLabel,

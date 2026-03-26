@@ -82,9 +82,9 @@ export const elevation = {
     ...Platform.select({
       ios: {
         shadowColor: "#8B7355",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.10,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
       },
       android: { elevation: 2 },
     }),
@@ -94,8 +94,8 @@ export const elevation = {
     ...Platform.select({
       ios: {
         shadowColor: "#8B7355",
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.12,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
         shadowRadius: 14,
       },
       android: { elevation: 4 },
