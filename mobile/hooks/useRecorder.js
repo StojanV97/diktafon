@@ -58,7 +58,7 @@ export function useRecorder({ onRecordingComplete }) {
   useEffect(() => {
     if (recorderState.isRecording) {
       const buf = meteringBuffer.current;
-      if (buf.length >= 40) buf.shift();
+      if (buf.length >= 100) buf.shift();
       buf.push(recorderState.metering ?? -160);
       setMeteringHistory([...buf]);
     }
