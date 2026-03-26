@@ -478,7 +478,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
           onPress={handleStartRecording}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
         </TouchableOpacity>
       )}
 

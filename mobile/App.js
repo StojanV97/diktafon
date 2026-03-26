@@ -138,8 +138,12 @@ function RootTabs() {
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.background },
+        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11, paddingBottom: 2 },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.divider,
+          borderTopWidth: 0.5,
+        },
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} />

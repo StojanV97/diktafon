@@ -138,7 +138,7 @@ export default function PlansScreen({ navigation }: any) {
           onPress={handleRecordPress}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
         </TouchableOpacity>
       )}
 

@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors, spacing, radii, typography } from "../theme";
+import { colors, spacing, radii, iconSize, typography } from "../theme";
 import { formatTimer } from "../src/utils/formatters";
 import { t } from "../src/i18n";
 
@@ -32,7 +32,7 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
           onPress={onCancel}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="close" size={22} color={colors.muted} />
+          <MaterialCommunityIcons name="close" size={iconSize.lg} color={colors.muted} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.pauseBtn}
@@ -41,8 +41,8 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
         >
           <MaterialCommunityIcons
             name={isPaused ? "play" : "pause"}
-            size={28}
-            color="#FFF"
+            size={iconSize.xl}
+            color={colors.surface}
           />
         </TouchableOpacity>
         <TouchableOpacity
@@ -50,10 +50,10 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
           onPress={onStop}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="check" size={22} color="#FFF" />
+          <MaterialCommunityIcons name="check" size={iconSize.lg} color={colors.surface} />
         </TouchableOpacity>
       </View>
-      <Text style={[typography.caption, { marginTop: spacing.sm }]}>
+      <Text style={[typography.caption, { marginTop: spacing.md }]}>
         {isPaused ? t('recording.overlay.discardResumeSave') : t('recording.overlay.discardPauseSave')}
       </Text>
     </View>
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.overlay,
   },
   timer: {
     fontFamily: "JetBrainsMono_500Medium",
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   cancelBtn: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.xl,
     width: 48,
     height: 48,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     height: 48,
-    gap: 3,
+    gap: spacing.xs,
     marginBottom: spacing.lg,
   },
   waveformBar: {

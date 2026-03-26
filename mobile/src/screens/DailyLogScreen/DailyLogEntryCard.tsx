@@ -146,8 +146,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
   cardRow: {
     flexDirection: "row",
@@ -159,19 +159,18 @@ const styles = StyleSheet.create({
     minWidth: 44,
   },
   timeLabel: {
-    fontFamily: "JetBrainsMono_500Medium",
-    fontSize: 13,
+    ...typography.caption,
     color: colors.foreground,
   },
   durationBadge: {
     backgroundColor: colors.primaryLight,
     borderRadius: radii.sm,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     marginTop: spacing.xs,
   },
   durationText: {
-    fontFamily: "JetBrainsMono_400Regular",
+    ...typography.mono,
     fontSize: 11,
     color: colors.primary,
   },
@@ -186,25 +185,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 100,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
   },
   statusText: {
     fontFamily: "JetBrainsMono_500Medium",
     fontSize: 10,
   },
   preview: {
+    ...typography.bodySmall,
     color: colors.muted,
     lineHeight: 20,
-    fontSize: 13,
   },
   transcribeLink: {
     flexDirection: "row",
     alignItems: "center",
   },
   transcribeLinkText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: colors.primary,
+    ...typography.label,
   },
 });

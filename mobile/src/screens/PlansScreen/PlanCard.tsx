@@ -140,9 +140,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   dateText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: colors.foreground,
+    ...typography.subheading,
   },
   itemsArea: {
     gap: spacing.xs,
@@ -153,15 +151,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   bullet: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
+    ...typography.body,
     color: colors.primary,
     lineHeight: 22,
   },
   itemText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: colors.foreground,
+    ...typography.body,
     lineHeight: 22,
     flex: 1,
   },
@@ -175,12 +170,10 @@ const styles = StyleSheet.create({
   },
   editInput: {
     flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: colors.foreground,
+    ...typography.body,
     borderBottomWidth: 1,
-    borderBottomColor: colors.primaryLight,
-    paddingVertical: 4,
+    borderBottomColor: colors.divider,
+    paddingVertical: spacing.xs,
   },
   addItemBtn: {
     flexDirection: "row",
@@ -189,9 +182,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   addItemText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: colors.primary,
+    ...typography.label,
   },
   editActions: {
     flexDirection: "row",
@@ -204,19 +195,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   cancelText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    ...typography.subheading,
     color: colors.muted,
   },
   saveBtn: {
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.primary,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
   },
   saveText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: "#FFF",
+    ...typography.subheading,
+    color: colors.surface,
   },
 });

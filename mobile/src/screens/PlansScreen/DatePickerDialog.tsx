@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   quickTextActive: {
-    color: "#FFF",
+    color: colors.surface,
   },
   input: {
     backgroundColor: colors.surface,

@@ -313,7 +313,7 @@ export default function EntryScreen({ route, navigation }: any) {
               <MaterialCommunityIcons
                 name={status.playing ? "pause" : "play"}
                 size={28}
-                color="#FFF"
+                color={colors.surface}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   progressBarTrack: {
     height: 4,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.divider,
     borderRadius: 2,
     overflow: "hidden",
   },
@@ -456,6 +456,6 @@ const styles = StyleSheet.create({
   actionDivider: {
     width: 1,
     height: 20,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.divider,
   },
 });

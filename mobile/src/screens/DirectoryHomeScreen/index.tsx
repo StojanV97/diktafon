@@ -345,7 +345,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             onPress={handleRecordPress}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="microphone" size={24} color="#FFF" />
+            <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
           </TouchableOpacity>
         </>
       )}
@@ -400,9 +400,9 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 },
-  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
+  emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
+  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
   headerArea: {
     paddingHorizontal: spacing.xs,
     paddingBottom: spacing.xl,
@@ -415,8 +415,8 @@ const styles = StyleSheet.create({
   settingsBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
     marginTop: spacing.xs,
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     bottom: spacing.lg + 56 + spacing.md,
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: radii.full,
     backgroundColor: colors.surface,
     right: spacing.lg + 4,
   },
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingRight: spacing.xs,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     marginBottom: spacing.md,
     overflow: "hidden",
   },
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   folderIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radii.full,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: spacing.lg,
@@ -479,10 +479,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
+    paddingVertical: spacing.xs,
   },
   tagChipText: {
-    fontFamily: "JetBrainsMono_400Regular",
+    ...typography.mono,
     fontSize: 11,
     color: colors.primary,
   },

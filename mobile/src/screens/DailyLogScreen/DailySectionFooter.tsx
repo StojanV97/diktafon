@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors, spacing, radii, elevation } from "../../../theme";
+import { colors, spacing, radii, elevation, iconSize, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 interface Props {
@@ -34,7 +34,7 @@ function DailySectionFooter({
         <View style={styles.combinedTitleRow}>
           <MaterialCommunityIcons
             name="text-box-outline"
-            size={18}
+            size={iconSize.md}
             color={colors.primary}
           />
           <Text style={styles.combinedTitle}>
@@ -48,7 +48,7 @@ function DailySectionFooter({
           >
             <MaterialCommunityIcons
               name="content-copy"
-              size={18}
+              size={iconSize.md}
               color={colors.muted}
             />
           </TouchableOpacity>
@@ -58,7 +58,7 @@ function DailySectionFooter({
           >
             <MaterialCommunityIcons
               name="share-variant"
-              size={18}
+              size={iconSize.md}
               color={colors.muted}
             />
           </TouchableOpacity>
@@ -106,8 +106,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   combinedTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    ...typography.subheading,
     color: colors.primary,
   },
   combinedActions: {
@@ -118,15 +117,11 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   combinedText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: colors.foreground,
+    ...typography.bodySmall,
     lineHeight: 22,
   },
   expandBtn: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: colors.primary,
+    ...typography.label,
     marginTop: spacing.sm,
   },
 });

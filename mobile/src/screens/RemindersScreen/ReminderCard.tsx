@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { IconButton, Menu, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors, spacing, radii, elevation, typography } from "../../../theme";
+import { colors, spacing, radii, elevation, iconSize, typography } from "../../../theme";
 import { t } from "../../i18n";
 import type { Reminder } from "../../types/reminder";
 
@@ -49,13 +49,13 @@ function recurrenceLabel(item: Reminder): string {
 function statusConfig(status: string) {
   switch (status) {
     case "pending":
-      return { label: t("reminders.pending"), bg: "#EEF2FF", fg: colors.primary, icon: "clock-outline" };
+      return { label: t("reminders.pending"), bg: colors.badgePending, fg: colors.badgePendingFg, icon: "clock-outline" };
     case "snoozed":
-      return { label: t("reminders.snoozed"), bg: "#FEF3C7", fg: "#D97706", icon: "alarm-snooze" };
+      return { label: t("reminders.snoozed"), bg: colors.badgeSnoozed, fg: colors.badgeSnoozedFg, icon: "alarm-snooze" };
     case "done":
-      return { label: t("reminders.done"), bg: "#DCFCE7", fg: "#16A34A", icon: "check-circle-outline" };
+      return { label: t("reminders.done"), bg: colors.badgeDone, fg: colors.badgeDoneFg, icon: "check-circle-outline" };
     default:
-      return { label: status, bg: "#F1F5F9", fg: colors.muted, icon: "help-circle-outline" };
+      return { label: status, bg: colors.badgeNeutral, fg: colors.muted, icon: "help-circle-outline" };
   }
 }
 
@@ -75,7 +75,7 @@ function ReminderCard({
         <View style={styles.cardLeft}>
           <MaterialCommunityIcons
             name="bell-outline"
-            size={20}
+            size={iconSize.md}
             color={colors.primary}
           />
         </View>
@@ -91,9 +91,9 @@ function ReminderCard({
             <View style={[styles.badge, { backgroundColor: sc.bg }]}>
               <MaterialCommunityIcons
                 name={sc.icon as any}
-                size={10}
+                size={iconSize.xs}
                 color={sc.fg}
-                style={{ marginRight: 3 }}
+                style={{ marginRight: spacing.xs }}
               />
               <Text style={[styles.badgeText, { color: sc.fg }]}>
                 {sc.label}
@@ -141,8 +141,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
   cardRow: {
     flexDirection: "row",
@@ -152,14 +152,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: spacing.md,
-    marginTop: 2,
+    marginTop: spacing.xs,
   },
   cardBody: { flex: 1 },
   actionText: {
-    ...typography.body,
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: colors.foreground,
+    ...typography.subheading,
     marginBottom: spacing.xs,
   },
   metaRow: {
@@ -169,26 +166,24 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   timeText: {
-    fontFamily: "JetBrainsMono_500Medium",
-    fontSize: 12,
-    color: colors.muted,
+    ...typography.mono,
   },
   badge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 100,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
   },
   badgeText: {
     fontFamily: "JetBrainsMono_500Medium",
     fontSize: 10,
   },
   recurrenceBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.badgeNeutral,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 100,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
   },
   recurrenceText: {
     fontFamily: "JetBrainsMono_500Medium",

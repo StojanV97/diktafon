@@ -27,7 +27,7 @@ const DayChip = memo(function DayChip({ dateStr, day, dayOfWeek, count, isToday,
   let bg, textColor;
   if (isSelected) {
     bg = colors.primary;
-    textColor = "#FFF";
+    textColor = colors.surface;
   } else if (isToday) {
     bg = colors.primaryLight;
     textColor = colors.primary;
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   chipCount: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 9,
-    color: "#FFF",
+    color: colors.surface,
     marginTop: 2,
   },
   dotsRow: {

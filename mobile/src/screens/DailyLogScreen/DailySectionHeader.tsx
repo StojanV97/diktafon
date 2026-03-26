@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { formatDuration, formatSectionDate } from "../../utils/formatters";
-import { colors, spacing, typography } from "../../../theme";
+import { colors, spacing, iconSize, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 const sectionCountStyle = [typography.caption, { marginLeft: spacing.sm }];
@@ -27,7 +27,7 @@ function DailySectionHeader({ date, allData, isCollapsed, onToggle }: Props) {
       >
         <MaterialCommunityIcons
           name={isCollapsed ? "chevron-right" : "chevron-down"}
-          size={18}
+          size={iconSize.md}
           color={colors.muted}
         />
         <Text style={styles.sectionTitle}>{formatSectionDate(date)}</Text>
@@ -57,9 +57,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: colors.foreground,
+    ...typography.subheading,
     marginLeft: spacing.xs,
   },
 });

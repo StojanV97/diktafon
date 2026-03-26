@@ -3,19 +3,42 @@ import { MD3LightTheme } from "react-native-paper";
 
 // ── Color tokens ────────────────────────────────────────────────
 export const colors = {
-  background: "#F7F8FA",
+  // Surfaces
+  background: "#FAF9F6",
   surface: "#FFFFFF",
-  foreground: "#0F172A",
-  muted: "#64748B",
-  primary: "#3B5EDB",
-  primaryLight: "#EBF0FB",
-  success: "#31C47E",
+  surfaceSecondary: "#F3F1EE",
+
+  // Text
+  foreground: "#1E293B",
+  muted: "#6B7280",
+
+  // Brand
+  primary: "#4A6FA5",
+  primaryLight: "#EEF3FA",
+
+  // Status
+  success: "#3D9A5F",
   successLight: "#ECFDF5",
-  warning: "#F59E0B",
+  warning: "#D97706",
   warningLight: "#FFFBEB",
-  danger: "#E04040",
+  danger: "#DC4A3D",
   dangerLight: "#FEF2F2",
-  borderGhost: "rgba(0,0,0,0.06)",
+
+  // Utility
+  borderGhost: "rgba(0,0,0,0.05)",
+  divider: "#E8E5E0",
+  overlay: "rgba(255,255,255,0.92)",
+
+  // Badge backgrounds (moved from hardcoded in components)
+  badgePending: "#EEF3FA",
+  badgeSnoozed: "#FEF3C7",
+  badgeDone: "#DCFCE7",
+  badgeNeutral: "#F3F1EE",
+
+  // Badge foregrounds
+  badgePendingFg: "#4A6FA5",
+  badgeSnoozedFg: "#D97706",
+  badgeDoneFg: "#16A34A",
 };
 
 // ── Spacing (4px base) ──────────────────────────────────────────
@@ -26,14 +49,25 @@ export const spacing = {
   lg: 16,
   xl: 20,
   xxl: 24,
+  xxxl: 32,
 };
 
 // ── Border radii (concentric system) ────────────────────────────
 export const radii = {
   sm: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  md: 10,
+  lg: 14,
+  xl: 18,
+  full: 9999,
+};
+
+// ── Icon size hierarchy ─────────────────────────────────────────
+export const iconSize = {
+  xs: 12,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 28,
 };
 
 // ── Elevation presets ───────────────────────────────────────────
@@ -47,10 +81,10 @@ export const elevation = {
     ...ghostBorder,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: "#8B7355",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.06,
-        shadowRadius: 3,
+        shadowRadius: 4,
       },
       android: { elevation: 1 },
     }),
@@ -59,10 +93,10 @@ export const elevation = {
     ...ghostBorder,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: "#8B7355",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
-        shadowRadius: 8,
+        shadowRadius: 10,
       },
       android: { elevation: 3 },
     }),
@@ -71,10 +105,10 @@ export const elevation = {
     ...ghostBorder,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: "#8B7355",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
-        shadowRadius: 16,
+        shadowRadius: 20,
       },
       android: { elevation: 6 },
     }),
@@ -100,9 +134,19 @@ export const typography = {
     fontSize: 17,
     color: colors.foreground,
   },
+  subheading: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: colors.foreground,
+  },
   body: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
+    color: colors.foreground,
+  },
+  bodySmall: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
     color: colors.foreground,
   },
   caption: {
@@ -110,19 +154,37 @@ export const typography = {
     fontSize: 13,
     color: colors.muted,
   },
+  label: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: colors.primary,
+  },
+  mono: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 12,
+    color: colors.muted,
+  },
 };
 
 // ── Folder color palette ────────────────────────────────────────
 export const FOLDER_COLORS = [
-  "#3B5EDB",
-  "#E04040",
-  "#31C47E",
-  "#F59E0B",
+  "#4A6FA5",
+  "#DC4A3D",
+  "#3D9A5F",
+  "#D97706",
   "#8B5CF6",
-  "#EC4899",
-  "#06B6D4",
-  "#F97316",
+  "#D4577A",
+  "#2D8A7F",
+  "#C4841D",
 ];
+
+// ── Standard card style ─────────────────────────────────────────
+export const card = {
+  backgroundColor: colors.surface,
+  borderRadius: radii.lg,
+  padding: spacing.lg,
+  marginBottom: spacing.md,
+};
 
 // ── Paper theme override ────────────────────────────────────────
 export const theme = {
@@ -132,7 +194,7 @@ export const theme = {
     primary: colors.primary,
     background: colors.background,
     surface: colors.surface,
-    surfaceVariant: colors.background,
+    surfaceVariant: colors.surfaceSecondary,
     onSurface: colors.foreground,
     onSurfaceVariant: colors.muted,
     outline: colors.borderGhost,

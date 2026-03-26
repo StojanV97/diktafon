@@ -94,7 +94,7 @@ export default function ReminderConfirmSheet({
               <MaterialCommunityIcons
                 name="alert-circle-outline"
                 size={16}
-                color="#D97706"
+                color={colors.warning}
               />
               <Text style={styles.warningText}>
                 {t("reminders.noTimeDetected")}
@@ -209,7 +209,7 @@ export default function ReminderConfirmSheet({
               disabled={saving || !action.trim()}
             >
               {saving ? (
-                <ActivityIndicator size={16} color="#FFF" />
+                <ActivityIndicator size={16} color={colors.surface} />
               ) : (
                 <Text style={styles.confirmBtnText}>
                   {t("reminders.confirm")}
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   warningRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningLight,
     padding: spacing.sm,
     borderRadius: radii.md,
     marginBottom: spacing.md,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   warningText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "#92400E",
+    color: colors.warning,
     flex: 1,
   },
   label: {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   recurrenceChipTextActive: {
-    color: "#FFF",
+    color: colors.surface,
   },
   buttonRow: {
     flexDirection: "row",
@@ -341,6 +341,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: "#FFF",
+    color: colors.surface,
   },
 });
