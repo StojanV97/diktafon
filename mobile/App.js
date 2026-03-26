@@ -141,9 +141,9 @@ function RootTabs() {
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.divider,
+          backgroundColor: colors.background,
           borderTopWidth: 0.5,
+          borderTopColor: colors.divider,
           paddingTop: spacing.sm,
           height: 88,
         },

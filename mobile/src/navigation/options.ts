@@ -3,7 +3,7 @@ import { colors } from "../../theme";
 export const stackScreenOptions = {
   animation: "slide_from_right" as const,
   headerShadowVisible: false,
-  headerStyle: { backgroundColor: colors.surface },
+  headerStyle: { backgroundColor: colors.background },
   headerTintColor: colors.foreground,
   headerTitleStyle: {
     fontFamily: "Inter_600SemiBold",
