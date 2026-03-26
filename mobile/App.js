@@ -99,7 +99,7 @@ function DailyLogsStack() {
   const Stack = createNativeStackNavigator();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
-      <Stack.Screen name="DailyLogsRoot" component={DailyLogScreen} options={{ title: t("tabs.dailyLogs") }} />
+      <Stack.Screen name="DailyLogsRoot" component={DailyLogScreen} options={{ headerShown: false }} />
       {sharedScreens(Stack)}
     </Stack.Navigator>
   );
@@ -109,7 +109,7 @@ function PlansStack() {
   const Stack = createNativeStackNavigator();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
-      <Stack.Screen name="PlansRoot" component={PlansScreen} options={{ title: t("tabs.plans") }} />
+      <Stack.Screen name="PlansRoot" component={PlansScreen} options={{ headerShown: false }} />
       {sharedScreens(Stack)}
     </Stack.Navigator>
   );
@@ -119,7 +119,7 @@ function RemindersStack() {
   const Stack = createNativeStackNavigator();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions}>
-      <Stack.Screen name="RemindersRoot" component={RemindersScreen} options={{ title: t("tabs.reminders") }} />
+      <Stack.Screen name="RemindersRoot" component={RemindersScreen} options={{ headerShown: false }} />
       {sharedScreens(Stack)}
     </Stack.Navigator>
   );

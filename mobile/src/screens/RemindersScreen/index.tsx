@@ -14,6 +14,7 @@ import {
   Text,
 } from "react-native-paper";
 import { useRecorder } from "../../../hooks/useRecorder";
+import ScreenHeader from "../../components/ScreenHeader";
 import { processReminderRecording } from "../../../services/reminderPipelineService";
 import {
   requestPermissions,
@@ -329,8 +330,11 @@ export default function RemindersScreen({ navigation, route }: any) {
       ) : (
         <>
           {sections.length === 0 && !isProcessing ? (
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
+            <View style={{ flex: 1 }}>
+              <ScreenHeader title={t("tabs.reminders")} />
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
+              </View>
             </View>
           ) : (
             <SectionList
@@ -338,6 +342,7 @@ export default function RemindersScreen({ navigation, route }: any) {
               keyExtractor={(item) => item.id}
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
+              ListHeaderComponent={<ScreenHeader title={t("tabs.reminders")} />}
               contentContainerStyle={styles.list}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -412,7 +417,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   list: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 100,
   },
   sectionHeader: {

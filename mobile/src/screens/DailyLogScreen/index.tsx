@@ -27,7 +27,7 @@ import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingView from "../../../components/RecordingView";
-import { AppHeaderRight } from "../../../components/AppHeader";
+import ScreenHeader from "../../components/ScreenHeader";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
 import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
@@ -112,14 +112,14 @@ export default function DailyLogScreen({ navigation, route }: any) {
   const [headerMenuVisible, setHeaderMenuVisible] = useState(false);
   const hasRecordedEntries = entries.some((e: any) => e.status === "recorded" || e.status === "error");
 
-  const headerRight = useCallback(
+  const headerRightElement = useMemo(
     () => (
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
         <Menu
           visible={headerMenuVisible}
           onDismiss={() => setHeaderMenuVisible(false)}
           anchor={
-            <TouchableOpacity onPress={() => setHeaderMenuVisible(true)} style={{ padding: 8, marginRight: 4 }}>
+            <TouchableOpacity onPress={() => setHeaderMenuVisible(true)} style={{ padding: 8 }}>
               <MaterialCommunityIcons name="dots-vertical" size={20} color={colors.foreground} />
             </TouchableOpacity>
           }
@@ -137,14 +137,10 @@ export default function DailyLogScreen({ navigation, route }: any) {
             disabled={entries.length === 0}
           />
         </Menu>
-        <AppHeaderRight onPress={() => setAiDialogVisible(true)} />
       </View>
     ),
     [headerMenuVisible, hasRecordedEntries, entries.length, openForBatch]
   );
-  useEffect(() => {
-    navigation.setOptions({ headerRight });
-  }, [navigation, headerRight]);
 
   // --- Auto-record via deep link ---
   const isRecordingRef = useRef(false);
@@ -508,6 +504,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
             renderItem={renderItem}
             renderSectionHeader={renderSectionHeader}
             renderSectionFooter={renderSectionFooter}
+            ListHeaderComponent={<ScreenHeader title={t("tabs.dailyLogs")} rightElement={headerRightElement} />}
             contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
             stickySectionHeadersEnabled={true}
             maxToRenderPerBatch={10}
@@ -593,7 +590,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
   fab: {

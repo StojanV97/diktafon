@@ -17,6 +17,7 @@ import { extractPlan } from "../../../services/planExtractionService";
 import { isPremium } from "../../../services/subscriptionService";
 import { hasDevKey } from "../../../services/cloudTranscriptionService";
 import RecordingView from "../../../components/RecordingView";
+import ScreenHeader from "../../components/ScreenHeader";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
@@ -135,6 +136,7 @@ export default function PlansScreen({ navigation }: any) {
             renderItem={({ item }) => (
               <PlanCard plan={item} onEdit={editPlan} onDelete={handleDelete} />
             )}
+            ListHeaderComponent={<ScreenHeader title={t("tabs.plans")} />}
             contentContainerStyle={[styles.list, plans.length === 0 && { flexGrow: 1 }]}
             ListEmptyComponent={
               <View style={styles.empty}>
@@ -197,7 +199,7 @@ export default function PlansScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  list: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   empty: {
     flex: 1,
     justifyContent: "center",

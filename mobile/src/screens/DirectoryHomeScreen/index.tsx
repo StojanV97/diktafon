@@ -38,6 +38,7 @@ import { formatDate } from "../../utils/formatters";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
+import ScreenHeader from "../../components/ScreenHeader";
 import FolderDialog from "./FolderDialog";
 
 export default function DirectoryHomeScreen({ navigation }: any) {
@@ -228,21 +229,8 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const regularFolders = useMemo(() => folders.filter((f) => !f.is_daily_log), [folders]);
 
   const listHeader = useMemo(() => (
-    <View style={[styles.headerArea, { paddingTop: insets.top + spacing.lg }]}>
-      <View style={styles.headerTitleRow}>
-        <View>
-          <Text style={typography.monoLabel as any}>APP</Text>
-          <Text style={[typography.title, { marginTop: spacing.xs }]}>Diktaphone</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Settings")}
-          style={styles.settingsBtn}
-        >
-          <MaterialCommunityIcons name="cog-outline" size={22} color={colors.muted} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [insets.top, navigation]);
+    <ScreenHeader title="Diktaphone" />
+  ), []);
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
@@ -409,24 +397,6 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
   emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
-  headerArea: {
-    paddingHorizontal: spacing.xs,
-    paddingBottom: spacing.xl,
-  },
-  headerTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: spacing.xs,
-  },
   fab: {
     position: "absolute",
     right: spacing.lg,
