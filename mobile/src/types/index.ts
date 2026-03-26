@@ -24,7 +24,6 @@ export interface Entry {
   duration_seconds: number;
   recording_type: RecordingType;
   recorded_date: string;
-  assemblyai_id?: string;
   encrypted?: boolean;
   deleted_locally?: boolean;
   created_at: string;
@@ -43,7 +42,7 @@ export interface TranscriptionResult {
 }
 
 export interface Settings {
-  defaultEngine: "local" | "cloud";
+  defaultEngine: "local" | "cloud" | "assemblyai";
   autoMoveFolderId: string | null;
   autoMoveFolderName: string;
   autoMoveKeepAudio: boolean;

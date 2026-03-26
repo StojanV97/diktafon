@@ -1,19 +1,3 @@
-# Diktafon — Project Reference
-
-Audio recording + transcription journal app with Serbian UI.
-**Stack**: Expo/React Native mobile (JS) — fully standalone, no backend required.
-**Purpose**: Record audio → transcribe (on-device whisper.rn or direct AssemblyAI cloud) → browse & share transcripts.
-
----
-
-## Quick Commands
-```
-cd mobile && npx expo run:ios           # Dev build on iOS simulator
-cd mobile && npx expo run:android       # Dev build on Android
-cd mobile && npx expo prebuild --clean  # Clean native rebuild (after plugin/config changes)
-cd mobile && npx expo start             # Start Metro bundler (dev client must already be installed)
-```
-
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

@@ -4,7 +4,7 @@ import { ActivityIndicator, Button, Dialog, RadioButton, Text } from "react-nati
 import { colors, spacing, radii, typography } from "../theme"
 import { t } from "../src/i18n"
 import { isPremium, getOfferings, purchasePackage } from "../services/subscriptionService"
-import { hasDevKey } from "../services/assemblyAIService"
+import { hasDevKey } from "../services/cloudTranscriptionService"
 import { getSession } from "../services/authService"
 
 export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engineChoice, onEngineChange, title, navigation }) {
@@ -25,7 +25,7 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
   }, [visible])
 
   const handleEngineChange = (value) => {
-    if (value === "assemblyai" && !premium) {
+    if (value === "cloud" && !premium) {
       onEngineChange(value)
       setShowUpgrade(true)
       loadOfferingsIfNeeded()
@@ -49,7 +49,7 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
   }
 
   const handleConfirm = () => {
-    if (engineChoice === "assemblyai" && !premium) return
+    if (engineChoice === "cloud" && !premium) return
     onConfirm()
   }
 
@@ -92,11 +92,11 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
               </Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.engineRow} onPress={() => handleEngineChange("assemblyai")}>
-            <RadioButton value="assemblyai" color={colors.primary} />
+          <TouchableOpacity style={styles.engineRow} onPress={() => handleEngineChange("cloud")}>
+            <RadioButton value="cloud" color={colors.primary} />
             <View style={styles.engineInfo}>
               <View style={styles.labelRow}>
-                <Text style={[typography.heading, { fontSize: 15 }]}>{t('engine.assemblyAI')}</Text>
+                <Text style={[typography.heading, { fontSize: 15 }]}>{t('engine.cloud')}</Text>
                 {!premium && (
                   <View style={styles.premiumBadge}>
                     <Text style={styles.premiumBadgeText}>Premium</Text>
@@ -104,7 +104,7 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
                 )}
               </View>
               <Text style={[typography.body, { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 }]}>
-                {t('engine.assemblyAIDesc')}
+                {t('engine.cloudDesc')}
                 {!premium && "\n" + t('settings.engine.premiumRequired')}
               </Text>
             </View>
@@ -126,7 +126,7 @@ export default function EngineChoiceDialog({ visible, onDismiss, onConfirm, engi
         <Button
           onPress={handleConfirm}
           textColor={colors.primary}
-          disabled={engineChoice === "assemblyai" && !premium}
+          disabled={engineChoice === "cloud" && !premium}
         >
           {t('common.start')}
         </Button>

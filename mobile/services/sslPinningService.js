@@ -2,13 +2,13 @@ import { initializeSslPinning } from "react-native-ssl-public-key-pinning"
 
 export async function setupSslPinning() {
   await initializeSslPinning({
-    "api.assemblyai.com": {
+    "api.together.xyz": {
       includeSubdomains: true,
       certs: [
-        // Leaf certificate pin
-        "CZeSZU67gkkm38VUyW3BQgsKeDDMhsspi6qsXBGCRRM=",
-        // Intermediate CA backup pin
-        "18tkPyr2nckv4fgo0dhAkaUtJ2hu2831xlO2SKhq8dg=",
+        // Cloudflare Inc ECC CA-3 intermediate (serves together.xyz)
+        "Wf0LI4XTm6a1FBJxMkVWXsGnrKEdEb3m4dj35MlzYRE=",
+        // Baltimore CyberTrust Root backup pin
+        "Y9mvm0exBk1JoQ57f9Vm28jKo5lFm/woKcVxrYxu80o=",
       ],
     },
     "huggingface.co": {

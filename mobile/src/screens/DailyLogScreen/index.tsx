@@ -350,7 +350,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
       batchTotal = ids.length;
       const dates = [...new Set(toTranscribe.map((e: any) => e.recorded_date || e.created_at.slice(0, 10)))];
 
-      if (engineChoice === "assemblyai") {
+      if (engineChoice === "cloud") {
         setBatchEntryIds(new Set(ids));
       }
 

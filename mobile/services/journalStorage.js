@@ -25,7 +25,6 @@ export {
   deleteEntryWithICloud,
   getTombstonedEntries,
   reviveTombstonedRecords,
-  updateEntryToProcessing,
   completeEntry,
   updateEntryText,
   failEntry,

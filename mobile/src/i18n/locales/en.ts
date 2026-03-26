@@ -46,7 +46,7 @@ export default {
     timeout: "Request timed out. Check your internet connection.",
     network: "Network error. Check your internet connection.",
     modelDownloadFailed: "Model download failed: %{error}",
-    premiumRequired: "Premium subscription is required for AssemblyAI transcription.",
+    premiumRequired: "Premium subscription is required for cloud transcription.",
     unknown: "Unknown error",
   },
 
@@ -114,6 +114,7 @@ export default {
     noEntries: "No recordings",
     noFolders: "No directories. Tap + to create a directory.",
     newFolder: "Directory",
+    reminder: "Reminder",
     newFolderTitle: "New directory",
     editFolderTitle: "Edit directory",
     folderName: "Name",
@@ -174,12 +175,12 @@ export default {
     chooseType: "Choose transcription type",
     onDevice: "On device — Free",
     onDeviceDesc: "On-device transcription (Whisper AI). Fully private, no internet needed. Model ~140MB (downloaded once).",
-    assemblyAI: "AssemblyAI — Premium",
-    assemblyAIDesc: "Speaker recognition (who said what), higher accuracy, support for accented speech, automatic punctuation and topic detection. Available for Premium users.",
+    cloud: "Cloud — Premium",
+    cloudDesc: "Higher accuracy, support for accented speech, automatic punctuation. Available for Premium users.",
     signInRequired: "Sign in is required for premium features.",
     signIn: "Sign in",
     unlockPremium: "Unlock Premium",
-    premiumCaption: "Cloud transcription with speaker recognition.",
+    premiumCaption: "Cloud transcription with higher accuracy.",
     notAvailable: "Subscription is currently unavailable.",
   },
 
@@ -226,8 +227,8 @@ export default {
       title: "Default engine",
       onDevice: "On device (private)",
       onDeviceDesc: "Whisper AI, no internet",
-      cloud: "AssemblyAI (cloud)",
-      cloudDesc: "Higher accuracy, speaker recognition",
+      cloud: "Cloud (Whisper)",
+      cloudDesc: "Higher accuracy, cloud processing",
       premiumRequired: "Available for Premium users",
     },
     whisper: {
@@ -329,10 +330,10 @@ export default {
     subscription: {
       title: "Subscription",
       premiumBadge: "Diktafon Premium",
-      usage: "AssemblyAI transcription: %{used} / %{limit} min this month",
+      usage: "Cloud transcription: %{used} / %{limit} min this month",
       remaining: "Remaining: %{remaining} min",
-      unlockCaption: "Unlock AssemblyAI cloud transcription with speaker recognition.",
-      features: "%{limit} min/month cloud transcription \u00B7 Higher accuracy \u00B7 Speaker recognition",
+      unlockCaption: "Unlock cloud transcription with higher accuracy.",
+      features: "%{limit} min/month cloud transcription \u00B7 Higher accuracy",
       activated: "Premium activated!",
       purchaseFailed: "Purchase failed.",
       restored: "Premium restored!",
@@ -342,19 +343,11 @@ export default {
     },
   },
 
-  assemblyAI: {
+  cloudTranscription: {
     timeout: "Request timed out. Check your internet connection.",
     networkError: "Network error. Check your internet connection.",
-    invalidUploadResponse: "Invalid server response during upload. Please try again.",
-    noUploadUrl: "Server did not return an upload URL. Please try again.",
     uploadFailed: "Recording upload failed. Please try again.",
-    submitError: "Error submitting to AssemblyAI. Please try again.",
-    noTranscriptId: "Server did not return a transcript ID. Please try again.",
-    invalidStatusResponse: "Invalid server response while checking status.",
-    statusCheckError: "Error checking transcription status.",
-    invalidResponse: "Invalid server response.",
     transcriptionFailed: "Transcription failed. Please try again.",
-    speakerLabel: "[Speaker %{num} – %{time}]",
   },
 
   reminders: {

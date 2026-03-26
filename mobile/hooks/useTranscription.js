@@ -1,45 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { AppState } from "react-native"
+import { useState } from "react"
 import * as whisperService from "../services/whisperService"
 import { t } from "../src/i18n"
 import {
   preflight,
   transcribeSingle,
   transcribeBatch,
-  pollProcessingEntries,
 } from "../services/transcriptionService"
 
 export function useTranscription({ entries, setEntries, onComplete }) {
   const [modelDownloadVisible, setModelDownloadVisible] = useState(false)
   const [modelDownloadProgress, setModelDownloadProgress] = useState(0)
-
-  const entriesRef = useRef(entries)
-  entriesRef.current = entries
-
-  const hasProcessing = useMemo(
-    () => entries.some((e) => e.status === "processing"),
-    [entries]
-  )
-
-  // Poll processing entries every 5 seconds
-  useEffect(() => {
-    if (!hasProcessing) return
-
-    const intervalId = setInterval(async () => {
-      if (AppState.currentState !== "active") return
-      const changed = await pollProcessingEntries(entriesRef.current)
-      if (changed.length === 0) return
-      setEntries((prev) =>
-        prev.map((e) => {
-          const update = changed.find((c) => c.entryId === e.id)
-          return update ? update.entry : e
-        })
-      )
-      onComplete?.()
-    }, 5000)
-
-    return () => clearInterval(intervalId)
-  }, [hasProcessing])
 
   const updateEntry = (entryId, updated) => {
     setEntries((prev) => prev.map((e) => (e.id === entryId ? updated : e)))

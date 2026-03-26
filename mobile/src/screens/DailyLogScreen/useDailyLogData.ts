@@ -62,7 +62,7 @@ export function useDailyLogData(setSnackbar: (msg: string) => void) {
     syncWidgetData().catch(() => {});
   }, [setEntries]);
 
-  // After AssemblyAI polling resolves all batch entries, consolidate
+  // After cloud transcription resolves all batch entries, consolidate
   useEffect(() => {
     if (batchEntryIds.size === 0) return;
     const batchEntries = entries.filter((e) => batchEntryIds.has(e.id));

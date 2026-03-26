@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const MONTHLY_MINUTES_LIMIT = 120
-const ASSEMBLYAI_API_KEY = Deno.env.get("ASSEMBLYAI_API_KEY")!
+const TOGETHER_API_KEY = Deno.env.get("TOGETHER_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
@@ -58,21 +58,14 @@ serve(async (req) => {
       })
     }
 
-    const url = new URL(req.url)
-    const path = url.pathname.split("/").pop()
-
-    if (req.method === "POST" && path === "submit") {
-      return await handleSubmit(req, supabase, user.id, corsHeaders)
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
 
-    if (req.method === "POST" && path === "status") {
-      return await handleStatus(req, corsHeaders)
-    }
-
-    return new Response(JSON.stringify({ error: "Not found" }), {
-      status: 404,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    return await handleTranscribe(req, supabase, user.id, corsHeaders)
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
@@ -105,13 +98,13 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-async function handleSubmit(
+async function handleTranscribe(
   req: Request,
   supabase: any,
   userId: string,
   headers: Record<string, string>,
 ) {
-  const { storage_path, speaker_labels, file_key } = await req.json()
+  const { storage_path, file_key, speaker_labels } = await req.json()
 
   // Validate storage path belongs to the requesting user
   const expectedPrefix = `transcribe/${userId}/`
@@ -144,118 +137,66 @@ async function handleSubmit(
     audioBytes = rawBytes
   }
 
-  // Upload decrypted audio directly to AssemblyAI (in-memory, never persisted)
-  const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
+  // Send to Together.ai Whisper (synchronous — returns transcript directly)
+  const formData = new FormData()
+  formData.append("file", new Blob([audioBytes], { type: "audio/wav" }), "audio.wav")
+  formData.append("model", "openai/whisper-large-v3")
+  formData.append("language", "sr")
+
+  if (speaker_labels) {
+    formData.append("response_format", "verbose_json")
+    formData.append("diarize", "true")
+  }
+
+  const togetherRes = await fetch("https://api.together.xyz/v1/audio/transcriptions", {
     method: "POST",
     headers: {
-      authorization: ASSEMBLYAI_API_KEY,
-      "content-type": "application/octet-stream",
+      authorization: `Bearer ${TOGETHER_API_KEY}`,
     },
-    body: audioBytes,
+    body: formData,
   })
 
-  if (!uploadRes.ok) {
-    return new Response(JSON.stringify({ error: "AssemblyAI upload failed" }), {
+  if (!togetherRes.ok) {
+    const body = await togetherRes.text()
+    return new Response(JSON.stringify({ error: `Together.ai error: ${body}` }), {
       status: 502,
       headers: { ...headers, "Content-Type": "application/json" },
     })
   }
 
-  const { upload_url } = await uploadRes.json()
-
-  // Submit transcription job
-  const res = await fetch("https://api.assemblyai.com/v2/transcript", {
-    method: "POST",
-    headers: {
-      authorization: ASSEMBLYAI_API_KEY,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      audio_url: upload_url,
-      language_code: "sr",
-      speaker_labels: speaker_labels ?? true,
-    }),
-  })
-
-  if (!res.ok) {
-    const body = await res.text()
-    return new Response(JSON.stringify({ error: `AssemblyAI error: ${body}` }), {
-      status: 502,
-      headers: { ...headers, "Content-Type": "application/json" },
-    })
-  }
-
-  const data = await res.json()
+  const result = await togetherRes.json()
 
   // Delete encrypted audio from storage immediately
   supabase.storage.from("audio-uploads").remove([storage_path]).catch(() => {})
 
-  return new Response(JSON.stringify({ assemblyai_id: data.id }), {
+  const text = speaker_labels ? formatSpeakerSegments(result) : (result.text || "")
+
+  return new Response(JSON.stringify({ text }), {
     status: 200,
     headers: { ...headers, "Content-Type": "application/json" },
   })
 }
 
-async function handleStatus(req: Request, headers: Record<string, string>) {
-  const { id } = await req.json()
-
-  // Validate transcript ID format (alphanumeric AssemblyAI IDs only)
-  if (typeof id !== "string" || !/^[a-z0-9_-]+$/i.test(id) || id.length > 64) {
-    return new Response(JSON.stringify({ error: "Invalid transcript ID" }), {
-      status: 400,
-      headers: { ...headers, "Content-Type": "application/json" },
-    })
-  }
-
-  const res = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-    headers: { authorization: ASSEMBLYAI_API_KEY },
-  })
-
-  if (!res.ok) {
-    return new Response(JSON.stringify({ error: "AssemblyAI status check failed" }), {
-      status: 502,
-      headers: { ...headers, "Content-Type": "application/json" },
-    })
-  }
-
-  const data = await res.json()
-
-  if (data.status === "completed") {
-    const text = formatUtterances(data)
-    const duration_seconds = Math.round(data.audio_duration || 0)
-    return new Response(JSON.stringify({ status: "done", text, duration_seconds }), {
-      status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
-    })
-  }
-
-  if (data.status === "error") {
-    return new Response(JSON.stringify({ status: "error", error: data.error }), {
-      status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
-    })
-  }
-
-  return new Response(JSON.stringify({ status: "processing" }), {
-    status: 200,
-    headers: { ...headers, "Content-Type": "application/json" },
-  })
-}
-
-// NOTE: formatUtterances is also duplicated in mobile/services/assemblyAIService.js
-// (separate Deno runtime, no shared code path — intentional duplication)
-function formatUtterances(data: any): string {
-  if (!data.utterances || data.utterances.length === 0) {
+function formatSpeakerSegments(data: any): string {
+  if (!data.speaker_segments || data.speaker_segments.length === 0) {
     return data.text || ""
   }
 
-  return data.utterances
-    .map((u: any) => {
-      const startSec = (u.start || 0) / 1000
+  return data.speaker_segments
+    .map((seg: any) => {
+      const startSec = seg.start || 0
       const m = Math.floor(startSec / 60)
       const s = Math.floor(startSec % 60)
       const timestamp = `${m}:${s.toString().padStart(2, "0")}`
-      return `[Govornik ${u.speaker} – ${timestamp}] ${u.text}`
+      const speaker = speakerLabel(seg.speaker_id)
+      return `[Govornik ${speaker} – ${timestamp}] ${seg.text.trim()}`
     })
     .join("\n")
+}
+
+function speakerLabel(speakerId: string): string {
+  // "SPEAKER_00" → "A", "SPEAKER_01" → "B", etc.
+  const match = speakerId?.match(/(\d+)$/)
+  if (!match) return speakerId || "?"
+  return String.fromCharCode(65 + parseInt(match[1], 10))
 }

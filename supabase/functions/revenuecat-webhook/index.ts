@@ -11,12 +11,14 @@ serve(async (req) => {
   }
 
   try {
-    // Verify webhook secret if configured
-    if (REVENUECAT_WEBHOOK_SECRET) {
-      const authHeader = req.headers.get("Authorization")
-      if (authHeader !== `Bearer ${REVENUECAT_WEBHOOK_SECRET}`) {
-        return new Response("Unauthorized", { status: 401 })
-      }
+    // Verify webhook secret (mandatory — fail-closed if not configured)
+    if (!REVENUECAT_WEBHOOK_SECRET) {
+      console.error("REVENUECAT_WEBHOOK_SECRET not configured — rejecting all requests")
+      return new Response("Server misconfigured", { status: 500 })
+    }
+    const authHeader = req.headers.get("Authorization")
+    if (authHeader !== `Bearer ${REVENUECAT_WEBHOOK_SECRET}`) {
+      return new Response("Unauthorized", { status: 401 })
     }
 
     const body = await req.json()

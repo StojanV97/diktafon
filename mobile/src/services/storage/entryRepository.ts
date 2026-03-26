@@ -159,20 +159,7 @@ export function reviveTombstonedRecords() {
 
 // ── Transcription state ────────────────────────────────
 
-export function updateEntryToProcessing(entryId: string, assemblyaiId: string) {
-  return withWriteLock(async () => {
-    const entries = await readJSON(entriesFile);
-    const entry = entries.find((e: any) => e.id === entryId);
-    if (!entry) return null;
-    entry.status = "processing";
-    entry.assemblyai_id = assemblyaiId;
-    entry.updated_at = new Date().toISOString();
-    await writeJSON(entriesFile, entries);
-    return { ...entry };
-  });
-}
-
-export function completeEntry(entryId: string, text: string, durationSeconds: number) {
+export function completeEntry(entryId: string, text: string, durationSeconds: number | null) {
   return withWriteLock(async () => {
     ensureDirs();
     const entries = await readJSON(entriesFile);
@@ -182,9 +169,9 @@ export function completeEntry(entryId: string, text: string, durationSeconds: nu
     entry.status = "done";
     entry.text = "";
     entry.encrypted = true;
-    entry.duration_seconds = durationSeconds;
+    if (durationSeconds != null) entry.duration_seconds = durationSeconds;
     entry.updated_at = new Date().toISOString();
-    delete entry.assemblyai_id;
+    delete entry.assemblyai_id; // clean up legacy field
     await writeJSON(entriesFile, entries);
 
     const textFile = new File(textsDir, `journal_${entryId}.txt`);
@@ -228,7 +215,7 @@ export function failEntry(entryId: string, error?: string) {
     entry.status = "error";
     entry.text = "";
     entry.updated_at = new Date().toISOString();
-    delete entry.assemblyai_id;
+    delete entry.assemblyai_id; // clean up legacy field
     await writeJSON(entriesFile, entries);
     return { ...entry };
   });

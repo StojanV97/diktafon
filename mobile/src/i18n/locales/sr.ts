@@ -46,7 +46,7 @@ export default {
     timeout: "Prekoraceno vreme. Proverite internet vezu.",
     network: "Greska u mrezi. Proverite internet vezu.",
     modelDownloadFailed: "Preuzimanje modela nije uspelo: %{error}",
-    premiumRequired: "Potrebna je Premium pretplata za AssemblyAI transkripciju.",
+    premiumRequired: "Potrebna je Premium pretplata za cloud transkripciju.",
     unknown: "Nepoznata greska",
   },
 
@@ -114,6 +114,7 @@ export default {
     noEntries: "Nema snimaka",
     noFolders: "Nema direktorijuma. Tapni + da kreiras direktorijum.",
     newFolder: "Direktorijum",
+    reminder: "Podsetnik",
     newFolderTitle: "Novi direktorijum",
     editFolderTitle: "Izmeni direktorijum",
     folderName: "Naziv",
@@ -174,12 +175,12 @@ export default {
     chooseType: "Izaberi tip transkripcije",
     onDevice: "Na uredjaju — Besplatno",
     onDeviceDesc: "Transkripcija na uredjaju (Whisper AI). Potpuno privatno, bez interneta. Model ~140MB (preuzima se jednom).",
-    assemblyAI: "AssemblyAI — Premium",
-    assemblyAIDesc: "Prepoznavanje govornika (ko je govorio sta), visa tacnost, podrska za akcentovane govore, automatske interpunkcije i detekcija tema. Dostupno za Premium korisnike.",
+    cloud: "Cloud — Premium",
+    cloudDesc: "Visa tacnost, podrska za akcentovane govore, automatske interpunkcije. Dostupno za Premium korisnike.",
     signInRequired: "Potrebna je prijava za premium funkcije.",
     signIn: "Prijavi se",
     unlockPremium: "Otključaj Premium",
-    premiumCaption: "Cloud transkripcija sa prepoznavanjem govornika.",
+    premiumCaption: "Cloud transkripcija sa visom tacnosti.",
     notAvailable: "Pretplata trenutno nije dostupna.",
   },
 
@@ -226,8 +227,8 @@ export default {
       title: "Podrazumevani motor",
       onDevice: "Na uredjaju (privatno)",
       onDeviceDesc: "Whisper AI, bez interneta",
-      cloud: "AssemblyAI (oblak)",
-      cloudDesc: "Visa tacnost, prepoznavanje govornika",
+      cloud: "Cloud (Whisper)",
+      cloudDesc: "Visa tacnost, cloud obrada",
       premiumRequired: "Dostupno za Premium korisnike",
     },
     whisper: {
@@ -329,10 +330,10 @@ export default {
     subscription: {
       title: "Pretplata",
       premiumBadge: "Diktafon Premium",
-      usage: "AssemblyAI transkripcija: %{used} / %{limit} min ovog meseca",
+      usage: "Cloud transkripcija: %{used} / %{limit} min ovog meseca",
       remaining: "Preostalo: %{remaining} min",
-      unlockCaption: "Otključaj AssemblyAI cloud transkripciju sa prepoznavanjem govornika.",
-      features: "%{limit} min/mesec cloud transkripcije \u00B7 Visa tacnost \u00B7 Prepoznavanje govornika",
+      unlockCaption: "Otključaj cloud transkripciju sa visom tacnosti.",
+      features: "%{limit} min/mesec cloud transkripcije \u00B7 Visa tacnost",
       activated: "Premium je aktiviran!",
       purchaseFailed: "Kupovina nije uspela.",
       restored: "Premium je obnovljen!",
@@ -342,19 +343,11 @@ export default {
     },
   },
 
-  assemblyAI: {
+  cloudTranscription: {
     timeout: "Prekoraceno vreme. Proverite internet vezu.",
     networkError: "Greska u mrezi. Proverite internet vezu.",
-    invalidUploadResponse: "Neispravan odgovor od servera pri uploadu. Pokusajte ponovo.",
-    noUploadUrl: "Server nije vratio URL za upload. Pokusajte ponovo.",
     uploadFailed: "Upload snimka nije uspeo. Pokusajte ponovo.",
-    submitError: "Greska pri slanju na AssemblyAI. Pokusajte ponovo.",
-    noTranscriptId: "Server nije vratio ID transkripcije. Pokusajte ponovo.",
-    invalidStatusResponse: "Neispravan odgovor od servera pri proveri statusa.",
-    statusCheckError: "Greska pri proveri statusa transkripcije.",
-    invalidResponse: "Neispravan odgovor od servera.",
     transcriptionFailed: "Transkripcija nije uspela. Pokusajte ponovo.",
-    speakerLabel: "[Govornik %{num} – %{time}]",
   },
 
   reminders: {

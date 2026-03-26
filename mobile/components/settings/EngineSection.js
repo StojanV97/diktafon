@@ -4,7 +4,7 @@ import { Divider, RadioButton, Text, TouchableRipple } from "react-native-paper"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { getSettings, updateSettings } from "../../services/settingsService"
 import { isPremium } from "../../services/subscriptionService"
-import { hasDevKey } from "../../services/assemblyAIService"
+import { hasDevKey } from "../../services/cloudTranscriptionService"
 import { colors, spacing, radii, typography } from "../../theme"
 import { sectionStyles as styles } from "./sectionStyles"
 import { t } from "../../src/i18n"
@@ -31,7 +31,7 @@ export default function EngineSection() {
   }, [])
 
   const handleEngineChange = async (value) => {
-    if (value === "assemblyai" && !premium) return
+    if (value === "cloud" && !premium) return
     setDefaultEngine(value)
     await updateSettings({ defaultEngine: value })
   }
@@ -56,9 +56,9 @@ export default function EngineSection() {
               </View>
             </View>
           </TouchableRipple>
-          <TouchableRipple onPress={() => handleEngineChange("assemblyai")} disabled={!premium}>
+          <TouchableRipple onPress={() => handleEngineChange("cloud")} disabled={!premium}>
             <View style={[radioStyles.radioRow, !premium && { opacity: 0.5 }]}>
-              <RadioButton value="assemblyai" color={colors.primary} disabled={!premium} />
+              <RadioButton value="cloud" color={colors.primary} disabled={!premium} />
               <View style={radioStyles.radioInfo}>
                 <View style={radioStyles.labelRow}>
                   <Text style={typography.body}>{t('settings.engine.cloud')}</Text>

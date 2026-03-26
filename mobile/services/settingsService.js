@@ -4,7 +4,7 @@ const SCHEMA = {
   defaultEngine: {
     key: "default_transcription_engine",
     default: "local",
-    parse: (v) => (v === "assemblyai" ? "assemblyai" : "local"),
+    parse: (v) => (v === "cloud" || v === "assemblyai") ? "cloud" : "local",
     serialize: (v) => v,
   },
   autoMoveFolderId: {

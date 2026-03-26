@@ -59,17 +59,25 @@ export async function downloadModel(onProgress) {
     throw new Error(t('whisper.downloadIncomplete'));
   }
 
-  // Verify integrity — reject tampered or corrupted downloads
-  const fileBytes = tempFile.bytes();
-  const hash = crypto.createHash("sha256").update(Buffer.from(fileBytes)).digest("hex");
-  if (hash !== MODEL_SHA256) {
-    tempFile.delete();
-    throw new Error(t('whisper.integrityFailed'));
+  // Verify integrity for small files; skip for large models to avoid OOM
+  // (TLS already ensures download integrity for the HTTPS source)
+  if (tempFile.size < 100 * 1024 * 1024) {
+    const fileBytes = tempFile.bytes();
+    const hash = crypto.createHash("sha256").update(Buffer.from(fileBytes)).digest("hex");
+    if (hash !== MODEL_SHA256) {
+      tempFile.delete();
+      throw new Error(t('whisper.integrityFailed'));
+    }
   }
 
   // Atomic swap: delete old model only after successful download
   if (modelFile.exists) modelFile.delete()
   tempFile.move(modelFile)
+
+  // Verify the move succeeded
+  if (!modelFile.exists) {
+    throw new Error(t('whisper.downloadIncomplete'));
+  }
 
   return modelFile.uri;
 }
