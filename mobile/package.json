@@ -24,7 +24,7 @@
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
-    "@sentry/react-native": "~7.2.0",
+    "@sentry/react-native": "~7.13.0",
     "@supabase/supabase-js": "^2.99.2",
     "babel-plugin-react-compiler": "^1.0.0",
     "babel-preset-expo": "~54.0.10",
