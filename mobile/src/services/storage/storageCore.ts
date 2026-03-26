@@ -20,6 +20,7 @@ export const audioDir = new Directory(journalDir, "audio");
 export const textsDir = new Directory(journalDir, "texts");
 export const foldersFile = new File(journalDir, "folders.json");
 export const entriesFile = new File(journalDir, "entries.json");
+export const plansFile = new File(journalDir, "plans.json");
 
 export const DAILY_LOG_FOLDER_NAME = "Dnevni Log";
 export const DEFAULT_FOLDER_COLOR = "#4A9EFF";
@@ -28,6 +29,7 @@ export const DAILY_LOG_FOLDER_COLOR = "#3B5EDB";
 // In-memory cache — avoids re-reading + JSON-parsing on every read (esp. 5s polling)
 let _foldersCache: any[] | null = null;
 let _entriesCache: any[] | null = null;
+let _plansCache: any[] | null = null;
 
 // Corruption detection — set when both main + .bak files are unreadable
 let _corruptionDetected: string | null = null;
@@ -55,6 +57,7 @@ export function ensureDirs(): void {
 export async function readJSON(file: InstanceType<typeof File>): Promise<any[]> {
   if (file === foldersFile && _foldersCache !== null) return _foldersCache;
   if (file === entriesFile && _entriesCache !== null) return _entriesCache;
+  if (file === plansFile && _plansCache !== null) return _plansCache;
 
   let result: any[];
   try {
@@ -132,6 +135,7 @@ export async function readJSON(file: InstanceType<typeof File>): Promise<any[]> 
 
   if (file === foldersFile) _foldersCache = result;
   else if (file === entriesFile) _entriesCache = result;
+  else if (file === plansFile) _plansCache = result;
   return result;
 }
 
@@ -160,6 +164,7 @@ export async function writeJSON(file: InstanceType<typeof File>, data: any[]): P
 
     if (file === foldersFile) _foldersCache = data;
     else if (file === entriesFile) _entriesCache = data;
+    else if (file === plansFile) _plansCache = data;
 
     if (file === foldersFile) {
       syncJSONToCloud("folders.json", data).catch((e: Error) =>
@@ -167,6 +172,10 @@ export async function writeJSON(file: InstanceType<typeof File>, data: any[]): P
       );
     } else if (file === entriesFile) {
       syncJSONToCloud("entries.json", data).catch((e: Error) =>
+        Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
+      );
+    } else if (file === plansFile) {
+      syncJSONToCloud("plans.json", data).catch((e: Error) =>
         Sentry.captureMessage("Cloud sync failed: " + e.message, "warning")
       );
     }

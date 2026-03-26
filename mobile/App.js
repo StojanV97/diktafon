@@ -104,6 +104,16 @@ function DailyLogsStack() {
   );
 }
 
+function PlansStack() {
+  const Stack = createNativeStackNavigator();
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="PlansRoot" component={PlansScreen} options={{ title: t("tabs.plans") }} />
+      {sharedScreens(Stack)}
+    </Stack.Navigator>
+  );
+}
+
 function RemindersStack() {
   const Stack = createNativeStackNavigator();
   return (
@@ -118,7 +128,7 @@ function RootTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: route.name === "PlansTab",
+        headerShown: false,
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.foreground,
@@ -134,7 +144,7 @@ function RootTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} />
       <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} />
-      <Tab.Screen name="PlansTab" component={PlansScreen} options={{ title: t("tabs.plans") }} />
+      <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} />
       <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} />
     </Tab.Navigator>
   );

@@ -49,7 +49,16 @@ export default {
 
   plans: {
     emptyTitle: "No plans yet",
-    emptyMessage: "Plans are automatically created when you mention tomorrow's plans in your recordings.",
+    emptyMessage: "Tap the microphone to create a plan by voice.",
+    transcribing: "Transcribing...",
+    extracting: "Extracting plan...",
+    extractionFailed: "Could not extract plan. Try again.",
+    noItems: "No plan items found in recording.",
+    datePickerTitle: "When is this plan for?",
+    datePickerConfirm: "Save",
+    deletePlanTitle: "Delete plan",
+    deletePlanMessage: "Delete this plan?",
+    premiumRequired: "Premium subscription is required for plan creation.",
   },
 
   errors: {

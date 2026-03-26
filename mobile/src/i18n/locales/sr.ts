@@ -49,7 +49,16 @@ export default {
 
   plans: {
     emptyTitle: "Nema planova",
-    emptyMessage: "Planovi se automatski kreiraju kada pomenete planove za sutra u snimcima.",
+    emptyMessage: "Tapni mikrofon da napravis plan glasom.",
+    transcribing: "Transkribovanje...",
+    extracting: "Izdvajanje plana...",
+    extractionFailed: "Nije moguce izdvojiti plan. Pokusaj ponovo.",
+    noItems: "Nisu pronadjene stavke plana u snimku.",
+    datePickerTitle: "Za koji datum je ovaj plan?",
+    datePickerConfirm: "Sacuvaj",
+    deletePlanTitle: "Obrisi plan",
+    deletePlanMessage: "Obrisati ovaj plan?",
+    premiumRequired: "Premium pretplata je potrebna za kreiranje planova.",
   },
 
   errors: {

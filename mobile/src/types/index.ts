@@ -49,6 +49,14 @@ export interface Settings {
   icloudSyncEnabled: boolean;
 }
 
+export interface Plan {
+  id: string;
+  date: string;
+  items: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StatusConfig {
   label: string;
   icon: string;
