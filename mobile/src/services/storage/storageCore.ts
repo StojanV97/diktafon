@@ -207,7 +207,7 @@ export async function readDecryptedText(textFile: InstanceType<typeof File>): Pr
     return await textFile.text();
   }
   try {
-    const bytes = textFile.bytes();
+    const bytes = await textFile.bytes();
     return decryptText(bytes, key);
   } catch {
     try {

@@ -69,7 +69,7 @@ export function migrateData() {
           const textFile = new File(textsDir, `journal_${entry.id}.txt`);
           if (textFile.exists) {
             try {
-              const bytes = textFile.bytes();
+              const bytes = await textFile.bytes();
               decryptText(bytes, key);
               entry.text = "";
               entry.encrypted = true;
@@ -103,11 +103,11 @@ export function migrateData() {
         const audioFile = new File(audioDir, entry.audio_file);
         if (!audioFile.exists) continue;
         try {
-          const bytes = audioFile.bytes();
+          const bytes = await audioFile.bytes();
           decryptBytes(bytes, key);
         } catch {
           try {
-            const raw = audioFile.bytes();
+            const raw = await audioFile.bytes();
             const encrypted = encryptBytes(raw, key);
             const base64 = Buffer.from(encrypted).toString("base64");
             await FileSystem.writeAsStringAsync(audioFile.uri, base64, {

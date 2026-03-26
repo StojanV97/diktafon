@@ -23,7 +23,7 @@ export async function exportAllData() {
   for (const entry of entries) {
     const audioFile = new File(audioDir, `${entry.id}.wav`);
     if (audioFile.exists) {
-      let audioData: any = audioFile.bytes();
+      let audioData: any = await audioFile.bytes();
       if (key) {
         try {
           audioData = decryptBytes(audioData, key);
