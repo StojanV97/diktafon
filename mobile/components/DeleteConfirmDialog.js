@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet } from "react-native";
 import { Button, Dialog, Text } from "react-native-paper";
+import * as Haptics from "expo-haptics";
 import { colors, radii, typography } from "../theme";
 import { t } from "../src/i18n";
 
@@ -13,7 +14,7 @@ export default function DeleteConfirmDialog({ visible, onDismiss, onConfirm, tit
       </Dialog.Content>
       <Dialog.Actions>
         <Button onPress={onDismiss} textColor={colors.muted} disabled={loading}>{t('common.cancel')}</Button>
-        <Button onPress={onConfirm} textColor={colors.danger} disabled={loading} loading={loading}>{confirmLabel || t('common.delete')}</Button>
+        <Button onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); onConfirm(); }} textColor={colors.danger} disabled={loading} loading={loading}>{confirmLabel || t('common.delete')}</Button>
       </Dialog.Actions>
     </Dialog>
   );

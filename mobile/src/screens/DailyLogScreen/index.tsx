@@ -33,6 +33,7 @@ import AIInsightsDialog from "../../../components/AIInsightsDialog";
 import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
+import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { syncWidgetData } from "../../../services/widgetDataService";
 import { formatSectionDate } from "../../utils/formatters";
@@ -384,7 +385,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
 
   // --- Recording handlers ---
   const handleStartRecording = useCallback(async () => {
-    try { await startRecording(); } catch (e) { setSnackbar(safeErrorMessage(e)); }
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); await startRecording(); } catch (e) { setSnackbar(safeErrorMessage(e)); }
   }, [startRecording, setSnackbar]);
 
   const handlePause = useCallback(async () => {

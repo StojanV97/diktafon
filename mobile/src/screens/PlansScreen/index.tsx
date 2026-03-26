@@ -18,6 +18,7 @@ import { isPremium } from "../../../services/subscriptionService";
 import { hasDevKey } from "../../../services/cloudTranscriptionService";
 import RecordingOverlay from "../../../components/RecordingOverlay";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
+import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, elevation, typography } from "../../../theme";
 import { t } from "../../i18n";
@@ -51,6 +52,7 @@ export default function PlansScreen({ navigation }: any) {
 
         if (result.date) {
           await addPlan(result.date, result.items);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else {
           setPendingItems(result.items);
           setDatePickerVisible(true);
@@ -69,6 +71,7 @@ export default function PlansScreen({ navigation }: any) {
         setSnackbar(t("plans.premiumRequired"));
         return;
       }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await startRecording();
     } catch (e) {
       setSnackbar(safeErrorMessage(e));

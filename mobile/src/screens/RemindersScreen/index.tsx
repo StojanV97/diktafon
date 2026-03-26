@@ -28,6 +28,7 @@ import {
 } from "../../services/storage";
 import RecordingOverlay from "../../../components/RecordingOverlay";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, elevation, typography } from "../../../theme";
@@ -118,6 +119,7 @@ export default function RemindersScreen({ navigation, route }: any) {
   // --- Recording handlers ---
   const handleStartRecording = useCallback(async () => {
     try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setPipelineState("recording");
       await startRecording();
     } catch (e) {

@@ -14,7 +14,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import * as ScreenCapture from "expo-screen-capture";
-import { theme, colors } from "./theme";
+import { theme, colors, spacing } from "./theme";
+import * as Haptics from "expo-haptics";
 import { onAuthStateChange } from "./services/authService";
 import { loginUser } from "./services/subscriptionService";
 import { t } from "./src/i18n";
@@ -138,18 +139,20 @@ function RootTabs() {
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11, paddingBottom: 2 },
+        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.divider,
           borderTopWidth: 0.5,
+          paddingTop: spacing.sm,
+          height: 88,
         },
       })}
     >
-      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} />
-      <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} />
-      <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} />
-      <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} />
+      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
+      <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
+      <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
+      <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
     </Tab.Navigator>
   );
 }

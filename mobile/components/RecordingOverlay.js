@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as Haptics from "expo-haptics";
 import { colors, spacing, radii, iconSize, typography } from "../theme";
 import { formatTimer } from "../src/utils/formatters";
 import { t } from "../src/i18n";
@@ -29,7 +30,7 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
       <View style={styles.recordControls}>
         <TouchableOpacity
           style={styles.cancelBtn}
-          onPress={onCancel}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onCancel?.(); }}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="close" size={iconSize.lg} color={colors.muted} />
@@ -47,7 +48,7 @@ function RecordingOverlay({ meteringHistory, elapsed, isPaused, onPause, onResum
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.saveBtn}
-          onPress={onStop}
+          onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onStop(); }}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="check" size={iconSize.lg} color={colors.surface} />

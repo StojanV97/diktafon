@@ -30,6 +30,7 @@ import {
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import RecordingOverlay from "../../../components/RecordingOverlay";
+import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
@@ -83,6 +84,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       if (isRecording) {
         await stopRecording();
       } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         await startRecording();
       }
     } catch (e) {
