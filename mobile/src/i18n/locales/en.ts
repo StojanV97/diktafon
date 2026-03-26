@@ -91,6 +91,13 @@ export default {
       discardResumeSave: "Discard \u00B7 Resume \u00B7 Save",
       discardPauseSave: "Discard \u00B7 Pause \u00B7 Save",
     },
+    inProgress: "Recording in progress...",
+    recording: "RECORDING",
+    paused: "PAUSED",
+    discard: "Discard",
+    pause: "Pause",
+    resume: "Resume",
+    save: "Save",
   },
 
   dailyLog: {

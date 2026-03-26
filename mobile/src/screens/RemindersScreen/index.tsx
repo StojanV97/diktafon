@@ -26,7 +26,7 @@ import {
   deleteReminder,
   markReminderDone,
 } from "../../services/storage";
-import RecordingOverlay from "../../../components/RecordingOverlay";
+import RecordingView from "../../../components/RecordingView";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
@@ -313,28 +313,10 @@ export default function RemindersScreen({ navigation, route }: any) {
         </View>
       )}
 
-      {/* Main list */}
-      {sections.length === 0 && !isActiveSession && !isProcessing ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          renderSectionHeader={renderSectionHeader}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        />
-      )}
-
-      {/* Recording overlay */}
-      {isActiveSession && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
+      {/* Recording view or main content */}
+      {isActiveSession ? (
+        <RecordingView
+          saveLabel={t("tabs.reminders")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
@@ -342,17 +324,36 @@ export default function RemindersScreen({ navigation, route }: any) {
           onStop={handleStop}
           onCancel={handleCancel}
         />
-      )}
+      ) : (
+        <>
+          {sections.length === 0 && !isProcessing ? (
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
+            </View>
+          ) : (
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              renderSectionHeader={renderSectionHeader}
+              contentContainerStyle={styles.list}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+            />
+          )}
 
-      {/* Record reminder FAB */}
-      {!isActiveSession && !isProcessing && pipelineState !== "confirming" && (
-        <TouchableOpacity
-          style={[styles.fab, elevation.md]}
-          onPress={handleStartRecording}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-        </TouchableOpacity>
+          {/* Record reminder FAB */}
+          {!isProcessing && pipelineState !== "confirming" && (
+            <TouchableOpacity
+              style={[styles.fab, elevation.md]}
+              onPress={handleStartRecording}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* Confirmation sheet */}

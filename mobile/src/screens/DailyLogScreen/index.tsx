@@ -26,7 +26,7 @@ import {
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
-import RecordingOverlay from "../../../components/RecordingOverlay";
+import RecordingView from "../../../components/RecordingView";
 import { AppHeaderRight } from "../../../components/AppHeader";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
@@ -488,35 +488,9 @@ export default function DailyLogScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      <SectionList
-        sections={sections}
-        keyExtractor={(item: any) => item.id}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        renderSectionFooter={renderSectionFooter}
-        contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
-        stickySectionHeadersEnabled={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={10}
-        removeClippedSubviews={true}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <Text style={[typography.body, styles.emptyText]}>
-            {t("dailyLog.noEntries")}
-          </Text>
-        }
-      />
-
-      {isActiveSession && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
+      {isActiveSession ? (
+        <RecordingView
+          saveLabel={t("tabs.dailyLogs")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={handlePause}
@@ -524,16 +498,42 @@ export default function DailyLogScreen({ navigation, route }: any) {
           onStop={handleStop}
           onCancel={handleCancel}
         />
-      )}
+      ) : (
+        <>
+          <SectionList
+            sections={sections}
+            keyExtractor={(item: any) => item.id}
+            renderItem={renderItem}
+            renderSectionHeader={renderSectionHeader}
+            renderSectionFooter={renderSectionFooter}
+            contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
+            stickySectionHeadersEnabled={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
+            removeClippedSubviews={true}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+              />
+            }
+            ListEmptyComponent={
+              <Text style={[typography.body, styles.emptyText]}>
+                {t("dailyLog.noEntries")}
+              </Text>
+            }
+          />
 
-      {!isActiveSession && (
-        <TouchableOpacity
-          style={[styles.fab, elevation.md]}
-          onPress={handleStartRecording}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.fab, elevation.md]}
+            onPress={handleStartRecording}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
+          </TouchableOpacity>
+        </>
       )}
 
       <Portal>

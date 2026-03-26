@@ -29,7 +29,7 @@ import {
 } from "../../../services/journalStorage";
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
-import RecordingOverlay from "../../../components/RecordingOverlay";
+import RecordingView from "../../../components/RecordingView";
 import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
@@ -311,30 +311,42 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     );
   }
 
+  const isActiveSession = isRecording || isPaused;
+
   return (
     <View style={styles.container}>
-      <FlatList
-        data={regularFolders}
-        keyExtractor={(item: any) => item.id}
-        renderItem={renderItem}
-        ListHeaderComponent={listHeader}
-        contentContainerStyle={[styles.list, { flexGrow: 1 }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load(); }}
-            tintColor={colors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={[typography.body, styles.emptyText]}>{t("home.noFolders")}</Text>
-          </View>
-        }
-      />
-
-      {!isRecording && !isPaused && (
+      {isActiveSession ? (
+        <RecordingView
+          saveLabel={t("tabs.dailyLogs")}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
+          onStop={stopRecording}
+          onCancel={stopRecording}
+        />
+      ) : (
         <>
+          <FlatList
+            data={regularFolders}
+            keyExtractor={(item: any) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={listHeader}
+            contentContainerStyle={[styles.list, { flexGrow: 1 }]}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => { setRefreshing(true); load(); }}
+                tintColor={colors.primary}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={[typography.body, styles.emptyText]}>{t("home.noFolders")}</Text>
+              </View>
+            }
+          />
+
           <TouchableOpacity
             style={[styles.fab, styles.fabSecondary, elevation.md]}
             onPress={() => openDialog("create")}
@@ -350,17 +362,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
           </TouchableOpacity>
         </>
-      )}
-
-      {(isRecording || isPaused) && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
-          elapsed={elapsed}
-          isPaused={isPaused}
-          onPause={pauseRecording}
-          onResume={resumeRecording}
-          onStop={stopRecording}
-        />
       )}
 
       <Portal>

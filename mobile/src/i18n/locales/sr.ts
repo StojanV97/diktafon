@@ -91,6 +91,13 @@ export default {
       discardResumeSave: "Odbaci \u00B7 Nastavi \u00B7 Sacuvaj",
       discardPauseSave: "Odbaci \u00B7 Pauziraj \u00B7 Sacuvaj",
     },
+    inProgress: "Snimanje u toku...",
+    recording: "SNIMA SE",
+    paused: "PAUZIRANO",
+    discard: "Odbaci",
+    pause: "Pauziraj",
+    resume: "Nastavi",
+    save: "Sacuvaj",
   },
 
   dailyLog: {

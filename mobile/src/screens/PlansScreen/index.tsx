@@ -16,7 +16,7 @@ import { useRecorder } from "../../../hooks/useRecorder";
 import { extractPlan } from "../../../services/planExtractionService";
 import { isPremium } from "../../../services/subscriptionService";
 import { hasDevKey } from "../../../services/cloudTranscriptionService";
-import RecordingOverlay from "../../../components/RecordingOverlay";
+import RecordingView from "../../../components/RecordingView";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
@@ -115,45 +115,48 @@ export default function PlansScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={plans}
-        keyExtractor={(item: any) => item.id}
-        renderItem={({ item }) => (
-          <PlanCard plan={item} onEdit={editPlan} onDelete={handleDelete} />
-        )}
-        contentContainerStyle={[styles.list, plans.length === 0 && { flexGrow: 1 }]}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={colors.muted} />
-            <Text style={[typography.heading, { marginTop: spacing.lg, color: colors.muted }]}>
-              {t("plans.emptyTitle")}
-            </Text>
-            <Text style={[typography.body, styles.emptyText]}>
-              {t("plans.emptyMessage")}
-            </Text>
-          </View>
-        }
-      />
-
-      {!isActiveSession && (
-        <TouchableOpacity
-          style={[styles.fab, elevation.md]}
-          onPress={handleRecordPress}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-        </TouchableOpacity>
-      )}
-
-      {(isRecording || isPaused) && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
+      {(isRecording || isPaused) ? (
+        <RecordingView
+          saveLabel={t("tabs.plans")}
           elapsed={elapsed}
           isPaused={isPaused}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
+          onCancel={stopRecording}
         />
+      ) : (
+        <>
+          <FlatList
+            data={plans}
+            keyExtractor={(item: any) => item.id}
+            renderItem={({ item }) => (
+              <PlanCard plan={item} onEdit={editPlan} onDelete={handleDelete} />
+            )}
+            contentContainerStyle={[styles.list, plans.length === 0 && { flexGrow: 1 }]}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={colors.muted} />
+                <Text style={[typography.heading, { marginTop: spacing.lg, color: colors.muted }]}>
+                  {t("plans.emptyTitle")}
+                </Text>
+                <Text style={[typography.body, styles.emptyText]}>
+                  {t("plans.emptyMessage")}
+                </Text>
+              </View>
+            }
+          />
+
+          {!isActiveSession && (
+            <TouchableOpacity
+              style={[styles.fab, elevation.md]}
+              onPress={handleRecordPress}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {isProcessing && (

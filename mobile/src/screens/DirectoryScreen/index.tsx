@@ -27,7 +27,7 @@ import {
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
-import RecordingOverlay from "../../../components/RecordingOverlay";
+import RecordingView from "../../../components/RecordingView";
 import CalendarStrip from "../../../components/CalendarStrip";
 import { AppHeaderLeft, AppHeaderRight } from "../../../components/AppHeader";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
@@ -58,7 +58,7 @@ const AUDIO_TYPES = [
 ];
 
 export default function DirectoryScreen({ route, navigation }: any) {
-  const { id: folderId } = route.params;
+  const { id: folderId, name: folderName } = route.params;
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
 
   const [entries, setEntries] = useState<any[]>([]);
@@ -418,6 +418,18 @@ export default function DirectoryScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
+      {isActiveSession ? (
+        <RecordingView
+          saveLabel={folderName || t("nav.directory")}
+          elapsed={elapsed}
+          isPaused={isPaused}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+          onCancel={handleCancel}
+        />
+      ) : (
+        <>
       <CalendarStrip
         viewedYear={viewedYear}
         viewedMonth={viewedMonth}
@@ -460,26 +472,14 @@ export default function DirectoryScreen({ route, navigation }: any) {
         }
       />
 
-      {isActiveSession && (
-        <RecordingOverlay
-          meteringHistory={meteringHistory}
-          elapsed={elapsed}
-          isPaused={isPaused}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStop={handleStop}
-          onCancel={handleCancel}
-        />
-      )}
-
-      {!isActiveSession && (
-        <TouchableOpacity
-          style={[styles.fab, elevation.md]}
-          onPress={handleStartRecording}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.fab, elevation.md]}
+        onPress={handleStartRecording}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
+      </TouchableOpacity>
+        </>
       )}
 
       <Portal>
