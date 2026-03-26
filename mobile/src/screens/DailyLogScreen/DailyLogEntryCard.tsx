@@ -49,7 +49,7 @@ function DailyLogEntryCard({
       <View style={[styles.accentBar, { backgroundColor: sc.fg }]} />
 
       <View style={styles.cardContent}>
-        {/* Top row: category label + menu */}
+        {/* Top row: status label + menu */}
         <View style={styles.topRow}>
           <View style={styles.categoryRow}>
             {isProcessing ? (
@@ -58,10 +58,6 @@ function DailyLogEntryCard({
               <MaterialCommunityIcons name={sc.icon as any} size={iconSize.sm} color={sc.fg} style={{ marginRight: spacing.xs }} />
             )}
             <Text style={[styles.categoryLabel, { color: sc.fg }]}>{sc.label}</Text>
-            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
-            {item.duration_seconds > 0 && (
-              <Text style={styles.timeText}> · {formatDuration(item.duration_seconds)}</Text>
-            )}
           </View>
           <Menu
             visible={isMenuOpen}
@@ -96,18 +92,15 @@ function DailyLogEntryCard({
           </Menu>
         </View>
 
-        {/* Main content */}
+        {/* Time + duration */}
+        <Text style={styles.metaText}>
+          {formatTime(item.created_at)}
+          {item.duration_seconds > 0 ? ` · ${formatDuration(item.duration_seconds)}` : ""}
+        </Text>
+
+        {/* Preview text for transcribed entries */}
         {isDone && item.text ? (
           <Text style={styles.preview} numberOfLines={2}>{item.text}</Text>
-        ) : isRecorded ? (
-          <TouchableOpacity
-            style={styles.transcribeLink}
-            onPress={() => onTranscribe(item.id)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.transcribeLinkText}>{t("dailyLog.toText")}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={iconSize.sm} color={colors.primary} />
-          </TouchableOpacity>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -126,13 +119,15 @@ const styles = StyleSheet.create({
   },
   accentBar: {
     width: 4,
-    alignSelf: "stretch",
+    height: 32,
     borderRadius: 2,
     marginLeft: spacing.md,
+    marginTop: spacing.md,
   },
   cardContent: {
     flex: 1,
-    padding: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.lg,
     paddingLeft: spacing.md,
   },
   topRow: {
@@ -151,9 +146,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginRight: spacing.sm,
   },
-  timeText: {
+  metaText: {
     ...typography.mono,
     fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
   },
   menuBtn: {
     margin: -spacing.sm,
@@ -163,13 +160,5 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     lineHeight: 20,
     marginTop: spacing.sm,
-  },
-  transcribeLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: spacing.sm,
-  },
-  transcribeLinkText: {
-    ...typography.label,
   },
 });
