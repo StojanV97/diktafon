@@ -33,7 +33,7 @@ import RecordingView from "../../../components/RecordingView";
 import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
+import { colors, spacing, radii, elevation, iconSize, typography, FOLDER_COLORS } from "../../../theme";
 import { formatDate } from "../../utils/formatters";
 import { t } from "../../i18n";
 
@@ -257,11 +257,35 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         style={[styles.card, elevation.sm]}
       >
         <View style={[styles.accentBar, { backgroundColor: color }]} />
-        <View style={[styles.folderIconWrap, { backgroundColor: color + "26" }]}>
-          <MaterialCommunityIcons name="folder-outline" size={22} color={color} />
-        </View>
         <View style={styles.cardBody}>
-          <Text style={typography.heading} numberOfLines={1}>{item.name}</Text>
+          <View style={styles.cardTopRow}>
+            <MaterialCommunityIcons name="folder-outline" size={iconSize.sm} color={color} style={{ marginRight: spacing.sm }} />
+            <Text style={[typography.heading, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+            <Menu
+              visible={menuVisible === item.id}
+              onDismiss={() => setMenuVisible(null)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  iconColor={colors.muted}
+                  size={iconSize.md}
+                  onPress={() => setMenuVisible(item.id)}
+                  style={styles.menuBtn}
+                />
+              }
+            >
+              <Menu.Item
+                leadingIcon="pencil-outline"
+                onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
+                title={t("common.edit")}
+              />
+              <Menu.Item
+                leadingIcon="delete-outline"
+                onPress={() => onDeletePress(item.id, item.name)}
+                title={t("common.delete")}
+              />
+            </Menu>
+          </View>
           <Text style={[typography.caption, { marginTop: 2 }]}>{formatDate(item.created_at)}</Text>
           {tags.length > 0 && (
             <View style={styles.tagRow}>
@@ -276,29 +300,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             </View>
           )}
         </View>
-        <Menu
-          visible={menuVisible === item.id}
-          onDismiss={() => setMenuVisible(null)}
-          anchor={
-            <IconButton
-              icon="dots-vertical"
-              iconColor={colors.muted}
-              size={20}
-              onPress={() => setMenuVisible(item.id)}
-            />
-          }
-        >
-          <Menu.Item
-            leadingIcon="pencil-outline"
-            onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
-            title={t("common.edit")}
-          />
-          <Menu.Item
-            leadingIcon="delete-outline"
-            onPress={() => onDeletePress(item.id, item.name)}
-            title={t("common.delete")}
-          />
-        </Menu>
       </TouchableOpacity>
     );
   }, [menuVisible, navigation, openDialog, onDeletePress]);
@@ -449,8 +450,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     flexDirection: "row",
-    alignItems: "center",
-    paddingRight: spacing.xs,
     paddingVertical: spacing.lg,
     marginBottom: spacing.md,
   },
@@ -460,16 +459,26 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginLeft: spacing.md,
   },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   folderIconWrap: {
-    width: 40,
-    height: 40,
+    width: 28,
+    height: 28,
     borderRadius: radii.full,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: spacing.lg,
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
-  cardBody: { flex: 1 },
+  menuBtn: {
+    margin: -spacing.sm,
+  },
+  cardBody: {
+    flex: 1,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+  },
   tagRow: {
     flexDirection: "row",
     flexWrap: "wrap",
