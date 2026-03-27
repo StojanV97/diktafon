@@ -22,6 +22,7 @@ import { fileExistsOnICloud } from "../../../services/icloudSyncService";
 import useAutoSave from "../../../hooks/useAutoSave";
 import { useTranscription } from "../../../hooks/useTranscription";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
+import { displayName } from "../../../utils/entryUtils";
 import { colors, spacing, radii, elevation, typography } from "../../../theme";
 import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../../utils/formatters";
 import { t } from "../../i18n";
@@ -122,7 +123,7 @@ export default function EntryScreen({ route, navigation }: any) {
     const subtitle = formatDate(record.created_at) +
       (record.duration_seconds > 0 ? `  \u2022  ${formatDurationVerbose(record.duration_seconds)}` : "");
     navigation.setOptions({
-      title: record.filename,
+      title: displayName(record.filename),
       subtitle,
     });
   }, [record, navigation]);

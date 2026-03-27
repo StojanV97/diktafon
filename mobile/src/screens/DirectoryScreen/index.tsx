@@ -32,7 +32,7 @@ import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import RecordingTypeDialog from "../../../components/RecordingTypeDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
-import { statusConfig, groupByDate } from "../../../utils/entryUtils";
+import { statusConfig, groupByDate, displayName } from "../../../utils/entryUtils";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
 import { formatDate } from "../../utils/formatters";
@@ -234,7 +234,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
         setDeleteDialogVisible(false);
         Alert.alert(
           t("deleteDialog.icloudTitle"),
-          t("deleteDialog.icloudEntryMessage", { filename: deleteTarget.filename }),
+          t("deleteDialog.icloudEntryMessage", { filename: displayName(deleteTarget.filename) }),
           [
             {
               text: t("deleteDialog.localOnly"),
@@ -296,7 +296,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
         <View style={styles.cardBody}>
           <View style={styles.cardTopRow}>
             <Text style={[typography.heading, { flex: 1 }]} numberOfLines={1}>
-              {item.filename}
+              {displayName(item.filename)}
             </Text>
             <Menu
               visible={menuVisible === item.id}
@@ -426,7 +426,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
           onDismiss={() => setDeleteDialogVisible(false)}
           onConfirm={onDeleteConfirm}
           title={t("deleteDialog.title")}
-          message={t("deleteDialog.entryMessage", { filename: deleteTarget?.filename })}
+          message={t("deleteDialog.entryMessage", { filename: deleteTarget?.filename ? displayName(deleteTarget.filename) : "" })}
           confirmLabel={undefined}
           loading={deleteLoading}
         />

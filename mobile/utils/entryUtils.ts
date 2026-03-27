@@ -17,6 +17,10 @@ export function statusConfig(status: EntryStatus | string): StatusConfig {
   }
 }
 
+export function displayName(filename: string): string {
+  return filename.replace(/\.[^.]+$/, "")
+}
+
 export function groupByDate(entries: Pick<Entry, "recorded_date" | "created_at">[]) {
   const map: Record<string, typeof entries> = {}
   for (const e of entries) {
