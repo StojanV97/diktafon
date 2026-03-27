@@ -178,7 +178,7 @@ function App() {
         message: "Font loading timed out after 10s",
         level: "warning",
       });
-    }, 10000);
+    }, 4000);
     return () => clearTimeout(timer);
   }, []);
 

@@ -96,6 +96,12 @@ export default function PlansScreen({ navigation }: any) {
     setDeleteTarget(planId);
   }, []);
 
+  const keyExtractor = useCallback((item: any) => item.id, []);
+  const renderPlanItem = useCallback(
+    ({ item }: any) => <PlanCard plan={item} onEdit={editPlan} onDelete={handleDelete} />,
+    [editPlan, handleDelete]
+  );
+
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget) {
       await removePlan(deleteTarget);
@@ -132,12 +138,10 @@ export default function PlansScreen({ navigation }: any) {
         <>
           <FlatList
             data={plans}
-            keyExtractor={(item: any) => item.id}
-            renderItem={({ item }) => (
-              <PlanCard plan={item} onEdit={editPlan} onDelete={handleDelete} />
-            )}
+            keyExtractor={keyExtractor}
+            renderItem={renderPlanItem}
             ListHeaderComponent={<ScreenHeader title={t("tabs.plans")} />}
-            contentContainerStyle={[styles.list, plans.length === 0 && { flexGrow: 1 }]}
+            contentContainerStyle={plans.length === 0 ? styles.listGrow : styles.list}
             ListEmptyComponent={
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={colors.muted} />
@@ -200,6 +204,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  listGrow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, flexGrow: 1 },
   empty: {
     flex: 1,
     justifyContent: "center",

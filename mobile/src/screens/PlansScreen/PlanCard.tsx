@@ -85,11 +85,16 @@ export default function PlanCard({ plan, onEdit, onDelete }: Props) {
               <Text style={styles.bullet}>{"\u2022"}</Text>
               <TextInput
                 style={styles.editInput}
-                value={item}
+                defaultValue={item}
                 onChangeText={(text) => {
-                  const next = [...editItems];
-                  next[idx] = text;
-                  setEditItems(next);
+                  editItems[idx] = text;
+                }}
+                onEndEditing={(e) => {
+                  setEditItems((prev) => {
+                    const next = [...prev];
+                    next[idx] = e.nativeEvent.text;
+                    return next;
+                  });
                 }}
               />
               <TouchableOpacity onPress={() => setEditItems(editItems.filter((_, i) => i !== idx))}>

@@ -54,8 +54,8 @@ export async function transcribeBatch(entryIds, engine, callbacks) {
       await transcribeSingle(entryId, engine, callbacks)
     }
   } else {
-    // Parallel for cloud
-    await Promise.all(
+    // Parallel for cloud — allSettled so one failure doesn't kill the batch
+    await Promise.allSettled(
       entryIds.map((entryId) => transcribeSingle(entryId, engine, callbacks))
     )
   }

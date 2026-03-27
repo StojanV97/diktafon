@@ -15,7 +15,6 @@ import {
   Snackbar,
   Text,
 } from "react-native-paper";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   fetchFolders,
@@ -42,7 +41,6 @@ import ScreenHeader from "../../components/ScreenHeader";
 import FolderDialog from "./FolderDialog";
 
 export default function DirectoryHomeScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
 
   const [folders, setFolders] = useState<any[]>([]);
@@ -130,13 +128,16 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     setDialogVisible(true);
   }, []);
 
-  const tagSuggestions = dialogTagInput.trim()
-    ? allTags.filter(
-        (tag) =>
-          tag.toLowerCase().includes(dialogTagInput.trim().toLowerCase()) &&
-          !dialogTags.includes(tag)
-      )
-    : [];
+  const tagSuggestions = useMemo(() =>
+    dialogTagInput.trim()
+      ? allTags.filter(
+          (tag) =>
+            tag.toLowerCase().includes(dialogTagInput.trim().toLowerCase()) &&
+            !dialogTags.includes(tag)
+        )
+      : [],
+    [dialogTagInput, allTags, dialogTags]
+  );
 
   const onDialogConfirm = useCallback(async () => {
     const name = dialogName.trim();
@@ -323,7 +324,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             keyExtractor={(item: any) => item.id}
             renderItem={renderItem}
             ListHeaderComponent={listHeader}
-            contentContainerStyle={[styles.list, { flexGrow: 1 }]}
+            contentContainerStyle={styles.listGrow}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -395,6 +396,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
+  listGrow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, flexGrow: 1 },
   emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
   fab: {

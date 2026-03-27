@@ -330,7 +330,7 @@ export default function RemindersScreen({ navigation, route }: any) {
       ) : (
         <>
           {sections.length === 0 && !isProcessing ? (
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <ScreenHeader title={t("tabs.reminders")} />
               <View style={styles.center}>
                 <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
@@ -344,6 +344,9 @@ export default function RemindersScreen({ navigation, route }: any) {
               renderSectionHeader={renderSectionHeader}
               ListHeaderComponent={<ScreenHeader title={t("tabs.reminders")} />}
               contentContainerStyle={styles.list}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={true}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
@@ -405,6 +408,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  flex1: { flex: 1 },
   center: {
     flex: 1,
     justifyContent: "center",

@@ -275,10 +275,10 @@ export default function DailyLogScreen({ navigation, route }: any) {
           {
             text: t("deleteDialog.localOnly"),
             onPress: async () => {
-              let failures = 0;
-              for (const entry of entries) {
-                try { await tombstoneEntry(entry.id); } catch { failures++; }
-              }
+              const results = await Promise.allSettled(
+                entries.map((entry: any) => tombstoneEntry(entry.id))
+              );
+              const failures = results.filter((r) => r.status === "rejected").length;
               await load();
               syncWidgetData();
               if (failures > 0) setSnackbar(t("dailyLog.partialDeleteFailed", { failures, total }));
@@ -289,10 +289,10 @@ export default function DailyLogScreen({ navigation, route }: any) {
             text: t("deleteDialog.everywhere"),
             style: "destructive",
             onPress: async () => {
-              let failures = 0;
-              for (const entry of entries) {
-                try { await deleteEntryWithICloud(entry.id); } catch { failures++; }
-              }
+              const results = await Promise.allSettled(
+                entries.map((entry: any) => deleteEntryWithICloud(entry.id))
+              );
+              const failures = results.filter((r) => r.status === "rejected").length;
               await load();
               syncWidgetData();
               if (failures > 0) setSnackbar(t("dailyLog.partialDeleteFailed", { failures, total }));
@@ -303,10 +303,10 @@ export default function DailyLogScreen({ navigation, route }: any) {
       );
       return;
     }
-    let failures = 0;
-    for (const entry of entries) {
-      try { await deleteEntry(entry.id); } catch { failures++; }
-    }
+    const results = await Promise.allSettled(
+      entries.map((entry: any) => deleteEntry(entry.id))
+    );
+    const failures = results.filter((r) => r.status === "rejected").length;
     await load();
     syncWidgetData();
     if (failures > 0) setSnackbar(t("dailyLog.partialDeleteFailed", { failures, total }));
