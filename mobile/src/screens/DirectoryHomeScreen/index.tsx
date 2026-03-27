@@ -21,7 +21,6 @@ import {
   createFolder,
   deleteFolder,
   updateFolder,
-  getAllTags,
   tombstoneFolder,
   deleteFolderWithICloud,
   createDailyLogEntry,
@@ -52,10 +51,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [dialogName, setDialogName] = useState("");
   const [dialogColor, setDialogColor] = useState(FOLDER_COLORS[0]);
-  const [dialogTags, setDialogTags] = useState<string[]>([]);
-  const [dialogTagInput, setDialogTagInput] = useState("");
   const [dialogTargetId, setDialogTargetId] = useState<string | null>(null);
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [dialogLoading, setDialogLoading] = useState(false);
 
   // Delete dialog
@@ -114,30 +110,15 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     if (mode === "edit" && folder) {
       setDialogName(folder.name);
       setDialogColor(folder.color || FOLDER_COLORS[0]);
-      setDialogTags(folder.tags || []);
       setDialogTargetId(folder.id);
     } else {
       setDialogName("");
       setDialogColor(FOLDER_COLORS[0]);
-      setDialogTags([]);
       setDialogTargetId(null);
     }
-    setDialogTagInput("");
-    const tags = await getAllTags();
-    setAllTags(tags);
     setDialogVisible(true);
   }, []);
 
-  const tagSuggestions = useMemo(() =>
-    dialogTagInput.trim()
-      ? allTags.filter(
-          (tag) =>
-            tag.toLowerCase().includes(dialogTagInput.trim().toLowerCase()) &&
-            !dialogTags.includes(tag)
-        )
-      : [],
-    [dialogTagInput, allTags, dialogTags]
-  );
 
   const onDialogConfirm = useCallback(async () => {
     const name = dialogName.trim();
@@ -149,13 +130,13 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     setDialogLoading(true);
     try {
       if (dialogMode === "create") {
-        const folder = await createFolder(name, dialogColor, dialogTags);
+        const folder = await createFolder(name, dialogColor, []);
         setFolders((prev) => [folder, ...prev]);
       } else {
         const updated = await updateFolder(dialogTargetId!, {
           name,
           color: dialogColor,
-          tags: dialogTags,
+          tags: [],
         });
         setFolders((prev) => prev.map((f) => (f.id === dialogTargetId ? updated : f)));
       }
@@ -165,7 +146,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     } finally {
       setDialogLoading(false);
     }
-  }, [dialogName, dialogLoading, dialogMode, dialogColor, dialogTags, dialogTargetId, setSnackbar]);
+  }, [dialogName, dialogLoading, dialogMode, dialogColor, dialogTargetId, setSnackbar]);
 
   // --- Delete ---
   const onDeletePress = useCallback((id: string, name: string) => {
@@ -364,12 +345,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
           onNameChange={setDialogName}
           color={dialogColor}
           onColorChange={setDialogColor}
-          tags={dialogTags}
-          onAddTag={(tag) => setDialogTags((prev) => [...prev, tag])}
-          onRemoveTag={(tag) => setDialogTags((prev) => prev.filter((t) => t !== tag))}
-          tagInput={dialogTagInput}
-          onTagInputChange={setDialogTagInput}
-          tagSuggestions={tagSuggestions}
           loading={dialogLoading}
           onConfirm={onDialogConfirm}
           onDismiss={() => setDialogVisible(false)}
