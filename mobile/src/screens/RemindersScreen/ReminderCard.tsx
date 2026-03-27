@@ -15,47 +15,75 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-function formatReminderTime(isoString: string): string {
-  const d = new Date(isoString);
+const DAY_KEYS = ["daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat"];
+
+function formatTime(d: Date): string {
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function formatReminderTime(item: Reminder): string {
+  const d = new Date(item.reminder_time);
+  const time = formatTime(d);
+
+  if (item.recurrence) {
+    const { type, days_of_week } = item.recurrence;
+
+    if (type === "daily") return time;
+
+    if (type === "weekly") {
+      const days = days_of_week && days_of_week.length > 0
+        ? days_of_week
+        : [d.getDay()];
+      const names = days.map((i) => t(`reminders.${DAY_KEYS[i]}`));
+      return `${names.join(", ")} ${time}`;
+    }
+
+    if (type === "monthly") {
+      return t("reminders.monthlyAt", { day: d.getDate(), time });
+    }
+  }
+
+  // One-time: show date + time with today/tomorrow shortcuts
   const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const hours = d.getHours().toString().padStart(2, "0");
-  const minutes = d.getMinutes().toString().padStart(2, "0");
-  const time = `${hours}:${minutes}`;
+  if (d.toDateString() === now.toDateString()) return `${t("reminders.today")} ${time}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `${t("reminders.tomorrow")} ${time}`;
 
-  if (d.toDateString() === now.toDateString()) {
-    return `${t("reminders.today")} ${time}`;
-  }
-  if (d.toDateString() === tomorrow.toDateString()) {
-    return `${t("reminders.tomorrow")} ${time}`;
-  }
   const day = d.getDate().toString().padStart(2, "0");
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
   return `${day}.${month}. ${time}`;
 }
 
-function recurrenceLabel(item: Reminder): string {
-  if (!item.recurrence) return t("reminders.once");
-  const map: Record<string, string> = {
-    daily: t("reminders.daily"),
-    weekly: t("reminders.weekly"),
-    monthly: t("reminders.monthly"),
-  };
-  return map[item.recurrence.type] || t("reminders.once");
+function recurrenceConfig(item: Reminder) {
+  if (!item.recurrence) {
+    return { label: t("reminders.once"), fg: colors.muted, bg: colors.badgeNeutral };
+  }
+  switch (item.recurrence.type) {
+    case "daily":
+      return { label: t("reminders.daily"), fg: colors.primary, bg: colors.primaryLight };
+    case "weekly":
+      return { label: t("reminders.weekly"), fg: colors.warning, bg: colors.warningLight };
+    case "monthly":
+      return { label: t("reminders.monthly"), fg: colors.badgeDoneFg, bg: colors.badgeDone };
+    default:
+      return { label: t("reminders.once"), fg: colors.muted, bg: colors.badgeNeutral };
+  }
 }
 
 function statusConfig(status: string) {
   switch (status) {
     case "pending":
-      return { label: t("reminders.pending"), fg: colors.badgePendingFg, icon: "clock-outline" as const };
+      return { label: t("reminders.pending"), icon: "clock-outline" as const };
+    case "notified":
+      return { label: t("reminders.notified"), icon: "bell-ring-outline" as const };
     case "snoozed":
-      return { label: t("reminders.snoozed"), fg: colors.badgeSnoozedFg, icon: "alarm-snooze" as const };
+      return { label: t("reminders.snoozed"), icon: "alarm-snooze" as const };
     case "done":
-      return { label: t("reminders.done"), fg: colors.badgeDoneFg, icon: "check-circle-outline" as const };
+      return { label: t("reminders.done"), icon: "check-circle-outline" as const };
     default:
-      return { label: status, fg: colors.muted, icon: "help-circle-outline" as const };
+      return { label: status, icon: "help-circle-outline" as const };
   }
 }
 
@@ -68,9 +96,10 @@ function ReminderCard({
   onDelete,
 }: Props) {
   const sc = statusConfig(item.status);
+  const rc = recurrenceConfig(item);
 
   return (
-    <View style={[styles.card, elevation.sm]}>
+    <View style={[styles.card, elevation.sm, { borderLeftColor: rc.fg }]}>
       <View style={styles.topRow}>
         <Text style={styles.actionText} numberOfLines={2}>{item.action.charAt(0).toUpperCase() + item.action.slice(1)}</Text>
         <Menu
@@ -101,12 +130,12 @@ function ReminderCard({
         </Menu>
       </View>
       <View style={styles.metaRow}>
-        <MaterialCommunityIcons name={sc.icon} size={14} color={sc.fg} style={{ marginRight: spacing.xs }} />
-        <Text style={[styles.statusLabel, { color: sc.fg }]}>{sc.label}</Text>
+        <MaterialCommunityIcons name={sc.icon} size={14} color={colors.muted} style={{ marginRight: spacing.xs }} />
+        <Text style={styles.statusLabel}>{sc.label}</Text>
         <Text style={styles.metaSeparator}> · </Text>
-        <Text style={typography.caption}>{formatReminderTime(item.reminder_time)}</Text>
-        <View style={styles.recurrenceBadge}>
-          <Text style={styles.recurrenceText}>{recurrenceLabel(item)}</Text>
+        <Text style={typography.caption}>{formatReminderTime(item)}</Text>
+        <View style={[styles.recurrenceBadge, { backgroundColor: rc.bg }]}>
+          <Text style={[styles.recurrenceText, { color: rc.fg }]}>{rc.label}</Text>
         </View>
       </View>
     </View>
@@ -122,7 +151,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.lg,
     borderLeftWidth: 4,
-    borderLeftColor: colors.badgeDoneFg,
   },
   topRow: {
     flexDirection: "row",
@@ -147,6 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1,
     textTransform: "uppercase",
+    color: colors.muted,
   },
   metaSeparator: {
     fontFamily: "JetBrainsMono_400Regular",

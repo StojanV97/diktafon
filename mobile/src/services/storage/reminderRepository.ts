@@ -105,8 +105,31 @@ export function snoozeReminder(id: string): Promise<Reminder | null> {
 export async function getPendingReminders(): Promise<Reminder[]> {
   const reminders = await readReminders();
   return reminders
-    .filter((r) => r.status === "pending" || r.status === "snoozed")
+    .filter((r) => r.status === "pending" || r.status === "snoozed" || r.status === "notified")
     .sort((a, b) => a.reminder_time.localeCompare(b.reminder_time));
+}
+
+export function markExpiredAsNotified(): Promise<number> {
+  return withWriteLock(async () => {
+    const reminders = [...await readReminders()];
+    const now = Date.now();
+    let count = 0;
+    for (let i = 0; i < reminders.length; i++) {
+      if (
+        reminders[i].status === "pending" &&
+        new Date(reminders[i].reminder_time).getTime() < now
+      ) {
+        reminders[i] = {
+          ...reminders[i],
+          status: "notified",
+          updated_at: new Date().toISOString(),
+        };
+        count++;
+      }
+    }
+    if (count > 0) await writeReminders(reminders);
+    return count;
+  });
 }
 
 /**

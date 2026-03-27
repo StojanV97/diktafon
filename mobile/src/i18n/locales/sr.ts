@@ -406,6 +406,7 @@ export default {
     pending: "Na cekanju",
     done: "Zavrseno",
     snoozed: "Odlozeno",
+    notified: "Obavesteno",
     markDone: "Oznaci kao gotovo",
     delete: "Obrisi",
     deleteConfirmTitle: "Obrisi podsetnik",
@@ -424,6 +425,14 @@ export default {
     notificationTitle: "Podsetnik",
     snoozeAction: "Odloži 5 min",
     doneAction: "Gotovo",
+    daySun: "Ned",
+    dayMon: "Pon",
+    dayTue: "Uto",
+    dayWed: "Sre",
+    dayThu: "Cet",
+    dayFri: "Pet",
+    daySat: "Sub",
+    monthlyAt: "%{day}. u mesecu %{time}",
   },
 
   whisper: {

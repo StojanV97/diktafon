@@ -79,6 +79,7 @@ export {
   snoozeReminder,
   getPendingReminders,
   getNextOccurrence,
+  markExpiredAsNotified,
 } from "./reminderRepository";
 
 // planRepository

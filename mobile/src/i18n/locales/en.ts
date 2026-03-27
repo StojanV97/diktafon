@@ -406,6 +406,7 @@ export default {
     pending: "Pending",
     done: "Done",
     snoozed: "Snoozed",
+    notified: "Notified",
     markDone: "Mark as done",
     delete: "Delete",
     deleteConfirmTitle: "Delete reminder",
@@ -424,6 +425,14 @@ export default {
     notificationTitle: "Reminder",
     snoozeAction: "Snooze 5 min",
     doneAction: "Done",
+    daySun: "Sun",
+    dayMon: "Mon",
+    dayTue: "Tue",
+    dayWed: "Wed",
+    dayThu: "Thu",
+    dayFri: "Fri",
+    daySat: "Sat",
+    monthlyAt: "%{day} of month %{time}",
   },
 
   whisper: {

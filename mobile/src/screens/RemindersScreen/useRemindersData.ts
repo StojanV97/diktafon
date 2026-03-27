@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { fetchReminders } from "../../services/storage";
+import { fetchReminders, markExpiredAsNotified } from "../../services/storage";
 import type { Reminder } from "../../types/reminder";
 
 export function useRemindersData(setSnackbar: (msg: string) => void) {
@@ -9,6 +9,7 @@ export function useRemindersData(setSnackbar: (msg: string) => void) {
 
   const load = useCallback(async () => {
     try {
+      await markExpiredAsNotified();
       const data = await fetchReminders();
       setReminders(data);
     } catch (e: any) {
@@ -27,7 +28,7 @@ export function useRemindersData(setSnackbar: (msg: string) => void) {
   const pendingReminders = useMemo(
     () =>
       reminders
-        .filter((r) => r.status === "pending" || r.status === "snoozed")
+        .filter((r) => r.status === "pending" || r.status === "snoozed" || r.status === "notified")
         .sort((a, b) => a.reminder_time.localeCompare(b.reminder_time)),
     [reminders]
   );

@@ -20,6 +20,7 @@ import {
   requestPermissions,
   scheduleReminderNotification,
   cancelNotification,
+  dismissNotification,
 } from "../../../services/notificationService";
 import {
   createReminder,
@@ -217,6 +218,7 @@ export default function RemindersScreen({ navigation, route }: any) {
         const reminder = pendingReminders.find((r) => r.id === id);
         if (reminder?.notification_id) {
           await cancelNotification(reminder.notification_id);
+          await dismissNotification(reminder.notification_id);
         }
         await markReminderDone(id);
         setSnackbar(t("reminders.markedDone"));
@@ -247,6 +249,7 @@ export default function RemindersScreen({ navigation, route }: any) {
       const reminder = allReminders.find((r) => r.id === deleteTargetId);
       if (reminder?.notification_id) {
         await cancelNotification(reminder.notification_id);
+        await dismissNotification(reminder.notification_id);
       }
       await deleteReminder(deleteTargetId);
       setSnackbar(t("reminders.deleted"));

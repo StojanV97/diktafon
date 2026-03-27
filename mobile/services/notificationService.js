@@ -15,11 +15,16 @@ const OFFSET_MINUTES = 0
 
 export function initNotifications() {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification) => {
+      const { reminderId } = notification.request.content.data || {}
+      if (reminderId) {
+        const reminder = await fetchReminder(reminderId)
+        if (!reminder) {
+          return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false }
+        }
+      }
+      return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }
+    },
   })
 
   Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [
@@ -77,6 +82,15 @@ export async function cancelNotification(notificationId) {
   }
 }
 
+export async function dismissNotification(notificationId) {
+  if (!notificationId) return
+  try {
+    await Notifications.dismissNotificationAsync(notificationId)
+  } catch {
+    // Not in notification center
+  }
+}
+
 async function scheduleNextOccurrence(reminderId) {
   const reminder = await fetchReminder(reminderId)
   if (!reminder || !reminder.recurrence) return
@@ -110,32 +124,33 @@ export function handleNotificationResponse(navigationRef) {
       const actionId = response.actionIdentifier
 
       if (actionId === "snooze") {
+        const reminder = await fetchReminder(reminderId)
+        if (!reminder) return
         await snoozeReminder(reminderId)
-        // Schedule new notification for 5 minutes from now
         const snoozeTime = new Date(
           Date.now() + SNOOZE_MINUTES * 60 * 1000
         ).toISOString()
-        const reminder = await fetchReminder(reminderId)
-        if (reminder) {
-          const notificationId = await scheduleReminderNotification({
-            ...reminder,
-            notification_time: snoozeTime,
-          })
-          await updateReminder(reminderId, { notification_id: notificationId })
-        }
+        const notificationId = await scheduleReminderNotification({
+          ...reminder,
+          notification_time: snoozeTime,
+        })
+        await updateReminder(reminderId, { notification_id: notificationId })
         return
       }
 
       if (actionId === "done") {
         const reminder = await fetchReminder(reminderId)
+        if (!reminder) return
         await markReminderDone(reminderId)
-        if (reminder?.recurrence) {
+        if (reminder.recurrence) {
           await scheduleNextOccurrence(reminderId)
         }
         return
       }
 
       // Default tap — navigate to Reminders screen
+      const reminder = await fetchReminder(reminderId)
+      if (!reminder) return
       if (navigationRef?.isReady()) {
         navigationRef.navigate("RemindersTab", { screen: "RemindersRoot" })
       }

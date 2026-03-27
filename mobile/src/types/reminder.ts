@@ -1,4 +1,4 @@
-export type ReminderStatus = "pending" | "done" | "snoozed";
+export type ReminderStatus = "pending" | "notified" | "done" | "snoozed";
 
 export type RecurrenceType = "daily" | "weekly" | "monthly";
 
