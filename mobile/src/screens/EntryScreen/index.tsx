@@ -116,6 +116,17 @@ export default function EntryScreen({ route, navigation }: any) {
     };
   }, [id]);
 
+  // Set header title/subtitle
+  useEffect(() => {
+    if (!record) return;
+    const subtitle = formatDate(record.created_at) +
+      (record.duration_seconds > 0 ? `  \u2022  ${formatDurationVerbose(record.duration_seconds)}` : "");
+    navigation.setOptions({
+      title: record.filename,
+      subtitle,
+    });
+  }, [record, navigation]);
+
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
@@ -248,12 +259,6 @@ export default function EntryScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContent}>
-        <Text style={typography.heading}>{record.filename}</Text>
-        <Text style={[typography.caption, { marginTop: spacing.xs, marginBottom: spacing.lg }]}>
-          {formatDate(record.created_at)}
-          {record.duration_seconds > 0 && `  \u2022  ${formatDurationVerbose(record.duration_seconds)}`}
-        </Text>
-
         {record.status === "done" && record.text ? (
           <View style={[styles.transcriptionCard, elevation.md]}>
             <View style={styles.transcriptionHeader}>

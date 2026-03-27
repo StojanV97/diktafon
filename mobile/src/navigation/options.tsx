@@ -8,6 +8,10 @@ export const stackScreenOptions = {
   animation: "slide_from_right" as const,
   contentStyle: { backgroundColor: colors.background },
   header: ({ options, route }: NativeStackHeaderProps) => (
-    <DetailScreenHeader title={getHeaderTitle(options, route.name)} />
+    <DetailScreenHeader
+      title={getHeaderTitle(options, route.name)}
+      subtitle={(options as any).subtitle}
+      onMenuPress={(options as any).onMenuPress}
+    />
   ),
 };

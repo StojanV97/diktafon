@@ -7,19 +7,27 @@ import HeaderMenuButton from "./HeaderMenuButton";
 
 interface Props {
   title: string;
+  subtitle?: string;
   onMenuPress?: () => void;
 }
 
-export default function DetailScreenHeader({ title, onMenuPress }: Props) {
+export default function DetailScreenHeader({ title, subtitle, onMenuPress }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.row}>
+      <View style={[styles.row, subtitle ? styles.rowWithSubtitle : undefined]}>
         <HeaderBackButton />
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
         <HeaderMenuButton onPress={onMenuPress} />
       </View>
     </View>
@@ -37,13 +45,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     height: 48,
   },
-  title: {
+  rowWithSubtitle: {
+    height: 56,
+  },
+  titleContainer: {
     flex: 1,
+    alignItems: "center",
+    marginHorizontal: spacing.md,
+  },
+  title: {
     textAlign: "center",
     fontFamily: "Inter_600SemiBold",
     fontWeight: "600",
-    fontSize: 17,
+    fontSize: 15,
     color: colors.foreground,
-    marginHorizontal: spacing.md,
+  },
+  subtitle: {
+    textAlign: "center",
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
   },
 });

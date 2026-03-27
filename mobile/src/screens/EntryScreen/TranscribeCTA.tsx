@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors, spacing, radii, typography } from "../../../theme";
+import { colors, spacing, radii, elevation, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 interface TranscribeCTAProps {
@@ -12,7 +12,7 @@ interface TranscribeCTAProps {
 export default function TranscribeCTA({ onPress }: TranscribeCTAProps) {
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, elevation.md]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.primaryLight,
-    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
     padding: spacing.lg,
     gap: spacing.md,
   },
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
