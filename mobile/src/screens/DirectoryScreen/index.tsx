@@ -34,8 +34,8 @@ import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { statusConfig, groupByDate } from "../../../utils/entryUtils";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, radii, elevation, typography } from "../../../theme";
-import { formatDurationCompact } from "../../utils/formatters";
+import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
+import { formatDate } from "../../utils/formatters";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -50,7 +50,8 @@ function formatMonthSectionHeader(dateStr: string) {
 }
 
 export default function DirectoryScreen({ route, navigation }: any) {
-  const { id: folderId, name: folderName } = route.params;
+  const { id: folderId, name: folderName, color: folderColor } = route.params;
+  const accentColor = folderColor || FOLDER_COLORS[0];
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
 
   const [entries, setEntries] = useState<any[]>([]);
@@ -282,7 +283,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
     const status = item.status ?? "done";
     const isRecorded = status === "recorded" || status === "error";
     const isProcessing = status === "processing";
-    const isError = status === "error";
     const isDone = !isRecorded && !isProcessing;
     const sc = statusConfig(status);
 
@@ -292,16 +292,12 @@ export default function DirectoryScreen({ route, navigation }: any) {
         onPress={() => navigation.navigate("Entry", { id: item.id })}
         style={[styles.card, elevation.sm]}
       >
-        <View style={styles.cardHeader}>
-          <Text style={[typography.heading, { flex: 1, marginRight: spacing.sm }]} numberOfLines={1}>
-            {item.filename}
-          </Text>
-          <View style={styles.cardMeta}>
-            {item.duration_seconds > 0 && (
-              <Text style={[typography.caption, { color: colors.primary }]}>
-                {formatDurationCompact(item.duration_seconds)}
-              </Text>
-            )}
+        <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+        <View style={styles.cardBody}>
+          <View style={styles.cardTopRow}>
+            <Text style={[typography.heading, { flex: 1 }]} numberOfLines={1}>
+              {item.filename}
+            </Text>
             <Menu
               visible={menuVisible === item.id}
               onDismiss={() => setMenuVisible(null)}
@@ -310,6 +306,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
                   icon="dots-vertical"
                   iconColor={colors.muted}
                   size={18}
+                  style={styles.menuBtn}
                   onPress={() => setMenuVisible(item.id)}
                 />
               }
@@ -330,37 +327,20 @@ export default function DirectoryScreen({ route, navigation }: any) {
               )}
             </Menu>
           </View>
-        </View>
-
-        <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+          <View style={styles.metaRow}>
             {isProcessing ? (
-              <ActivityIndicator size={12} color={sc.fg} style={{ marginRight: 6 }} />
+              <ActivityIndicator size={12} color={sc.fg} style={{ marginRight: spacing.xs }} />
             ) : (
-              <MaterialCommunityIcons name={sc.icon as any} size={14} color={sc.fg} style={{ marginRight: 6 }} />
+              <MaterialCommunityIcons name={sc.icon as any} size={14} color={sc.fg} style={{ marginRight: spacing.xs }} />
             )}
-            <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
+            <Text style={[styles.statusLabel, { color: sc.fg }]}>{sc.label}</Text>
+            <Text style={styles.metaSeparator}> · </Text>
+            <Text style={typography.caption}>{formatDate(item.created_at)}</Text>
           </View>
-          {isRecorded && (
-            <TouchableOpacity
-              style={styles.transcribeLink}
-              onPress={() => openEngineDialog(item.id)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.transcribeLinkText}>{t("dailyLog.toText")}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color={colors.primary} />
-            </TouchableOpacity>
-          )}
         </View>
-
-        {isDone && item.text && (
-          <Text style={[typography.body, styles.preview, isError && { color: colors.danger }]} numberOfLines={2}>
-            {item.text}
-          </Text>
-        )}
       </TouchableOpacity>
     );
-  }, [menuVisible, navigation, openEngineDialog, onDeletePress]);
+  }, [menuVisible, navigation, openEngineDialog, onDeletePress, accentColor]);
 
   if (loading) {
     return (
@@ -527,45 +507,43 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
+    flexDirection: "row",
+    paddingVertical: spacing.lg,
     marginBottom: spacing.md,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
+  accentBar: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 2,
+    marginLeft: spacing.md,
   },
-  cardMeta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  statusRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
+  cardBody: {
+    flex: 1,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
   },
-  statusBadge: {
+  cardTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 100,
   },
-  statusText: {
+  menuBtn: {
+    margin: -spacing.sm,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  statusLabel: {
     fontFamily: "JetBrainsMono_500Medium",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  metaSeparator: {
+    fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-  },
-  preview: {
     color: colors.muted,
-    lineHeight: 20,
-  },
-  transcribeLink: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  transcribeLinkText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: colors.primary,
   },
   fab: {
     position: "absolute",

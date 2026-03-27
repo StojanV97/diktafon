@@ -242,7 +242,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => navigation.navigate("Directory", { id: item.id, name: item.name })}
+        onPress={() => navigation.navigate("Directory", { id: item.id, name: item.name, color: item.color })}
         style={[styles.card, elevation.sm]}
       >
         <View style={[styles.accentBar, { backgroundColor: color }]} />
