@@ -242,7 +242,7 @@ export default function EntryScreen({ route, navigation }: any) {
         </Text>
 
         {record.status === "done" && record.text ? (
-          <>
+          <View style={[styles.transcriptionCard, elevation.md]}>
             <View style={styles.transcriptionHeader}>
               <Text style={typography.monoLabel as any}>{t("entry.transcription")}</Text>
               <TouchableOpacity onPress={copyText} hitSlop={8}>
@@ -256,9 +256,9 @@ export default function EntryScreen({ route, navigation }: any) {
               value={editableText}
               onChangeText={handleTextChange}
             />
-          </>
+          </View>
         ) : record.text ? (
-          <>
+          <View style={[styles.transcriptionCard, elevation.md]}>
             <View style={styles.transcriptionHeader}>
               <Text style={typography.monoLabel as any}>{t("entry.transcription")}</Text>
               <TouchableOpacity onPress={copyText} hitSlop={8}>
@@ -266,15 +266,15 @@ export default function EntryScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </View>
             <Text style={styles.bodyText} selectable>{record.text}</Text>
-          </>
+          </View>
         ) : record.status === "processing" ? (
-          <>
+          <View style={[styles.transcriptionCard, elevation.md]}>
             <Text style={[typography.monoLabel as any, { marginBottom: spacing.md }]}>{t("entry.transcription")}</Text>
             <View style={{ alignItems: "center", paddingVertical: spacing.xl }}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.sm }]}>{t("entry.statusProcessing")}</Text>
             </View>
-          </>
+          </View>
         ) : (
           <TranscribeCTA onPress={handleTranscribe} />
         )}
@@ -372,7 +372,9 @@ const styles = StyleSheet.create({
   playerCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
-    margin: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
@@ -410,8 +412,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  textScroll: { flex: 1, backgroundColor: colors.surface },
-  textContent: { padding: spacing.lg },
+  textScroll: { flex: 1, backgroundColor: colors.background },
+  textContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 6, flexGrow: 1 },
+  transcriptionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    flex: 1,
+  },
   bodyText: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
