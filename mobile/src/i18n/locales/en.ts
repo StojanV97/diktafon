@@ -167,6 +167,8 @@ export default {
     statusDone: "Done",
     transcription: "TRANSCRIPTION",
     transcriptUnavailable: "Transcript not available. Go back and tap \"Transcribe\".",
+    transcribeTitle: "Transcribe",
+    transcribeDescription: "Convert your recording to text",
     downloadFromICloud: "Download from iCloud",
     downloadingFromICloud: "Downloading from iCloud...",
     audioNotFound: "Audio file not found",

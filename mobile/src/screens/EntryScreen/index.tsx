@@ -1,10 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   AppState,
   Keyboard,
-  Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -13,25 +11,28 @@ import {
 import { usePreventScreenCapture } from "expo-screen-capture";
 import {
   ActivityIndicator,
-  Menu,
+  Portal,
   Snackbar,
   Text,
 } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-// expo-file-system legacy API (cacheDirectory, writeAsStringAsync, EncodingType)
-const FileSystemLegacy = require("expo-file-system") as { cacheDirectory: string; writeAsStringAsync: any; EncodingType: any };
-import * as Sharing from "expo-sharing";
-import { fetchEntry, entryAudioUri, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, cleanupDecryptedFile, downloadAudioFromICloud } from "../../../services/journalStorage";
+import { fetchEntry, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, cleanupDecryptedFile, downloadAudioFromICloud } from "../../../services/journalStorage";
 import { fileExistsOnICloud } from "../../../services/icloudSyncService";
 import useAutoSave from "../../../hooks/useAutoSave";
+import { useTranscription } from "../../../hooks/useTranscription";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, radii, elevation, typography } from "../../../theme";
+import { colors, spacing, elevation, typography } from "../../../theme";
 import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../../utils/formatters";
 import { t } from "../../i18n";
-
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useClipboardWithTimer } from "../../hooks/useClipboardWithTimer";
+import { useEngineDialog } from "../../hooks/useEngineDialog";
+import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
+import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
+import WaveformPlayer from "./WaveformPlayer";
+import TranscribeCTA from "./TranscribeCTA";
+import { extractWaveformData } from "../../utils/wavWaveform";
 
 export default function EntryScreen({ route, navigation }: any) {
   usePreventScreenCapture();
@@ -41,15 +42,42 @@ export default function EntryScreen({ route, navigation }: any) {
 
   const [record, setRecord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [audioMissing, setAudioMissing] = useState(false);
   const [audioOnICloud, setAudioOnICloud] = useState(false);
   const [audioDownloading, setAudioDownloading] = useState(false);
   const [decryptedAudioUri, setDecryptedAudioUri] = useState<string | null>(null);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
 
   const saveFn = useCallback((text: string) => updateEntryText(id, text), [id]);
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
+
+  // Engine dialog for transcription
+  const {
+    engineDialogVisible,
+    engineChoice,
+    setEngineChoice,
+    engineTargetId,
+    openForEntry,
+    closeDialog: closeEngineDialog,
+  } = useEngineDialog();
+
+  // Transcription hook (single-entry wrapper)
+  const { startTranscription, modelDownload } = useTranscription({
+    entries: record ? [record] : [],
+    setEntries: (fn: any) => {
+      const prev = record ? [record] : [];
+      const next = typeof fn === "function" ? fn(prev) : fn;
+      if (next[0]) setRecord(next[0]);
+    },
+    onComplete: async () => {
+      const data = await fetchEntry(id);
+      if (data) {
+        setRecord(data);
+        if (data.status === "done" && data.text) init(data.text);
+      }
+    },
+  });
 
   useEffect(() => {
     let ignore = false;
@@ -115,7 +143,22 @@ export default function EntryScreen({ route, navigation }: any) {
   const audioSource = decryptedAudioUri && !audioMissing ? { uri: decryptedAudioUri } : null;
   const player = useAudioPlayer(audioSource as any, 250 as any);
   const status = useAudioPlayerStatus(player);
-  const [barWidth, setBarWidth] = useState(1);
+
+  // Load waveform data when decrypted audio becomes available
+  useEffect(() => {
+    if (!decryptedAudioUri) {
+      setWaveformData([]);
+      return;
+    }
+    let cancelled = false;
+    try {
+      const data = extractWaveformData(decryptedAudioUri, 64);
+      if (!cancelled) setWaveformData(data);
+    } catch {
+      if (!cancelled) setWaveformData([]);
+    }
+    return () => { cancelled = true; };
+  }, [decryptedAudioUri]);
 
   useEffect(() => {
     const unsub = navigation.addListener("blur", () => {
@@ -128,11 +171,10 @@ export default function EntryScreen({ route, navigation }: any) {
     if (status.didJustFinish) player.seekTo(0);
   }, [status.didJustFinish]);
 
-  const handleSeek = useCallback((event: any) => {
+  const handleSeek = useCallback((fraction: number) => {
     if (!status.isLoaded || !status.duration) return;
-    const fraction = Math.max(0, Math.min(1, event.nativeEvent.locationX / barWidth));
     player.seekTo(fraction * status.duration);
-  }, [status.isLoaded, status.duration, barWidth, player]);
+  }, [status.isLoaded, status.duration, player]);
 
   const currentText = record?.status === "done" ? editableText : record?.text;
 
@@ -140,59 +182,18 @@ export default function EntryScreen({ route, navigation }: any) {
     if (currentText) copyWithTimer(currentText);
   }, [currentText, copyWithTimer]);
 
-  const shareText = useCallback(async () => {
-    setShareMenuVisible(false);
-    if (!currentText) return;
-    try {
-      await Share.share({ message: currentText, title: record.filename });
-    } catch {
-      // user dismissed
-    }
-  }, [currentText, record]);
+  // Transcription handler
+  const handleTranscribe = useCallback(() => {
+    if (record?.id) openForEntry(record.id);
+  }, [record?.id, openForEntry]);
 
-  const saveRecordingToFiles = useCallback(async () => {
-    setShareMenuVisible(false);
-    if (!record?.audio_file) return;
-    try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        setSnackbar(t("entry.sharingNotAvailable"));
-        return;
-      }
-      const shareUri = decryptedAudioUri || entryAudioUri(record.id);
-      await Sharing.shareAsync(shareUri, {
-        mimeType: "audio/wav",
-        dialogTitle: t("entry.saveRecording"),
-        UTI: "com.microsoft.waveform-audio",
-      });
-    } catch (e) {
-      setSnackbar(safeErrorMessage(e, t("entry.saveRecordingFailed")));
-    }
-  }, [record, decryptedAudioUri, setSnackbar]);
-
-  const saveTranscriptToFiles = useCallback(async () => {
-    setShareMenuVisible(false);
-    if (!currentText || !record?.filename) return;
-    try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        setSnackbar(t("entry.sharingNotAvailable"));
-        return;
-      }
-      const baseName = record.filename.replace(/\.[^.]+$/, "");
-      const txtPath = FileSystemLegacy.cacheDirectory + baseName + ".txt";
-      await FileSystemLegacy.writeAsStringAsync(txtPath, currentText, {
-        encoding: FileSystemLegacy.EncodingType.UTF8,
-      });
-      await Sharing.shareAsync(txtPath, {
-        mimeType: "text/plain",
-        dialogTitle: t("entry.saveTranscript"),
-        UTI: "public.plain-text",
-      });
-    } catch (e) {
-      setSnackbar(safeErrorMessage(e, t("entry.saveTranscriptFailed")));
-    }
-  }, [currentText, record, setSnackbar]);
+  const onTranscribeConfirm = useCallback(async () => {
+    closeEngineDialog();
+    if (!engineTargetId) return;
+    const result: any = await startTranscription(engineTargetId, engineChoice);
+    if (!result.started) setSnackbar(result.message);
+    else if (result.error) setSnackbar(result.error);
+  }, [engineTargetId, engineChoice, startTranscription, closeEngineDialog, setSnackbar]);
 
   const handleDownloadAudio = useCallback(async () => {
     setAudioDownloading(true);
@@ -240,21 +241,43 @@ export default function EntryScreen({ route, navigation }: any) {
           {record.duration_seconds > 0 && `  \u2022  ${formatDurationVerbose(record.duration_seconds)}`}
         </Text>
 
-        <Text style={[typography.monoLabel as any, { marginBottom: spacing.md }]}>{t("entry.transcription")}</Text>
-        {record.status === "done" && record.text
-          ? <TextInput
+        {record.status === "done" && record.text ? (
+          <>
+            <View style={styles.transcriptionHeader}>
+              <Text style={typography.monoLabel as any}>{t("entry.transcription")}</Text>
+              <TouchableOpacity onPress={copyText} hitSlop={8}>
+                <MaterialCommunityIcons name="content-copy" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
               style={styles.bodyText}
               multiline
               scrollEnabled={false}
               value={editableText}
               onChangeText={handleTextChange}
             />
-          : record.text
-            ? <Text style={styles.bodyText} selectable>{record.text}</Text>
-            : <Text style={[typography.body, { color: colors.muted, fontStyle: "italic" }]}>
-                {t("entry.transcriptUnavailable")}
-              </Text>
-        }
+          </>
+        ) : record.text ? (
+          <>
+            <View style={styles.transcriptionHeader}>
+              <Text style={typography.monoLabel as any}>{t("entry.transcription")}</Text>
+              <TouchableOpacity onPress={copyText} hitSlop={8}>
+                <MaterialCommunityIcons name="content-copy" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.bodyText} selectable>{record.text}</Text>
+          </>
+        ) : record.status === "processing" ? (
+          <>
+            <Text style={[typography.monoLabel as any, { marginBottom: spacing.md }]}>{t("entry.transcription")}</Text>
+            <View style={{ alignItems: "center", paddingVertical: spacing.xl }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[typography.caption, { color: colors.muted, marginTop: spacing.sm }]}>{t("entry.statusProcessing")}</Text>
+            </View>
+          </>
+        ) : (
+          <TranscribeCTA onPress={handleTranscribe} />
+        )}
       </ScrollView>
 
       {!keyboardVisible && audioMissing && (
@@ -280,18 +303,11 @@ export default function EntryScreen({ route, navigation }: any) {
 
       {!keyboardVisible && record?.audio_file && !audioMissing && (
         <View style={[styles.playerCard, elevation.md]}>
-          <Pressable
-            style={styles.progressBarTrack}
-            onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
-            onPress={handleSeek}
-          >
-            <View style={[
-              styles.progressBarFill,
-              { width: status.isLoaded && status.duration
-                  ? `${(status.currentTime / status.duration) * 100}%`
-                  : "0%" }
-            ]} />
-          </Pressable>
+          <WaveformPlayer
+            amplitudes={waveformData}
+            progress={status.isLoaded && status.duration ? status.currentTime / status.duration : 0}
+            onSeek={handleSeek}
+          />
           <View style={styles.timeRow}>
             <Text style={styles.timeText}>{formatPlaybackTime(status.currentTime)}</Text>
             <Text style={styles.timeText}>{formatPlaybackTime(status.duration)}</Text>
@@ -327,47 +343,21 @@ export default function EntryScreen({ route, navigation }: any) {
         </View>
       )}
 
-      {!keyboardVisible && (
-        <View style={[styles.actions, elevation.sm]}>
-          <TouchableOpacity onPress={copyText} style={styles.actionBtn}>
-            <MaterialCommunityIcons name="content-copy" size={20} color={colors.muted} />
-            <Text style={styles.actionLabel}>{t("entry.copy")}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionDivider} />
-
-          <Menu
-            visible={shareMenuVisible}
-            onDismiss={() => setShareMenuVisible(false)}
-            anchor={
-              <TouchableOpacity onPress={() => setShareMenuVisible(true)} style={styles.actionBtn}>
-                <MaterialCommunityIcons name="share-variant" size={20} color={colors.muted} />
-                <Text style={styles.actionLabel}>{t("entry.share")}</Text>
-              </TouchableOpacity>
-            }
-          >
-            <Menu.Item
-              leadingIcon="text-box-outline"
-              onPress={shareText}
-              title={t("entry.shareTranscript")}
-            />
-            {record.audio_file && (
-              <Menu.Item
-                leadingIcon="music-note"
-                onPress={saveRecordingToFiles}
-                title={t("entry.saveRecordingToFiles")}
-              />
-            )}
-            {currentText && (
-              <Menu.Item
-                leadingIcon="file-document-outline"
-                onPress={saveTranscriptToFiles}
-                title={t("entry.saveTranscriptToFiles")}
-              />
-            )}
-          </Menu>
-        </View>
-      )}
+      <Portal>
+        <EngineChoiceDialog
+          visible={engineDialogVisible}
+          onDismiss={closeEngineDialog}
+          onConfirm={onTranscribeConfirm}
+          engineChoice={engineChoice}
+          onEngineChange={setEngineChoice}
+          title={undefined}
+          navigation={navigation}
+        />
+        <ModelDownloadDialog
+          visible={modelDownload.visible}
+          progress={modelDownload.progress}
+        />
+      </Portal>
 
       <Snackbar visible={!!snackbar} onDismiss={dismissSnackbar} duration={2000}>
         {snackbar}
@@ -381,20 +371,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   playerCard: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.background,
-  },
-  progressBarTrack: {
-    height: 4,
-    backgroundColor: colors.divider,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: colors.primary,
-    borderRadius: 2,
+    borderTopColor: colors.divider,
   },
   timeRow: {
     flexDirection: "row",
@@ -433,29 +414,10 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     lineHeight: 24,
   },
-  actions: {
+  transcriptionHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    borderTopWidth: 0,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  actionLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: colors.muted,
-  },
-  actionDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: colors.divider,
+    marginBottom: spacing.md,
   },
 });

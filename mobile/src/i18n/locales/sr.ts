@@ -167,6 +167,8 @@ export default {
     statusDone: "Gotovo",
     transcription: "TRANSKRIPCIJA",
     transcriptUnavailable: "Transkript nije dostupan. Vrati se i tapni \"Transkribisi\".",
+    transcribeTitle: "Transkribuj",
+    transcribeDescription: "Pretvori snimak u tekst",
     downloadFromICloud: "Preuzmi sa iCloud-a",
     downloadingFromICloud: "Preuzimanje sa iCloud-a...",
     audioNotFound: "Audio fajl nije pronadjen",
