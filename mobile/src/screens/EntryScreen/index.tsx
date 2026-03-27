@@ -48,6 +48,7 @@ export default function EntryScreen({ route, navigation }: any) {
   const [audioDownloading, setAudioDownloading] = useState(false);
   const [decryptedAudioUri, setDecryptedAudioUri] = useState<string | null>(null);
   const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [editing, setEditing] = useState(false);
 
   const saveFn = useCallback((text: string) => updateEntryText(id, text), [id]);
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
@@ -137,7 +138,7 @@ export default function EntryScreen({ route, navigation }: any) {
   }, [id, record, audioMissing]);
 
   useEffect(() => {
-    return navigation.addListener("beforeRemove", () => { flush(); });
+    return navigation.addListener("beforeRemove", () => { flush(); setEditing(false); });
   }, [navigation, flush]);
 
   const audioSource = decryptedAudioUri && !audioMissing ? { uri: decryptedAudioUri } : null;
@@ -181,6 +182,18 @@ export default function EntryScreen({ route, navigation }: any) {
   const copyText = useCallback(() => {
     if (currentText) copyWithTimer(currentText);
   }, [currentText, copyWithTimer]);
+
+  const startEditing = useCallback(() => setEditing(true), []);
+
+  const saveEditing = useCallback(() => {
+    flush();
+    setEditing(false);
+  }, [flush]);
+
+  const cancelEditing = useCallback(() => {
+    init(record?.text || "");
+    setEditing(false);
+  }, [init, record?.text]);
 
   // Transcription handler
   const handleTranscribe = useCallback(() => {
@@ -245,17 +258,40 @@ export default function EntryScreen({ route, navigation }: any) {
           <View style={[styles.transcriptionCard, elevation.md]}>
             <View style={styles.transcriptionHeader}>
               <Text style={typography.monoLabel as any}>{t("entry.transcription")}</Text>
-              <TouchableOpacity onPress={copyText} hitSlop={8}>
-                <MaterialCommunityIcons name="content-copy" size={18} color={colors.muted} />
-              </TouchableOpacity>
+              <View style={styles.headerIcons}>
+                {editing ? (
+                  <>
+                    <TouchableOpacity onPress={cancelEditing} hitSlop={8}>
+                      <MaterialCommunityIcons name="close" size={20} color={colors.danger} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={saveEditing} hitSlop={8}>
+                      <MaterialCommunityIcons name="check" size={20} color={colors.success} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity onPress={startEditing} hitSlop={8}>
+                      <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.muted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={copyText} hitSlop={8}>
+                      <MaterialCommunityIcons name="content-copy" size={18} color={colors.muted} />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             </View>
-            <TextInput
-              style={styles.bodyText}
-              multiline
-              scrollEnabled={false}
-              value={editableText}
-              onChangeText={handleTextChange}
-            />
+            {editing ? (
+              <TextInput
+                style={styles.bodyText}
+                multiline
+                scrollEnabled={false}
+                value={editableText}
+                onChangeText={handleTextChange}
+                autoFocus
+              />
+            ) : (
+              <Text style={styles.bodyText} selectable>{editableText}</Text>
+            )}
           </View>
         ) : record.text ? (
           <View style={[styles.transcriptionCard, elevation.md]}>
@@ -431,5 +467,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.md,
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
   },
 });
