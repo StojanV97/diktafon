@@ -2,7 +2,7 @@ import { Buffer } from "@craftzdog/react-native-buffer"
 global.Buffer = global.Buffer || Buffer
 
 import React, { useCallback, useEffect, useState } from "react";
-import { View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Alert, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
@@ -23,6 +23,7 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { useAppInit } from "./src/hooks/useAppInit";
 import { useBiometricLock } from "./src/hooks/useBiometricLock";
 import { linking } from "./src/navigation/linking";
+import { recordingGuard } from "./src/utils/recordingGuard";
 import { stackScreenOptions } from "./src/navigation/options";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
@@ -125,6 +126,31 @@ function RemindersStack() {
   );
 }
 
+const createTabListeners = (tabName) => ({ navigation }) => ({
+  tabPress: (e) => {
+    Haptics.selectionAsync();
+    if (navigation.isFocused()) return;
+    const guard = recordingGuard.current;
+    if (!guard.isActive) return;
+    e.preventDefault();
+    Alert.alert(
+      t("recording.activeAlertTitle"),
+      t("recording.activeAlertMessage"),
+      [
+        { text: t("recording.continueRecording"), style: "cancel" },
+        {
+          text: t("recording.cancelAndLeave"),
+          style: "destructive",
+          onPress: async () => {
+            try { await guard.cancelRecording?.(); } catch {}
+            navigationRef.current?.navigate(tabName);
+          },
+        },
+      ]
+    );
+  },
+});
+
 function RootTabs() {
   return (
     <Tab.Navigator
@@ -149,10 +175,10 @@ function RootTabs() {
         },
       })}
     >
-      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
-      <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
-      <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
-      <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} listeners={{ tabPress: () => Haptics.selectionAsync() }} />
+      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} listeners={createTabListeners("HomeTab")} />
+      <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} listeners={createTabListeners("DailyLogsTab")} />
+      <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} listeners={createTabListeners("PlansTab")} />
+      <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} listeners={createTabListeners("RemindersTab")} />
     </Tab.Navigator>
   );
 }

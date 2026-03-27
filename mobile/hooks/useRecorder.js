@@ -10,6 +10,7 @@ import {
   setAudioModeAsync,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system";
+import { setRecordingGuard } from "../src/utils/recordingGuard";
 
 const WHISPER_RECORDING_OPTIONS = {
   extension: '.wav',
@@ -46,6 +47,20 @@ export function useRecorder({ onRecordingComplete }) {
 
   const isSessionActiveRef = useRef(false);
   isSessionActiveRef.current = isSessionActive;
+
+  const cancelRecordingRef = useRef(null);
+
+  // Sync recording guard for tab-switch protection
+  useEffect(() => {
+    if (isSessionActive) {
+      setRecordingGuard(true, async () => {
+        await cancelRecordingRef.current?.();
+      });
+    } else {
+      setRecordingGuard(false, null);
+    }
+    return () => setRecordingGuard(false, null);
+  }, [isSessionActive]);
 
   // Cleanup on unmount: stop recording + release audio mode
   useEffect(() => {
@@ -143,6 +158,8 @@ export function useRecorder({ onRecordingComplete }) {
       FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
     }
   };
+
+  cancelRecordingRef.current = cancelRecording;
 
   return {
     isRecording: recorderState.isRecording,
