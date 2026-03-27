@@ -40,9 +40,6 @@ export default function PlanCard({ plan, onEdit, onDelete }: Props) {
 
   return (
     <View style={[styles.card, elevation.sm]}>
-      {/* Left accent bar */}
-      <View style={styles.accentBar} />
-
       <View style={styles.cardContent}>
       {/* Top row: category label + menu */}
       <View style={styles.topRow}>
@@ -138,20 +135,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     marginBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  accentBar: {
-    width: 4,
-    alignSelf: "stretch",
-    backgroundColor: colors.primary,
-    borderRadius: 2,
-    marginLeft: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
   },
   cardContent: {
-    flex: 1,
     padding: spacing.lg,
-    paddingLeft: spacing.md,
   },
   topRow: {
     flexDirection: "row",
