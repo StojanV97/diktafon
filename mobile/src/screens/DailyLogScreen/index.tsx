@@ -505,7 +505,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
             renderSectionHeader={renderSectionHeader}
             renderSectionFooter={renderSectionFooter}
             ListHeaderComponent={<ScreenHeader title={t("tabs.dailyLogs")} rightElement={headerRightElement} />}
-            contentContainerStyle={entries.length === 0 ? styles.empty : styles.list}
+            contentContainerStyle={entries.length === 0 ? [styles.list, { flexGrow: 1 }] : styles.list}
             stickySectionHeadersEnabled={true}
             maxToRenderPerBatch={10}
             windowSize={5}
@@ -519,9 +519,11 @@ export default function DailyLogScreen({ navigation, route }: any) {
               />
             }
             ListEmptyComponent={
-              <Text style={[typography.body, styles.emptyText]}>
-                {t("dailyLog.noEntries")}
-              </Text>
+              <View style={styles.empty}>
+                <Text style={[typography.body, styles.emptyText]}>
+                  {t("dailyLog.noEntries")}
+                </Text>
+              </View>
             }
           />
 
