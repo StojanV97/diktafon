@@ -97,6 +97,10 @@ export default function DirectoryScreen({ route, navigation }: any) {
 
   usePreventBackDuringRecording(navigation, isRecording, isPaused, cancelRecording);
 
+  useEffect(() => {
+    navigation.setOptions({ headerShown: !isSessionActive });
+  }, [navigation, isSessionActive]);
+
   const { startTranscription, modelDownload } = useTranscription({
     entries,
     setEntries,
