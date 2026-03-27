@@ -11,6 +11,7 @@ import {
 import { ActivityIndicator, Text } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radii, typography } from "../../../theme";
 import { t } from "../../i18n";
 import type { Recurrence, RecurrenceType, ParsedReminderResult } from "../../types/reminder";
@@ -37,6 +38,7 @@ export default function ReminderConfirmSheet({
   onCancel,
   saving,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [action, setAction] = useState(parsed.action);
   const [date, setDate] = useState<Date>(
     parsed.datetime ? new Date(parsed.datetime) : new Date()
@@ -85,7 +87,7 @@ export default function ReminderConfirmSheet({
       animationType="slide"
       onRequestClose={onCancel}
     >
-      <Pressable style={styles.backdrop} onPress={onCancel}>
+      <Pressable style={[styles.backdrop, { paddingTop: insets.top }]} onPress={onCancel}>
         <Pressable style={styles.sheet} onPress={() => {}}>
           <Text style={styles.title}>{t("reminders.confirmTitle")}</Text>
 

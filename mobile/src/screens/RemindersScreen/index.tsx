@@ -334,7 +334,7 @@ export default function RemindersScreen({ navigation, route }: any) {
       ) : (
         <>
           {sections.length === 0 && !isProcessing ? (
-            <View style={styles.flex1}>
+            <View style={[styles.flex1, { paddingHorizontal: spacing.lg }]}>
               <ScreenHeader title={t("tabs.reminders")} />
               <View style={styles.center}>
                 <Text style={styles.emptyText}>{t("reminders.noReminders")}</Text>
