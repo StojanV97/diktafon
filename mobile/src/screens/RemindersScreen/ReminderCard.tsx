@@ -71,50 +71,43 @@ function ReminderCard({
 
   return (
     <View style={[styles.card, elevation.sm]}>
-      {/* Left accent bar */}
-      <View style={[styles.accentBar, { backgroundColor: sc.fg }]} />
-
-      <View style={styles.cardContent}>
-        {/* Top row: category label + menu */}
-        <View style={styles.topRow}>
-          <View style={styles.categoryRow}>
-            <MaterialCommunityIcons name={sc.icon} size={iconSize.sm} color={sc.fg} style={{ marginRight: spacing.xs }} />
-            <Text style={[styles.categoryLabel, { color: sc.fg }]}>{sc.label}</Text>
-            <Text style={styles.metaText}>{formatReminderTime(item.reminder_time)}</Text>
-            <View style={styles.recurrenceBadge}>
-              <Text style={styles.recurrenceText}>{recurrenceLabel(item)}</Text>
-            </View>
-          </View>
-          <Menu
-            visible={isMenuOpen}
-            onDismiss={onMenuClose}
-            anchor={
-              <IconButton
-                icon="dots-vertical"
-                iconColor={colors.muted}
-                size={iconSize.md}
-                onPress={() => onMenuOpen(item.id)}
-                style={styles.menuBtn}
-              />
-            }
-          >
-            {item.status !== "done" && (
-              <Menu.Item
-                leadingIcon="check-circle-outline"
-                onPress={() => onMarkDone(item.id)}
-                title={t("reminders.markDone")}
-              />
-            )}
-            <Menu.Item
-              leadingIcon="delete-outline"
-              onPress={() => onDelete(item.id)}
-              title={t("reminders.delete")}
+      <View style={styles.topRow}>
+        <Text style={styles.actionText} numberOfLines={2}>{item.action.charAt(0).toUpperCase() + item.action.slice(1)}</Text>
+        <Menu
+          visible={isMenuOpen}
+          onDismiss={onMenuClose}
+          anchor={
+            <IconButton
+              icon="dots-vertical"
+              iconColor={colors.muted}
+              size={iconSize.md}
+              onPress={() => onMenuOpen(item.id)}
+              style={styles.menuBtn}
             />
-          </Menu>
+          }
+        >
+          {item.status !== "done" && (
+            <Menu.Item
+              leadingIcon="check-circle-outline"
+              onPress={() => onMarkDone(item.id)}
+              title={t("reminders.markDone")}
+            />
+          )}
+          <Menu.Item
+            leadingIcon="delete-outline"
+            onPress={() => onDelete(item.id)}
+            title={t("reminders.delete")}
+          />
+        </Menu>
+      </View>
+      <View style={styles.metaRow}>
+        <MaterialCommunityIcons name={sc.icon} size={14} color={sc.fg} style={{ marginRight: spacing.xs }} />
+        <Text style={[styles.statusLabel, { color: sc.fg }]}>{sc.label}</Text>
+        <Text style={styles.metaSeparator}> · </Text>
+        <Text style={typography.caption}>{formatReminderTime(item.reminder_time)}</Text>
+        <View style={styles.recurrenceBadge}>
+          <Text style={styles.recurrenceText}>{recurrenceLabel(item)}</Text>
         </View>
-
-        {/* Main content: action text */}
-        <Text style={styles.actionText} numberOfLines={2}>{item.action}</Text>
       </View>
     </View>
   );
@@ -127,47 +120,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     marginBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  accentBar: {
-    width: 4,
-    alignSelf: "stretch",
-    borderRadius: 2,
-    marginLeft: spacing.md,
-  },
-  cardContent: {
-    flex: 1,
     padding: spacing.lg,
-    paddingLeft: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.badgeDoneFg,
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  actionText: {
+    ...typography.body,
     flex: 1,
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  categoryLabel: {
-    ...typography.monoLabel,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  metaText: {
-    ...typography.mono,
-    fontSize: 11,
   },
   menuBtn: {
     margin: -spacing.sm,
   },
-  actionText: {
-    ...typography.subheading,
-    marginTop: spacing.sm,
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    gap: spacing.xs,
+  },
+  statusLabel: {
+    fontFamily: "JetBrainsMono_500Medium",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  metaSeparator: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: colors.muted,
   },
   recurrenceBadge: {
     backgroundColor: colors.badgeNeutral,
