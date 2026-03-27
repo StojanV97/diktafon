@@ -80,7 +80,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
   const copyWithTimer = useClipboardWithTimer(setSnackbar);
 
   // --- Recording ---
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
+  const { isRecording, isPaused, isSessionActive, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri: string, durationSeconds: number) => {
       try {
         const entry = await createDailyLogEntry(uri, durationSeconds);
@@ -480,7 +480,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
     );
   }
 
-  const isActiveSession = isRecording || isPaused;
+  const isActiveSession = isSessionActive;
 
   return (
     <View style={styles.container}>

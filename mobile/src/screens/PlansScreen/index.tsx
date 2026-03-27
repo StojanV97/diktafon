@@ -45,7 +45,7 @@ export default function PlansScreen({ navigation }: any) {
     return unsub;
   }, [navigation, load]);
 
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+  const { isRecording, isPaused, isSessionActive, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri: string) => {
       try {
         const result = await extractPlan(uri, (state: string) => setPipelineState(state as PipelineState));
@@ -110,7 +110,7 @@ export default function PlansScreen({ navigation }: any) {
   }, [deleteTarget, removePlan]);
 
   const isProcessing = pipelineState === "transcribing" || pipelineState === "extracting";
-  const isActiveSession = isRecording || isPaused || isProcessing;
+  const isActiveSession = isSessionActive || isProcessing;
 
   if (loading) {
     return (
@@ -122,7 +122,7 @@ export default function PlansScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {(isRecording || isPaused) ? (
+      {isSessionActive ? (
         <RecordingView
           saveLabel={t("tabs.plans")}
           title={t("recording.newPlan")}
@@ -131,7 +131,7 @@ export default function PlansScreen({ navigation }: any) {
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
-          onCancel={stopRecording}
+          onCancel={cancelRecording}
           onSettings={() => navigation.navigate("Settings")}
         />
       ) : (

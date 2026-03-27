@@ -95,7 +95,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
   const [recordingTypeDialogVisible, setRecordingTypeDialogVisible] = useState(false);
   const pendingRecordingTypeRef = useRef("beleshka");
 
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
+  const { isRecording, isPaused, isSessionActive, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri: string, durationSeconds: number, filename: string) => {
       try {
         const entry = await createEntry(folderId, filename, uri, durationSeconds, pendingRecordingTypeRef.current);
@@ -414,7 +414,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
     );
   }
 
-  const isActiveSession = isRecording || isPaused;
+  const isActiveSession = isSessionActive;
 
   return (
     <View style={styles.container}>

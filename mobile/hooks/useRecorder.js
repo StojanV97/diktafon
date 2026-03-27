@@ -9,6 +9,7 @@ import {
   AudioQuality,
   setAudioModeAsync,
 } from "expo-audio";
+import * as FileSystem from "expo-file-system";
 
 const WHISPER_RECORDING_OPTIONS = {
   extension: '.wav',
@@ -39,16 +40,17 @@ export function useRecorder({ onRecordingComplete }) {
   });
   const recorderState = useAudioRecorderState(audioRecorder, 100);
   const [isPaused, setIsPaused] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
   const meteringBuffer = useRef([]);
   const [meteringHistory, setMeteringHistory] = useState([]);
 
-  const isRecordingRef = useRef(false);
-  isRecordingRef.current = recorderState.isRecording;
+  const isSessionActiveRef = useRef(false);
+  isSessionActiveRef.current = isSessionActive;
 
   // Cleanup on unmount: stop recording + release audio mode
   useEffect(() => {
     return () => {
-      if (isRecordingRef.current) {
+      if (isSessionActiveRef.current) {
         audioRecorder.stop().catch(() => {});
         setAudioModeAsync({ allowsRecording: false }).catch(() => {});
       }
@@ -84,23 +86,36 @@ export function useRecorder({ onRecordingComplete }) {
       throw new Error(t('recording.recorderNotReady'));
     }
     audioRecorder.record();
+    setIsSessionActive(true);
     setIsPaused(false);
     return { started: true };
   };
 
   const pauseRecording = async () => {
-    await audioRecorder.pause();
+    // Set paused BEFORE stopping recorder so isActiveSession stays true
+    // (isRecording becomes false when recorder pauses)
     setIsPaused(true);
+    try {
+      await audioRecorder.pause();
+    } catch (e) {
+      setIsPaused(false);
+      throw e;
+    }
   };
 
   const resumeRecording = async () => {
-    audioRecorder.record();
-    setIsPaused(false);
+    try {
+      audioRecorder.record();
+      setIsPaused(false);
+    } catch (e) {
+      throw e;
+    }
   };
 
   const stopRecording = async () => {
     const elapsed = recorderState.durationMillis ?? 0;
     await audioRecorder.stop();
+    setIsSessionActive(false);
     setIsPaused(false);
     meteringBuffer.current = [];
     setMeteringHistory([]);
@@ -117,15 +132,22 @@ export function useRecorder({ onRecordingComplete }) {
 
   const cancelRecording = async () => {
     await audioRecorder.stop();
+    setIsSessionActive(false);
     setIsPaused(false);
     meteringBuffer.current = [];
     setMeteringHistory([]);
     await setAudioModeAsync({ allowsRecording: false });
+    // Delete the orphaned audio file
+    const uri = audioRecorder.uri;
+    if (uri) {
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+    }
   };
 
   return {
     isRecording: recorderState.isRecording,
     isPaused,
+    isSessionActive,
     elapsed: recorderState.durationMillis ?? 0,
     meteringHistory,
     startRecording,

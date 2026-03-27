@@ -81,6 +81,7 @@ export default function RemindersScreen({ navigation, route }: any) {
   const {
     isRecording,
     isPaused,
+    isSessionActive,
     elapsed,
     meteringHistory,
     startRecording,
@@ -108,7 +109,7 @@ export default function RemindersScreen({ navigation, route }: any) {
     },
   });
 
-  const isActiveSession = isRecording || isPaused;
+  const isActiveSession = isSessionActive;
   const isProcessing = pipelineState === "transcribing" || pipelineState === "parsing";
 
   // --- Navigation focus ---

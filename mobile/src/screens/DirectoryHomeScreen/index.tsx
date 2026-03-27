@@ -67,7 +67,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
 
   // Quick recording
-  const { isRecording, isPaused, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording } = useRecorder({
+  const { isRecording, isPaused, isSessionActive, elapsed, meteringHistory, startRecording, pauseRecording, resumeRecording, stopRecording, cancelRecording } = useRecorder({
     onRecordingComplete: async (uri: string, durationSeconds: number) => {
       try {
         await createDailyLogEntry(uri, durationSeconds);
@@ -301,7 +301,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
     );
   }
 
-  const isActiveSession = isRecording || isPaused;
+  const isActiveSession = isSessionActive;
 
   return (
     <View style={styles.container}>
@@ -314,7 +314,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
-          onCancel={stopRecording}
+          onCancel={cancelRecording}
           onSettings={() => navigation.navigate("Settings")}
         />
       ) : (
