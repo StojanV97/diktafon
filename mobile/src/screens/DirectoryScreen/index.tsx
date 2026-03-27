@@ -16,7 +16,6 @@ import {
   Text,
 } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import * as DocumentPicker from "expo-document-picker";
 import {
   createEntry,
   fetchEntries,
@@ -29,8 +28,6 @@ import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingView from "../../../components/RecordingView";
 import CalendarStrip from "../../../components/CalendarStrip";
-import { AppHeaderLeft, AppHeaderRight } from "../../../components/AppHeader";
-import AIInsightsDialog from "../../../components/AIInsightsDialog";
 import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import RecordingTypeDialog from "../../../components/RecordingTypeDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
@@ -51,11 +48,6 @@ function formatMonthSectionHeader(dateStr: string) {
   const date = new Date(dateStr + "T00:00:00");
   return `${SECTION_DAYS[date.getDay()]} ${date.getDate()}.`;
 }
-
-const AUDIO_TYPES = [
-  "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
-  "audio/flac", "audio/aac", "audio/x-m4a", "audio/webm", "audio/*",
-];
 
 export default function DirectoryScreen({ route, navigation }: any) {
   const { id: folderId, name: folderName } = route.params;
@@ -88,9 +80,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
     closeDialog: closeEngineDialog,
   } = useEngineDialog();
 
-  // AI dialog
-  const [aiDialogVisible, setAiDialogVisible] = useState(false);
-
   // Recording type dialog
   const [recordingTypeDialogVisible, setRecordingTypeDialogVisible] = useState(false);
   const pendingRecordingTypeRef = useRef("beleshka");
@@ -113,26 +102,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
     setEntries,
     onComplete: undefined,
   });
-
-  // Header
-  const headerLeft = useCallback(
-    () => <AppHeaderLeft onPress={() => navigation.goBack()} />,
-    [navigation]
-  );
-  const headerRight = useCallback(
-    () => (
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <TouchableOpacity onPress={importFile} style={{ padding: 8, marginRight: 4 }}>
-          <MaterialCommunityIcons name="file-upload-outline" size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <AppHeaderRight onPress={() => setAiDialogVisible(true)} />
-      </View>
-    ),
-    [importFile]
-  );
-  useEffect(() => {
-    navigation.setOptions({ headerBackVisible: false, headerLeft, headerRight });
-  }, [navigation, headerLeft, headerRight]);
 
   const load = useCallback(async () => {
     try {
@@ -229,23 +198,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
   const handleCancel = useCallback(async () => {
     try { await cancelRecording(); } catch (e) { setSnackbar(safeErrorMessage(e, t("recording.cancelFailed"))); }
   }, [cancelRecording, setSnackbar]);
-
-  // --- Import ---
-  const importFile = useCallback(async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: AUDIO_TYPES,
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
-      const entry = await createEntry(folderId, asset.name, asset.uri, 0);
-      setEntries((prev) => [entry, ...prev]);
-    } catch (e) {
-      setSnackbar(safeErrorMessage(e, t("directory.importFailed")));
-    }
-  }, [folderId, setSnackbar]);
 
   // --- Engine dialog ---
   const openEngineDialog = useCallback((entryId: string) => {
@@ -512,7 +464,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
           onDismiss={() => setRecordingTypeDialogVisible(false)}
           onConfirm={onRecordingTypeConfirm}
         />
-        <AIInsightsDialog visible={aiDialogVisible} onDismiss={() => setAiDialogVisible(false)} />
       </Portal>
 
       <Snackbar visible={!!snackbar} onDismiss={dismissSnackbar} duration={3000}>
