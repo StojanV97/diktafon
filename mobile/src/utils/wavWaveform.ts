@@ -9,9 +9,7 @@ export function extractWaveformData(
   barCount = 64
 ): number[] {
   try {
-    // File constructor expects a filesystem path, not a file:// URI
-    const path = fileUri.startsWith("file://") ? fileUri.slice(7) : fileUri;
-    const file = new File(path);
+    const file = new File(fileUri);
     if (!file.exists) return [];
 
     const bytes = file.bytesSync();

@@ -22,7 +22,7 @@ import { fileExistsOnICloud } from "../../../services/icloudSyncService";
 import useAutoSave from "../../../hooks/useAutoSave";
 import { useTranscription } from "../../../hooks/useTranscription";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, elevation, typography } from "../../../theme";
+import { colors, spacing, radii, elevation, typography } from "../../../theme";
 import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../../utils/formatters";
 import { t } from "../../i18n";
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -316,7 +316,7 @@ export default function EntryScreen({ route, navigation }: any) {
             <TouchableOpacity
               onPress={() => player.seekTo(Math.max(0, status.currentTime - 10))}
               disabled={!status.isLoaded}
-              style={styles.skipBtn}
+              style={[styles.skipBtn, elevation.sm]}
             >
               <MaterialCommunityIcons name="rewind-10" size={22} color={colors.muted} />
             </TouchableOpacity>
@@ -335,7 +335,7 @@ export default function EntryScreen({ route, navigation }: any) {
             <TouchableOpacity
               onPress={() => player.seekTo(Math.min(status.duration ?? 0, status.currentTime + 10))}
               disabled={!status.isLoaded}
-              style={styles.skipBtn}
+              style={[styles.skipBtn, elevation.sm]}
             >
               <MaterialCommunityIcons name="fast-forward-10" size={22} color={colors.muted} />
             </TouchableOpacity>
@@ -371,17 +371,16 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   playerCard: {
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
+    borderRadius: radii.xl,
+    margin: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   timeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   timeText: {
     fontFamily: "JetBrainsMono_400Regular",
@@ -396,13 +395,18 @@ const styles = StyleSheet.create({
     gap: spacing.xxl,
   },
   skipBtn: {
-    padding: spacing.sm,
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   playFab: {
-    backgroundColor: colors.primary,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    backgroundColor: colors.danger,
+    width: 58,
+    height: 58,
+    borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
   },
