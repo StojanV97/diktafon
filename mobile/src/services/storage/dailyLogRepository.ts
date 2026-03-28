@@ -84,7 +84,8 @@ export async function fetchDailyLogEntries() {
   const entries = await readJSON(entriesFile);
   return entries
     .filter((e: any) => e.folder_id === folder.id && !e.deleted_locally)
-    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map((e: any) => ({ ...e }));
 }
 
 export async function fetchDailyLogStats() {

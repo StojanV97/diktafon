@@ -31,7 +31,8 @@ export async function fetchFolders() {
 
 export async function getFolder(id: string) {
   const folders = await readJSON(foldersFile);
-  return folders.find((f: any) => f.id === id) || null;
+  const folder = folders.find((f: any) => f.id === id);
+  return folder ? { ...folder } : null;
 }
 
 export function updateFolder(id: string, updates: { name?: string; color?: string; tags?: string[] }) {
@@ -44,7 +45,7 @@ export function updateFolder(id: string, updates: { name?: string; color?: strin
     if (updates.tags !== undefined) folder.tags = updates.tags;
     folder.updated_at = new Date().toISOString();
     await writeJSON(foldersFile, folders);
-    return folder;
+    return { ...folder };
   });
 }
 

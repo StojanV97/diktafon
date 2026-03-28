@@ -56,7 +56,9 @@ export function createEntry(
 
 export async function fetchEntries(folderId: string) {
   const entries = await readJSON(entriesFile);
-  return entries.filter((e: any) => e.folder_id === folderId && !e.deleted_locally);
+  return entries
+    .filter((e: any) => e.folder_id === folderId && !e.deleted_locally)
+    .map((e: any) => ({ ...e }));
 }
 
 export async function fetchEntry(entryId: string) {
@@ -67,12 +69,13 @@ export async function fetchEntry(entryId: string) {
   const textFile = new File(textsDir, `journal_${entryId}.txt`);
   if (textFile.exists) {
     try {
-      entry.text = await readDecryptedText(textFile);
+      const text = await readDecryptedText(textFile);
+      return { ...entry, text };
     } catch {
       // keep text from JSON
     }
   }
-  return entry;
+  return { ...entry };
 }
 
 export function deleteEntry(entryId: string) {
