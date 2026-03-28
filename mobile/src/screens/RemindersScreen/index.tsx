@@ -4,8 +4,10 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   ActivityIndicator,
   Portal,
@@ -53,8 +55,11 @@ export default function RemindersScreen({ navigation, route }: any) {
     refreshing,
     onRefresh,
     load,
-    pendingReminders,
-    doneReminders,
+    onceReminders,
+    dailyReminders,
+    weeklyReminders,
+    monthlyReminders,
+    historyReminders,
     setReminders,
   } = useRemindersData(setSnackbar);
 
@@ -214,6 +219,17 @@ export default function RemindersScreen({ navigation, route }: any) {
     setPipelineResult(null);
   }, []);
 
+  // --- Collapsed sections ---
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleSection = useCallback((title: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  }, []);
+
   // --- Menu ---
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenuVisible(null), []);
@@ -223,7 +239,8 @@ export default function RemindersScreen({ navigation, route }: any) {
     async (id: string) => {
       setMenuVisible(null);
       try {
-        const reminder = pendingReminders.find((r) => r.id === id);
+        const allActive = [...onceReminders, ...dailyReminders, ...weeklyReminders, ...monthlyReminders];
+        const reminder = allActive.find((r) => r.id === id);
         if (reminder?.notification_id) {
           await cancelNotification(reminder.notification_id);
           await dismissNotification(reminder.notification_id);
@@ -235,7 +252,7 @@ export default function RemindersScreen({ navigation, route }: any) {
         setSnackbar(safeErrorMessage(e));
       }
     },
-    [pendingReminders, load, setSnackbar]
+    [onceReminders, dailyReminders, weeklyReminders, monthlyReminders, load, setSnackbar]
   );
 
   // --- Delete ---
@@ -253,7 +270,7 @@ export default function RemindersScreen({ navigation, route }: any) {
     if (!deleteTargetId || deleteLoading) return;
     setDeleteLoading(true);
     try {
-      const allReminders = [...pendingReminders, ...doneReminders];
+      const allReminders = [...onceReminders, ...dailyReminders, ...weeklyReminders, ...monthlyReminders, ...historyReminders];
       const reminder = allReminders.find((r) => r.id === deleteTargetId);
       if (reminder?.notification_id) {
         await cancelNotification(reminder.notification_id);
@@ -269,16 +286,20 @@ export default function RemindersScreen({ navigation, route }: any) {
       setDeleteDialogVisible(false);
       setDeleteTargetId(null);
     }
-  }, [deleteTargetId, deleteLoading, pendingReminders, doneReminders, load, setSnackbar]);
+  }, [deleteTargetId, deleteLoading, onceReminders, dailyReminders, weeklyReminders, monthlyReminders, historyReminders, load, setSnackbar]);
 
   // --- Sections ---
-  const sections = [];
-  if (pendingReminders.length > 0) {
-    sections.push({ title: t("reminders.active"), data: pendingReminders });
-  }
-  if (doneReminders.length > 0) {
-    sections.push({ title: t("reminders.completed"), data: doneReminders });
-  }
+  const sections: { title: string; data: Reminder[]; count: number }[] = [];
+  const addSection = (title: string, items: Reminder[]) => {
+    if (items.length > 0) {
+      sections.push({ title, data: collapsed.has(title) ? [] : items, count: items.length });
+    }
+  };
+  addSection(t("reminders.once"), onceReminders);
+  addSection(t("reminders.daily"), dailyReminders);
+  addSection(t("reminders.weekly"), weeklyReminders);
+  addSection(t("reminders.monthly"), monthlyReminders);
+  addSection(t("reminders.history"), historyReminders);
 
   const renderItem = useCallback(
     ({ item }: { item: Reminder }) => (
@@ -295,10 +316,26 @@ export default function RemindersScreen({ navigation, route }: any) {
   );
 
   const renderSectionHeader = useCallback(
-    ({ section }: any) => (
-      <Text style={styles.sectionHeader}>{section.title}</Text>
-    ),
-    []
+    ({ section }: any) => {
+      const isCollapsed = collapsed.has(section.title);
+      return (
+        <TouchableOpacity
+          style={styles.sectionHeaderRow}
+          onPress={() => toggleSection(section.title)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.sectionHeader}>
+            {section.title}{isCollapsed ? ` (${section.count})` : ""}
+          </Text>
+          <MaterialCommunityIcons
+            name={isCollapsed ? "chevron-down" : "chevron-up"}
+            size={16}
+            color={colors.muted}
+          />
+        </TouchableOpacity>
+      );
+    },
+    [collapsed, toggleSection]
   );
 
   const processingLabel =
@@ -426,14 +463,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: 100,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
   sectionHeader: {
     fontFamily: "Menlo", fontWeight: "500",
     fontSize: 11,
     color: colors.muted,
     textTransform: "uppercase",
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
   },
   processingOverlay: {
     ...StyleSheet.absoluteFillObject,

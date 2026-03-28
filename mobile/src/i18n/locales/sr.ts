@@ -424,6 +424,7 @@ export default {
     noTimeDetected: "Vreme nije prepoznato. Izaberite rucno.",
     active: "Aktivni",
     completed: "Zavrseni",
+    history: "Istorija",
     today: "Danas",
     tomorrow: "Sutra",
     notificationTitle: "Podsetnik",

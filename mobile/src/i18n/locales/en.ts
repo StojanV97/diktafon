@@ -424,6 +424,7 @@ export default {
     noTimeDetected: "Time not detected. Please select manually.",
     active: "Active",
     completed: "Completed",
+    history: "History",
     today: "Today",
     tomorrow: "Tomorrow",
     notificationTitle: "Reminder",

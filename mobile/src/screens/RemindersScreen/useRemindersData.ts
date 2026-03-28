@@ -25,15 +25,30 @@ export function useRemindersData(setSnackbar: (msg: string) => void) {
     load();
   }, [load]);
 
-  const pendingReminders = useMemo(
-    () =>
-      reminders
-        .filter((r) => r.status === "pending" || r.status === "snoozed" || r.status === "notified")
-        .sort((a, b) => a.reminder_time.localeCompare(b.reminder_time)),
+  const notDone = (r: Reminder) => r.status !== "done";
+  const byTime = (a: Reminder, b: Reminder) => a.reminder_time.localeCompare(b.reminder_time);
+
+  const onceReminders = useMemo(
+    () => reminders.filter((r) => notDone(r) && !r.recurrence).sort(byTime),
     [reminders]
   );
 
-  const doneReminders = useMemo(
+  const dailyReminders = useMemo(
+    () => reminders.filter((r) => notDone(r) && r.recurrence?.type === "daily").sort(byTime),
+    [reminders]
+  );
+
+  const weeklyReminders = useMemo(
+    () => reminders.filter((r) => notDone(r) && r.recurrence?.type === "weekly").sort(byTime),
+    [reminders]
+  );
+
+  const monthlyReminders = useMemo(
+    () => reminders.filter((r) => notDone(r) && r.recurrence?.type === "monthly").sort(byTime),
+    [reminders]
+  );
+
+  const historyReminders = useMemo(
     () =>
       reminders
         .filter((r) => r.status === "done")
@@ -48,7 +63,10 @@ export function useRemindersData(setSnackbar: (msg: string) => void) {
     refreshing,
     onRefresh,
     load,
-    pendingReminders,
-    doneReminders,
+    onceReminders,
+    dailyReminders,
+    weeklyReminders,
+    monthlyReminders,
+    historyReminders,
   };
 }
