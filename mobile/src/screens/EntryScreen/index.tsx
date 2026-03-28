@@ -28,8 +28,6 @@ import { formatDate, formatDurationVerbose, formatPlaybackTime } from "../../uti
 import { t } from "../../i18n";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useClipboardWithTimer } from "../../hooks/useClipboardWithTimer";
-import { useEngineDialog } from "../../hooks/useEngineDialog";
-import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import WaveformPlayer from "./WaveformPlayer";
 import TranscribeCTA from "./TranscribeCTA";
@@ -53,16 +51,6 @@ export default function EntryScreen({ route, navigation }: any) {
 
   const saveFn = useCallback((text: string) => updateEntryText(id, text), [id]);
   const { editableText, handleTextChange, flush, init } = useAutoSave(saveFn);
-
-  // Engine dialog for transcription
-  const {
-    engineDialogVisible,
-    engineChoice,
-    setEngineChoice,
-    engineTargetId,
-    openForEntry,
-    closeDialog: closeEngineDialog,
-  } = useEngineDialog();
 
   // Transcription hook (single-entry wrapper)
   const { startTranscription, modelDownload } = useTranscription({
@@ -215,17 +203,12 @@ export default function EntryScreen({ route, navigation }: any) {
   }, [init, record?.text]);
 
   // Transcription handler
-  const handleTranscribe = useCallback(() => {
-    if (record?.id) openForEntry(record.id);
-  }, [record?.id, openForEntry]);
-
-  const onTranscribeConfirm = useCallback(async () => {
-    closeEngineDialog();
-    if (!engineTargetId) return;
-    const result: any = await startTranscription(engineTargetId, engineChoice);
+  const handleTranscribe = useCallback(async () => {
+    if (!record?.id) return;
+    const result: any = await startTranscription(record.id);
     if (!result.started) setSnackbar(result.message);
     else if (result.error) setSnackbar(result.error);
-  }, [engineTargetId, engineChoice, startTranscription, closeEngineDialog, setSnackbar]);
+  }, [record?.id, startTranscription, setSnackbar]);
 
   const handleDownloadAudio = useCallback(async () => {
     setAudioDownloading(true);
@@ -393,15 +376,6 @@ export default function EntryScreen({ route, navigation }: any) {
       )}
 
       <Portal>
-        <EngineChoiceDialog
-          visible={engineDialogVisible}
-          onDismiss={closeEngineDialog}
-          onConfirm={onTranscribeConfirm}
-          engineChoice={engineChoice}
-          onEngineChange={setEngineChoice}
-          title={undefined}
-          navigation={navigation}
-        />
         <ModelDownloadDialog
           visible={modelDownload.visible}
           progress={modelDownload.progress}

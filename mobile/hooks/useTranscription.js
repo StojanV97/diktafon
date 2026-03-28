@@ -3,6 +3,7 @@ import * as whisperService from "../services/whisperService"
 import { t } from "../src/i18n"
 import {
   preflight,
+  resolveEngine,
   transcribeSingle,
   transcribeBatch,
 } from "../services/transcriptionService"
@@ -39,7 +40,8 @@ export function useTranscription({ entries, setEntries, onComplete }) {
     return { ready: false, message: t("errors.unknown") }
   }
 
-  const startTranscription = async (entryId, engine) => {
+  const startTranscription = async (entryId) => {
+    const engine = await resolveEngine()
     const preflightResult = await handlePreflight(engine)
     if (!preflightResult.ready) return { started: false, message: preflightResult.message }
 
@@ -52,7 +54,8 @@ export function useTranscription({ entries, setEntries, onComplete }) {
     return error ? { started: true, error } : { started: true }
   }
 
-  const startBatchTranscription = async (entryIds, engine) => {
+  const startBatchTranscription = async (entryIds) => {
+    const engine = await resolveEngine()
     const preflightResult = await handlePreflight(engine)
     if (!preflightResult.ready) return { started: false, message: preflightResult.message }
 

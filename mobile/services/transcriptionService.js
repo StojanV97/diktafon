@@ -9,6 +9,12 @@ import {
   failEntry,
 } from "./journalStorage"
 
+export async function resolveEngine() {
+  if (cloudService.hasDevKey()) return "cloud"
+  const premium = await isPremium()
+  return premium ? "cloud" : "local"
+}
+
 export async function preflight(engine) {
   if (engine === "local") {
     const status = whisperService.getModelStatus()

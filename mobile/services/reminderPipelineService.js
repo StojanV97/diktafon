@@ -1,6 +1,6 @@
 import * as cloudService from "./cloudTranscriptionService"
 import * as whisperService from "./whisperService"
-import { getSettings } from "./settingsService"
+import { resolveEngine } from "./transcriptionService"
 import { parseReminder } from "./reminderParseService"
 import { t } from "../src/i18n"
 
@@ -27,8 +27,8 @@ async function transcribeWithWhisper(audioUri) {
 export async function processReminderRecording(audioUri, onStateChange) {
   onStateChange?.("transcribing")
 
-  const { defaultEngine } = await getSettings()
-  const transcript = defaultEngine === "cloud"
+  const engine = await resolveEngine()
+  const transcript = engine === "cloud"
     ? await transcribeWithCloud(audioUri)
     : await transcribeWithWhisper(audioUri)
 

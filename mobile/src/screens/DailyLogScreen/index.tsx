@@ -30,7 +30,6 @@ import RecordingView from "../../../components/RecordingView";
 import ScreenHeader from "../../components/ScreenHeader";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AIInsightsDialog from "../../../components/AIInsightsDialog";
-import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import * as Haptics from "expo-haptics";
@@ -41,7 +40,6 @@ import { colors, spacing, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
-import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
 import { recordingTrigger } from "../../utils/recordingTrigger";
 import { useClipboardWithTimer } from "../../hooks/useClipboardWithTimer";
@@ -66,17 +64,6 @@ export default function DailyLogScreen({ navigation, route }: any) {
     load,
     consolidateAndReload,
   } = useDailyLogData(setSnackbar);
-
-  const {
-    engineDialogVisible,
-    engineChoice,
-    setEngineChoice,
-    engineTargetId,
-    batchDate,
-    openForEntry,
-    openForBatch,
-    closeDialog: closeEngineDialog,
-  } = useEngineDialog();
 
   const copyWithTimer = useClipboardWithTimer(setSnackbar);
 
@@ -127,7 +114,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
         >
           <Menu.Item
             leadingIcon="text-recognition"
-            onPress={() => { setHeaderMenuVisible(false); openForBatch(null); }}
+            onPress={() => { setHeaderMenuVisible(false); handleBatchTranscribe(); }}
             title={t("dailyLog.allToText")}
             disabled={!hasRecordedEntries}
           />
@@ -140,7 +127,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
         </Menu>
       </View>
     ),
-    [headerMenuVisible, hasRecordedEntries, entries.length, openForBatch]
+    [headerMenuVisible, hasRecordedEntries, entries.length, handleBatchTranscribe]
   );
 
   // --- Auto-record via deep link ---
@@ -348,37 +335,29 @@ export default function DailyLogScreen({ navigation, route }: any) {
     }
   }, [moveLoading, moveTargetEntryId, setEntries, setSnackbar]);
 
-  // --- Transcription confirm ---
-  const onTranscribeConfirm = useCallback(async () => {
-    closeEngineDialog();
-    let result: any;
-    let batchTotal = 0;
-    if (!engineTargetId) {
-      const toTranscribe = batchDate
-        ? entries.filter(
-            (e: any) => (e.recorded_date || e.created_at.slice(0, 10)) === batchDate && (e.status === "recorded" || e.status === "error")
-          )
-        : entries.filter((e: any) => e.status === "recorded" || e.status === "error");
-      const ids = toTranscribe.map((e: any) => e.id);
-      batchTotal = ids.length;
-      const dates = [...new Set(toTranscribe.map((e: any) => e.recorded_date || e.created_at.slice(0, 10)))];
+  // --- Transcription ---
+  const handleTranscribeSingle = useCallback(async (entryId: string) => {
+    setMenuVisible(null);
+    const result: any = await startTranscription(entryId);
+    if (!result.started) setSnackbar(result.message);
+    else if (result.error) setSnackbar(result.error);
+  }, [startTranscription, setSnackbar]);
 
-      if (engineChoice === "cloud") {
-        setBatchEntryIds(new Set(ids));
-      }
+  const handleBatchTranscribe = useCallback(async () => {
+    const toTranscribe = entries.filter((e: any) => e.status === "recorded" || e.status === "error");
+    const ids = toTranscribe.map((e: any) => e.id);
+    if (ids.length === 0) return;
+    const dates = [...new Set(toTranscribe.map((e: any) => e.recorded_date || e.created_at.slice(0, 10)))];
 
-      result = await startBatchTranscription(ids, engineChoice);
+    setBatchEntryIds(new Set(ids));
+    const result: any = await startBatchTranscription(ids);
 
-      if (result.started && engineChoice === "local") {
-        await consolidateAndReload(dates);
-      }
-    } else {
-      result = await startTranscription(engineTargetId, engineChoice);
+    if (result.started) {
+      await consolidateAndReload(dates);
     }
     if (!result.started) setSnackbar(result.message);
-    else if (result.errors?.length > 0) setSnackbar(t("dailyLog.batchPartialFailed", { errors: result.errors.length, total: batchTotal }));
-    else if (result.error) setSnackbar(result.error);
-  }, [engineTargetId, batchDate, engineChoice, entries, startTranscription, startBatchTranscription, setBatchEntryIds, consolidateAndReload, closeEngineDialog, setSnackbar]);
+    else if (result.errors?.length > 0) setSnackbar(t("dailyLog.batchPartialFailed", { errors: result.errors.length, total: ids.length }));
+  }, [entries, startBatchTranscription, setBatchEntryIds, consolidateAndReload, setSnackbar]);
 
   // --- Recording handlers ---
   const handleStartRecording = useCallback(async () => {
@@ -408,11 +387,6 @@ export default function DailyLogScreen({ navigation, route }: any) {
     try { await cancelRecording(); } catch (e) { setSnackbar(safeErrorMessage(e, t("recording.cancelFailed"))); }
   }, [cancelRecording, setSnackbar]);
 
-  // --- Engine dialog triggers ---
-  const openSingleEngineDialog = useCallback((entryId: string) => {
-    setMenuVisible(null);
-    openForEntry(entryId);
-  }, [openForEntry]);
 
   // --- Combined transcript actions ---
   const copyCombinedText = useCallback((date: string) => {
@@ -473,11 +447,11 @@ export default function DailyLogScreen({ navigation, route }: any) {
       onMenuOpen={setMenuVisible}
       onMenuClose={closeMenu}
       onPress={onEntryPress}
-      onTranscribe={openSingleEngineDialog}
+      onTranscribe={handleTranscribeSingle}
       onMove={onMovePress}
       onDelete={onDeletePress}
     />
-  ), [menuVisible, closeMenu, onEntryPress, openSingleEngineDialog, onMovePress, onDeletePress]);
+  ), [menuVisible, closeMenu, onEntryPress, handleTranscribeSingle, onMovePress, onDeletePress]);
 
   // --- Loading state ---
   if (loading) {
@@ -557,15 +531,6 @@ export default function DailyLogScreen({ navigation, route }: any) {
           message={t("deleteDialog.message")}
           confirmLabel={undefined}
           loading={deleteLoading}
-        />
-        <EngineChoiceDialog
-          visible={engineDialogVisible}
-          onDismiss={closeEngineDialog}
-          onConfirm={onTranscribeConfirm}
-          engineChoice={engineChoice}
-          onEngineChange={setEngineChoice}
-          title={batchDate ? t("dailyLog.batchTranscription") : undefined}
-          navigation={navigation}
         />
         <ModelDownloadDialog
           visible={modelDownload.visible}

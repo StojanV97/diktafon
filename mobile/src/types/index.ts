@@ -42,7 +42,6 @@ export interface TranscriptionResult {
 }
 
 export interface Settings {
-  defaultEngine: "local" | "cloud" | "assemblyai";
   autoMoveFolderId: string | null;
   autoMoveFolderName: string;
   autoMoveKeepAudio: boolean;

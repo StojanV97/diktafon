@@ -28,7 +28,6 @@ import { useRecorder } from "../../../hooks/useRecorder";
 import { useTranscription } from "../../../hooks/useTranscription";
 import RecordingView from "../../../components/RecordingView";
 import CalendarStrip from "../../../components/CalendarStrip";
-import EngineChoiceDialog from "../../../components/EngineChoiceDialog";
 import RecordingTypeDialog from "../../../components/RecordingTypeDialog";
 import ModelDownloadDialog from "../../../components/ModelDownloadDialog";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
@@ -39,7 +38,6 @@ import { formatDate } from "../../utils/formatters";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
-import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
 import { recordingTrigger } from "../../utils/recordingTrigger";
 
@@ -71,16 +69,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Engine dialog
-  const {
-    engineDialogVisible,
-    engineChoice,
-    setEngineChoice,
-    engineTargetId,
-    openForEntry,
-    closeDialog: closeEngineDialog,
-  } = useEngineDialog();
 
   // Recording type dialog
   const [recordingTypeDialogVisible, setRecordingTypeDialogVisible] = useState(false);
@@ -212,19 +200,13 @@ export default function DirectoryScreen({ route, navigation }: any) {
     try { await cancelRecording(); } catch (e) { setSnackbar(safeErrorMessage(e, t("recording.cancelFailed"))); }
   }, [cancelRecording, setSnackbar]);
 
-  // --- Engine dialog ---
-  const openEngineDialog = useCallback((entryId: string) => {
+  // --- Transcription ---
+  const handleTranscribe = useCallback(async (entryId: string) => {
     setMenuVisible(null);
-    openForEntry(entryId);
-  }, [openForEntry]);
-
-  const onTranscribeConfirm = useCallback(async () => {
-    closeEngineDialog();
-    if (!engineTargetId) return;
-    const result: any = await startTranscription(engineTargetId, engineChoice);
+    const result: any = await startTranscription(entryId);
     if (!result.started) setSnackbar(result.message);
     else if (result.error) setSnackbar(result.error);
-  }, [engineTargetId, engineChoice, startTranscription, closeEngineDialog, setSnackbar]);
+  }, [startTranscription, setSnackbar]);
 
   // --- Delete ---
   const onDeletePress = useCallback((entryId: string, filename: string) => {
@@ -322,7 +304,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
               {isRecorded && (
                 <Menu.Item
                   leadingIcon="text-recognition"
-                  onPress={() => openEngineDialog(item.id)}
+                  onPress={() => handleTranscribe(item.id)}
                   title={t("dailyLog.toText")}
                 />
               )}
@@ -348,7 +330,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }, [menuVisible, navigation, openEngineDialog, onDeletePress, accentColor]);
+  }, [menuVisible, navigation, handleTranscribe, onDeletePress, accentColor]);
 
   if (loading) {
     return (
@@ -431,15 +413,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
           message={t("deleteDialog.entryMessage", { filename: deleteTarget?.filename ? displayName(deleteTarget.filename) : "" })}
           confirmLabel={undefined}
           loading={deleteLoading}
-        />
-        <EngineChoiceDialog
-          visible={engineDialogVisible}
-          onDismiss={closeEngineDialog}
-          onConfirm={onTranscribeConfirm}
-          engineChoice={engineChoice}
-          onEngineChange={setEngineChoice}
-          title={undefined}
-          navigation={navigation}
         />
         <ModelDownloadDialog
           visible={modelDownload.visible}

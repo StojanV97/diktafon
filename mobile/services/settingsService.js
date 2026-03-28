@@ -1,12 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
 const SCHEMA = {
-  defaultEngine: {
-    key: "default_transcription_engine",
-    default: "local",
-    parse: (v) => (v === "cloud" || v === "assemblyai") ? "cloud" : "local",
-    serialize: (v) => v,
-  },
   autoMoveFolderId: {
     key: "daily_log_auto_move_folder_id",
     default: null,

@@ -1,6 +1,6 @@
 import * as cloudService from "./cloudTranscriptionService"
 import * as whisperService from "./whisperService"
-import { getSettings } from "./settingsService"
+import { resolveEngine } from "./transcriptionService"
 import { supabase } from "./supabaseClient"
 import { t } from "../src/i18n"
 import * as FileSystem from "expo-file-system/legacy"
@@ -126,8 +126,8 @@ export async function extractPlan(audioUri, onStateChange) {
   try {
     onStateChange?.("transcribing")
 
-    const { defaultEngine } = await getSettings()
-    const { text } = defaultEngine === "cloud"
+    const engine = await resolveEngine()
+    const { text } = engine === "cloud"
       ? await cloudService.transcribe(audioUri)
       : await whisperService.transcribe(audioUri)
 
