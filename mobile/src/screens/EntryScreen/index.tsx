@@ -16,7 +16,7 @@ import {
   Text,
 } from "react-native-paper";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from "expo-audio";
 import { fetchEntry, entryAudioExists, updateEntryText, getDecryptedAudioUri, cleanupDecryptedAudio, cleanupDecryptedFile, downloadAudioFromICloud } from "../../../services/journalStorage";
 import { fileExistsOnICloud } from "../../../services/icloudSyncService";
 import useAutoSave from "../../../hooks/useAutoSave";
@@ -153,8 +153,15 @@ export default function EntryScreen({ route, navigation }: any) {
     return navigation.addListener("beforeRemove", () => { flush(); setEditing(false); });
   }, [navigation, flush]);
 
+  // Ensure audio plays even when iOS silent switch is on
+  useEffect(() => {
+    if (decryptedAudioUri) {
+      setAudioModeAsync({ playsInSilentMode: true });
+    }
+  }, [decryptedAudioUri]);
+
   const audioSource = decryptedAudioUri && !audioMissing ? { uri: decryptedAudioUri } : null;
-  const player = useAudioPlayer(audioSource as any, 250 as any);
+  const player = useAudioPlayer(audioSource as any, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
   // Load waveform data when decrypted audio becomes available

@@ -370,6 +370,7 @@ export default function RemindersScreen({ navigation, route }: any) {
           title={t("recording.newReminder")}
           elapsed={elapsed}
           isPaused={isPaused}
+          meteringHistory={meteringHistory}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={handleStop}

@@ -25,9 +25,38 @@ export function extractWaveformData(
       return [];
     }
 
-    const numChannels = bytes[22] | (bytes[23] << 8);
-    const bitsPerSample = bytes[34] | (bytes[35] << 8);
-    const dataSize = bytes[40] | (bytes[41] << 8) | (bytes[42] << 16) | (bytes[43] << 24);
+    // Scan RIFF sub-chunks to find 'fmt ' and 'data' chunks
+    let numChannels = 1;
+    let bitsPerSample = 16;
+    let dataOffset = -1;
+    let dataSize = 0;
+    let offset = 12; // skip RIFF header (4) + file size (4) + WAVE (4)
+
+    while (offset + 8 <= bytes.length) {
+      const chunkId = String.fromCharCode(
+        bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]
+      );
+      const chunkSize =
+        bytes[offset + 4] |
+        (bytes[offset + 5] << 8) |
+        (bytes[offset + 6] << 16) |
+        (bytes[offset + 7] << 24);
+
+      if (chunkId === "fmt " && offset + 8 + chunkSize <= bytes.length) {
+        numChannels = bytes[offset + 10] | (bytes[offset + 11] << 8);
+        bitsPerSample = bytes[offset + 22] | (bytes[offset + 23] << 8);
+      } else if (chunkId === "data") {
+        dataOffset = offset + 8;
+        dataSize = chunkSize;
+        break;
+      }
+
+      // Advance to next chunk (align to 2-byte boundary per WAV spec)
+      offset += 8 + chunkSize;
+      if (chunkSize % 2 !== 0) offset++;
+    }
+
+    if (dataOffset === -1) return [];
 
     const bytesPerSample = bitsPerSample / 8;
     const totalSamples = Math.floor(dataSize / (bytesPerSample * numChannels));
@@ -35,8 +64,6 @@ export function extractWaveformData(
 
     const samplesPerBar = Math.floor(totalSamples / barCount);
     if (samplesPerBar <= 0) return [];
-
-    const dataOffset = 44;
     const amplitudes: number[] = [];
 
     for (let bar = 0; bar < barCount; bar++) {

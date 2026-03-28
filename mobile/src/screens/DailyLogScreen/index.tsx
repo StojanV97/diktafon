@@ -498,6 +498,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
           title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
+          meteringHistory={meteringHistory}
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}

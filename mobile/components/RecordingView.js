@@ -82,34 +82,28 @@ function TimerRing({ elapsed, isPaused }) {
   );
 }
 
-// ── Animated Waveform Bar ─────────────────────────────
+// ── Real Metering Waveform ────────────────────────────
 const BAR_COUNT = 48;
 const BAR_WIDTH = 3;
 const BAR_GAP = 2;
 const BAR_MIN = 8;
 const BAR_MAX = 50;
+const MIN_DB = -60;
 
-function WaveformBar({ index, isPaused }) {
+function dbToNormalized(db) {
+  "worklet";
+  const clamped = Math.max(MIN_DB, Math.min(0, db ?? -160));
+  return (clamped - MIN_DB) / (0 - MIN_DB); // 0.0 to 1.0
+}
+
+function MeteringBar({ db, isPaused }) {
   const height = useSharedValue(BAR_MIN);
 
   useEffect(() => {
-    if (isPaused) {
-      cancelAnimation(height);
-      return;
-    }
-    const baseHeight = BAR_MIN + Math.random() * (BAR_MAX - BAR_MIN) * 0.5;
-    const duration = 800 + Math.random() * 600; // 0.8-1.4s
-
-    height.value = baseHeight;
-    height.value = withRepeat(
-      withTiming(BAR_MIN + Math.random() * (BAR_MAX - BAR_MIN), {
-        duration,
-        easing: Easing.inOut(Easing.sin),
-      }),
-      -1,
-      true // reverse (oscillate)
-    );
-  }, [isPaused]);
+    const normalized = dbToNormalized(db);
+    const target = BAR_MIN + normalized * (BAR_MAX - BAR_MIN);
+    height.value = withTiming(target, { duration: 100, easing: Easing.out(Easing.quad) });
+  }, [db]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     height: height.value,
@@ -119,11 +113,18 @@ function WaveformBar({ index, isPaused }) {
   return <Animated.View style={[styles.waveformBar, animatedStyle]} />;
 }
 
-function AnimatedWaveform({ isPaused }) {
+function MeteringWaveform({ meteringHistory, isPaused }) {
+  // Pad with silence at the start if fewer than BAR_COUNT entries
+  const padCount = Math.max(0, BAR_COUNT - meteringHistory.length);
+  const visible = meteringHistory.slice(-BAR_COUNT);
+
   return (
     <View style={styles.waveformContainer}>
-      {Array.from({ length: BAR_COUNT }, (_, i) => (
-        <WaveformBar key={i} index={i} isPaused={isPaused} />
+      {Array.from({ length: padCount }, (_, i) => (
+        <View key={`pad-${i}`} style={[styles.waveformBar, { height: BAR_MIN, opacity: 0.35 }]} />
+      ))}
+      {visible.map((db, i) => (
+        <MeteringBar key={`m-${padCount + i}`} db={db} isPaused={isPaused} />
       ))}
     </View>
   );
@@ -159,6 +160,7 @@ export default function RecordingView({
   title,
   elapsed,
   isPaused,
+  meteringHistory = [],
   onPause,
   onResume,
   onStop,
@@ -214,8 +216,8 @@ export default function RecordingView({
       {/* Circular timer */}
       <TimerRing elapsed={elapsed} isPaused={isPaused} />
 
-      {/* Animated waveform */}
-      <AnimatedWaveform isPaused={isPaused} />
+      {/* Real metering waveform */}
+      <MeteringWaveform meteringHistory={meteringHistory} isPaused={isPaused} />
 
       {/* Controls */}
       <View style={styles.controls}>

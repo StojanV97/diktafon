@@ -368,6 +368,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
           title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
+          meteringHistory={meteringHistory}
           onPause={handlePause}
           onResume={handleResume}
           onStop={handleStop}

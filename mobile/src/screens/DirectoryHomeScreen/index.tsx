@@ -313,6 +313,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
           title={t("recording.newRecording")}
           elapsed={elapsed}
           isPaused={isPaused}
+          meteringHistory={meteringHistory}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}

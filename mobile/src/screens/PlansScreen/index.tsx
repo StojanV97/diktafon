@@ -135,6 +135,7 @@ export default function PlansScreen({ navigation }: any) {
           title={t("recording.newPlan")}
           elapsed={elapsed}
           isPaused={isPaused}
+          meteringHistory={meteringHistory}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}

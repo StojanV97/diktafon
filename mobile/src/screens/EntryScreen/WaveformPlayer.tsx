@@ -1,5 +1,11 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import { colors } from "../../../theme";
 
 const BAR_WIDTH = 3;
@@ -9,11 +15,36 @@ const MAX_BAR = 56;
 const CURSOR_WIDTH = 3;
 const SEEK_TRACK_HEIGHT = 3;
 const SEEK_CIRCLE_SIZE = 14;
+const SMOOTH_DURATION = 100;
 
 interface WaveformPlayerProps {
   amplitudes: number[];
   progress: number;
   onSeek: (fraction: number) => void;
+}
+
+function WaveformBar({ amp, played }: { amp: number; played: boolean }) {
+  const height = useSharedValue(MIN_BAR);
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    height.value = withTiming(MIN_BAR + amp * (MAX_BAR - MIN_BAR), {
+      duration: SMOOTH_DURATION,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [amp]);
+
+  useEffect(() => {
+    opacity.value = withTiming(played ? 1 : 0.3, { duration: SMOOTH_DURATION });
+  }, [played]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: height.value,
+    backgroundColor: played ? colors.danger : colors.muted,
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.bar, animatedStyle]} />;
 }
 
 export default function WaveformPlayer({
@@ -22,6 +53,20 @@ export default function WaveformPlayer({
   onSeek,
 }: WaveformPlayerProps) {
   const [totalWidth, setTotalWidth] = useState(1);
+  const cursorPos = useSharedValue(0);
+  const fillWidth = useSharedValue(0);
+
+  useEffect(() => {
+    const target = progress * totalWidth;
+    cursorPos.value = withTiming(target, {
+      duration: SMOOTH_DURATION,
+      easing: Easing.linear,
+    });
+    fillWidth.value = withTiming(target, {
+      duration: SMOOTH_DURATION,
+      easing: Easing.linear,
+    });
+  }, [progress, totalWidth]);
 
   const handlePress = useCallback(
     (event: any) => {
@@ -35,8 +80,19 @@ export default function WaveformPlayer({
   );
 
   const playheadIndex = progress > 0 ? Math.floor(progress * amplitudes.length) : -1;
-  const cursorLeft = progress * totalWidth;
-  const progressPct = `${Math.min(100, progress * 100)}%`;
+
+  const cursorStyle = useAnimatedStyle(() => ({
+    left: cursorPos.value - CURSOR_WIDTH / 2,
+    opacity: cursorPos.value > 0 ? 1 : 0,
+  }));
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: fillWidth.value,
+  }));
+
+  const circleStyle = useAnimatedStyle(() => ({
+    left: cursorPos.value - SEEK_CIRCLE_SIZE / 2,
+  }));
 
   return (
     <Pressable
@@ -47,47 +103,18 @@ export default function WaveformPlayer({
       {/* Waveform bars + red cursor */}
       <View style={styles.waveformArea}>
         <View style={styles.barsRow}>
-          {amplitudes.map((amp, i) => {
-            const height = MIN_BAR + amp * (MAX_BAR - MIN_BAR);
-            const played = i <= playheadIndex;
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.bar,
-                  {
-                    height,
-                    backgroundColor: played ? colors.danger : colors.muted,
-                    opacity: played ? 1 : 0.3,
-                  },
-                ]}
-              />
-            );
-          })}
+          {amplitudes.map((amp, i) => (
+            <WaveformBar key={i} amp={amp} played={i <= playheadIndex} />
+          ))}
         </View>
-        {/* Red playhead cursor */}
-        {progress > 0 && (
-          <View
-            style={[
-              styles.cursor,
-              { left: cursorLeft - CURSOR_WIDTH / 2 },
-            ]}
-          />
-        )}
+        <Animated.View style={[styles.cursor, cursorStyle]} />
       </View>
 
       {/* Seek bar with red/gray split track */}
       <View style={styles.seekRow}>
         <View style={styles.seekTrack} />
-        <View
-          style={[styles.seekTrackFill, { width: progressPct as any }]}
-        />
-        <View
-          style={[
-            styles.seekCircle,
-            { left: cursorLeft - SEEK_CIRCLE_SIZE / 2 },
-          ]}
-        />
+        <Animated.View style={[styles.seekTrackFill, fillStyle]} />
+        <Animated.View style={[styles.seekCircle, circleStyle]} />
       </View>
     </Pressable>
   );
