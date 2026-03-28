@@ -156,6 +156,7 @@ export default {
     deleteFolderTitle: "Delete directory",
     deleteFolderMessage: "Delete \"%{name}\" and all entries in it?",
     nameTooLong: "Name cannot be longer than 100 characters.",
+    directories: "Directories",
     recordingSaved: "Recording saved to Daily Logs.",
     statsRecordings: "recordings",
     statsTranscripts: "transcripts",

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Dimensions,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -9,7 +10,6 @@ import {
 } from "react-native";
 import {
   ActivityIndicator,
-  IconButton,
   Menu,
   Portal,
   Snackbar,
@@ -32,21 +32,25 @@ import RecordingView from "../../../components/RecordingView";
 import * as Haptics from "expo-haptics";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, radii, elevation, iconSize, typography, FOLDER_COLORS } from "../../../theme";
-import { formatDate } from "../../utils/formatters";
+import { colors, spacing, radii, elevation, typography, FOLDER_COLORS } from "../../../theme";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import ScreenHeader from "../../components/ScreenHeader";
-import FolderPlusFAB from "../../components/FolderPlusFAB";
 import { recordingTrigger } from "../../utils/recordingTrigger";
 import FolderDialog from "./FolderDialog";
+
+const GRID_COLUMNS = 3;
+const GRID_GAP = spacing.sm;
+const GRID_PADDING = spacing.lg;
+const CARD_WIDTH = (Dimensions.get("window").width - 2 * GRID_PADDING - (GRID_COLUMNS - 1) * GRID_GAP) / GRID_COLUMNS;
 
 export default function DirectoryHomeScreen({ navigation }: any) {
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
 
   const [folders, setFolders] = useState<any[]>([]);
   const [stats, setStats] = useState({ recordings: 0, transcripts: 0, durationLabel: "0m" });
+  const [folderCounts, setFolderCounts] = useState<Map<string, { recordings: number; transcripts: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -112,6 +116,15 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       const minutes = Math.floor((totalSeconds % 3600) / 60);
       const durationLabel = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
       setStats({ recordings, transcripts, durationLabel });
+
+      const counts = new Map<string, { recordings: number; transcripts: number }>();
+      for (const e of active) {
+        const c = counts.get(e.folder_id) || { recordings: 0, transcripts: 0 };
+        c.recordings++;
+        if (e.status === "done") c.transcripts++;
+        counts.set(e.folder_id, c);
+      }
+      setFolderCounts(counts);
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     } finally {
@@ -234,63 +247,53 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
-    const tags = item.tags || [];
-    const visibleTags = tags.slice(0, 3);
-    const extraCount = tags.length - visibleTags.length;
+    const counts = folderCounts.get(item.id) || { recordings: 0, transcripts: 0 };
 
     return (
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => navigation.navigate("Directory", { id: item.id, name: item.name, color: item.color })}
-        style={[styles.card, elevation.sm]}
+        style={[styles.gridCard, elevation.sm]}
       >
-        <View style={[styles.accentBar, { backgroundColor: color }]} />
-        <View style={styles.cardBody}>
-          <View style={styles.cardTopRow}>
-            <MaterialCommunityIcons name="folder-outline" size={iconSize.sm} color={color} style={{ marginRight: spacing.sm }} />
-            <Text style={[typography.heading, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
-            <Menu
-              visible={menuVisible === item.id}
-              onDismiss={() => setMenuVisible(null)}
-              anchor={
-                <IconButton
-                  icon="dots-vertical"
-                  iconColor={colors.muted}
-                  size={iconSize.md}
-                  onPress={() => setMenuVisible(item.id)}
-                  style={styles.menuBtn}
-                />
-              }
-            >
-              <Menu.Item
-                leadingIcon="pencil-outline"
-                onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
-                title={t("common.edit")}
-              />
-              <Menu.Item
-                leadingIcon="delete-outline"
-                onPress={() => onDeletePress(item.id, item.name)}
-                title={t("common.delete")}
-              />
-            </Menu>
-          </View>
-          <Text style={[typography.caption, { marginTop: 2 }]}>{formatDate(item.created_at)}</Text>
-          {tags.length > 0 && (
-            <View style={styles.tagRow}>
-              {visibleTags.map((tag: string) => (
-                <View key={tag} style={styles.tagChip}>
-                  <Text style={styles.tagChipText}>{tag.toLowerCase()}</Text>
-                </View>
-              ))}
-              {extraCount > 0 && (
-                <Text style={[typography.caption, { marginLeft: spacing.xs }]}>+{extraCount}</Text>
-              )}
-            </View>
-          )}
+        <View style={styles.gridCardTopRow}>
+          <MaterialCommunityIcons name="folder-outline" size={26} color={color} />
+          <Menu
+            visible={menuVisible === item.id}
+            onDismiss={() => setMenuVisible(null)}
+            anchor={
+              <TouchableOpacity
+                onPress={() => setMenuVisible(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="dots-vertical" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            }
+          >
+            <Menu.Item
+              leadingIcon="pencil-outline"
+              onPress={() => { setMenuVisible(null); openDialog("edit", item); }}
+              title={t("common.edit")}
+            />
+            <Menu.Item
+              leadingIcon="delete-outline"
+              onPress={() => onDeletePress(item.id, item.name)}
+              title={t("common.delete")}
+            />
+          </Menu>
+        </View>
+
+        <Text style={styles.gridCardName} numberOfLines={1}>{item.name}</Text>
+
+        <View style={styles.gridCardCounts}>
+          <MaterialCommunityIcons name="microphone-outline" size={12} color={colors.muted} />
+          <Text style={styles.gridCardCountText}>{counts.recordings}</Text>
+          <Text style={styles.gridCardDot}>{" \u00B7 "}</Text>
+          <MaterialCommunityIcons name="text-box-check-outline" size={12} color={colors.muted} />
+          <Text style={styles.gridCardCountText}>{counts.transcripts}</Text>
         </View>
       </TouchableOpacity>
     );
-  }, [menuVisible, navigation, openDialog, onDeletePress]);
+  }, [menuVisible, navigation, openDialog, onDeletePress, folderCounts]);
 
   if (loading) {
     return (
@@ -339,11 +342,24 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             </View>
           </View>
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t("home.directories")}</Text>
+            <TouchableOpacity
+              onPress={() => openDialog("create")}
+              style={styles.addBtn}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="folder-plus-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={regularFolders}
             keyExtractor={(item: any) => item.id}
             renderItem={renderItem}
-            contentContainerStyle={styles.listGrow}
+            numColumns={GRID_COLUMNS}
+            columnWrapperStyle={styles.columnWrapper}
+            contentContainerStyle={styles.gridContent}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -357,8 +373,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
               </View>
             }
           />
-
-          <FolderPlusFAB onPress={() => openDialog("create")} />
         </>
       )}
 
@@ -396,8 +410,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   fixedHeader: { paddingHorizontal: spacing.lg },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
-  listGrow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, flexGrow: 1 },
   statsStrip: {
     flexDirection: "row",
     alignItems: "center",
@@ -430,56 +442,69 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: colors.divider,
   },
-  emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
-  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+  sectionHeader: {
     flexDirection: "row",
-    paddingVertical: spacing.lg,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
-  accentBar: {
-    width: 4,
-    alignSelf: "stretch",
-    borderRadius: 2,
-    marginLeft: spacing.md,
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "600" as const,
+    color: colors.foreground,
   },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  folderIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.full,
+  addBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: spacing.sm,
   },
-  menuBtn: {
-    margin: -spacing.sm,
+  columnWrapper: {
+    gap: GRID_GAP,
+    paddingHorizontal: GRID_PADDING,
   },
-  cardBody: {
-    flex: 1,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.sm,
+  gridContent: {
+    paddingBottom: spacing.xxxl,
+    flexGrow: 1,
+    gap: GRID_GAP,
   },
-  tagRow: {
+  gridCard: {
+    width: CARD_WIDTH,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingTop: 8,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    justifyContent: "space-between",
+  },
+  gridCardTopRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.sm,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
   },
-  tagChip: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+  gridCardName: {
+    fontSize: 12,
+    fontWeight: "400" as const,
+    color: colors.muted,
   },
-  tagChipText: {
-    ...typography.mono,
+  gridCardCounts: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  gridCardCountText: {
     fontSize: 11,
-    color: colors.primary,
+    color: colors.muted,
+    marginLeft: 2,
   },
+  gridCardDot: {
+    fontSize: 11,
+    color: colors.muted,
+  },
+  emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
+  emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
 });

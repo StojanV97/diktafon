@@ -156,6 +156,7 @@ export default {
     deleteFolderTitle: "Obrisi direktorijum",
     deleteFolderMessage: "Obrisati \"%{name}\" i sve zapise u njemu?",
     nameTooLong: "Naziv ne moze biti duzi od 100 karaktera.",
+    directories: "Direktorijumi",
     recordingSaved: "Snimak sacuvan u Dnevne Zapise.",
     statsRecordings: "snimaka",
     statsTranscripts: "transkripata",
