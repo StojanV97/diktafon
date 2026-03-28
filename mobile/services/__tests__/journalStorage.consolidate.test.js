@@ -97,7 +97,7 @@ function readEntries() {
 const DAILY_FOLDER = {
   id: "daily-folder-1",
   name: "Dnevni Log",
-  color: "#3B5EDB",
+  color: "#1E90FF",
   tags: [],
   is_daily_log: true,
   created_at: "2026-03-18T08:00:00.000Z",

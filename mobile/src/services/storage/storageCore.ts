@@ -23,8 +23,8 @@ export const entriesFile = new File(journalDir, "entries.json");
 export const plansFile = new File(journalDir, "plans.json");
 
 export const DAILY_LOG_FOLDER_NAME = "Dnevni Log";
-export const DEFAULT_FOLDER_COLOR = "#4A9EFF";
-export const DAILY_LOG_FOLDER_COLOR = "#3B5EDB";
+export const DEFAULT_FOLDER_COLOR = "#1E90FF";
+export const DAILY_LOG_FOLDER_COLOR = "#1E90FF";
 
 // In-memory cache — avoids re-reading + JSON-parsing on every read (esp. 5s polling)
 let _foldersCache: any[] | null = null;

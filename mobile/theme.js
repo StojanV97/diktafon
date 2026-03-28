@@ -13,8 +13,8 @@ export const colors = {
   muted: "#6B7280",
 
   // Brand
-  primary: "#4A6FA5",
-  primaryLight: "#EEF3FA",
+  primary: "#1E90FF",
+  primaryLight: "#E8F4FF",
 
   // Status
   success: "#3D9A5F",
@@ -30,13 +30,13 @@ export const colors = {
   overlay: "rgba(255,255,255,0.92)",
 
   // Badge backgrounds (moved from hardcoded in components)
-  badgePending: "#EEF3FA",
+  badgePending: "#E8F4FF",
   badgeSnoozed: "#FEF3C7",
   badgeDone: "#DCFCE7",
   badgeNeutral: "#F3F1EE",
 
   // Badge foregrounds
-  badgePendingFg: "#4A6FA5",
+  badgePendingFg: "#1E90FF",
   badgeSnoozedFg: "#D97706",
   badgeDoneFg: "#16A34A",
 };
@@ -168,7 +168,7 @@ export const typography = {
 
 // ── Folder color palette ────────────────────────────────────────
 export const FOLDER_COLORS = [
-  "#4A6FA5",
+  "#1E90FF",
   "#DC4A3D",
   "#3D9A5F",
   "#D97706",
