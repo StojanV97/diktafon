@@ -37,12 +37,13 @@ import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { syncWidgetData } from "../../../services/widgetDataService";
 import { formatSectionDate } from "../../utils/formatters";
-import { colors, spacing, elevation, typography } from "../../../theme";
+import { colors, spacing, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
+import MicFAB from "../../components/MicFAB";
 import { useClipboardWithTimer } from "../../hooks/useClipboardWithTimer";
 import { useDailyLogData } from "./useDailyLogData";
 import DailyLogEntryCard from "./DailyLogEntryCard";
@@ -527,13 +528,7 @@ export default function DailyLogScreen({ navigation, route }: any) {
             }
           />
 
-          <TouchableOpacity
-            style={[styles.fab, elevation.md]}
-            onPress={handleStartRecording}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-          </TouchableOpacity>
+          <MicFAB onPress={handleStartRecording} />
         </>
       )}
 
@@ -595,15 +590,4 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 26 },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

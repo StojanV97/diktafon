@@ -52,9 +52,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
+    width: 36,
+    height: 36,
+    borderRadius: radii.md,
     backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",

@@ -37,6 +37,8 @@ import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import ScreenHeader from "../../components/ScreenHeader";
+import MicFAB from "../../components/MicFAB";
+import FolderPlusFAB from "../../components/FolderPlusFAB";
 import FolderDialog from "./FolderDialog";
 
 export default function DirectoryHomeScreen({ navigation }: any) {
@@ -320,20 +322,8 @@ export default function DirectoryHomeScreen({ navigation }: any) {
             }
           />
 
-          <TouchableOpacity
-            style={[styles.fab, styles.fabSecondary, elevation.md]}
-            onPress={() => openDialog("create")}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="folder-plus-outline" size={22} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.fab, elevation.md]}
-            onPress={handleRecordPress}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-          </TouchableOpacity>
+          <FolderPlusFAB onPress={() => openDialog("create")} />
+          <MicFAB onPress={handleRecordPress} />
         </>
       )}
 
@@ -374,25 +364,6 @@ const styles = StyleSheet.create({
   listGrow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, flexGrow: 1 },
   emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabSecondary: {
-    bottom: spacing.lg + 56 + spacing.md,
-    width: 48,
-    height: 48,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    right: spacing.lg + 4,
-  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,

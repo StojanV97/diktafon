@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -21,13 +20,14 @@ import ScreenHeader from "../../components/ScreenHeader";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import * as Haptics from "expo-haptics";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
-import { colors, spacing, elevation, typography } from "../../../theme";
+import { colors, spacing, typography } from "../../../theme";
 import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { usePlansData } from "./usePlansData";
 import PlanCard from "./PlanCard";
 import DatePickerDialog from "./DatePickerDialog";
+import MicFAB from "../../components/MicFAB";
 
 type PipelineState = "idle" | "recording" | "transcribing" | "extracting";
 
@@ -156,13 +156,7 @@ export default function PlansScreen({ navigation }: any) {
           />
 
           {!isActiveSession && (
-            <TouchableOpacity
-              style={[styles.fab, elevation.md]}
-              onPress={handleRecordPress}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-            </TouchableOpacity>
+            <MicFAB onPress={handleRecordPress} />
           )}
         </>
       )}
@@ -216,17 +210,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.sm,
     lineHeight: 22,
-  },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   processingOverlay: {
     ...StyleSheet.absoluteFillObject,

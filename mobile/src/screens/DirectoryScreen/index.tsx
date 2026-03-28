@@ -41,6 +41,7 @@ import { t } from "../../i18n";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
+import MicFAB from "../../components/MicFAB";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "\u010cET", "PET", "SUB"];
 
@@ -410,13 +411,7 @@ export default function DirectoryScreen({ route, navigation }: any) {
         }
       />
 
-      <TouchableOpacity
-        style={[styles.fab, elevation.md]}
-        onPress={handleStartRecording}
-        activeOpacity={0.8}
-      >
-        <MaterialCommunityIcons name="microphone" size={24} color={colors.surface} />
-      </TouchableOpacity>
+      <MicFAB onPress={handleStartRecording} />
         </>
       )}
 
@@ -544,16 +539,5 @@ const styles = StyleSheet.create({
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
     color: colors.muted,
-  },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
