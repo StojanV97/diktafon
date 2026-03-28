@@ -29,7 +29,7 @@ import {
 } from "../../services/storage";
 import RecordingView from "../../../components/RecordingView";
 import * as Haptics from "expo-haptics";
-import MicFAB from "../../components/MicFAB";
+import { recordingTrigger } from "../../utils/recordingTrigger";
 import DeleteConfirmDialog from "../../../components/DeleteConfirmDialog";
 import { safeErrorMessage } from "../../../utils/errorHelpers";
 import { colors, spacing, typography } from "../../../theme";
@@ -129,6 +129,15 @@ export default function RemindersScreen({ navigation, route }: any) {
       setSnackbar(safeErrorMessage(e));
     }
   }, [startRecording, setSnackbar]);
+
+  const canRecord = !isProcessing && pipelineState !== "confirming";
+
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      recordingTrigger.current = canRecord ? handleStartRecording : null;
+    });
+    return unsub;
+  }, [navigation, handleStartRecording, canRecord]);
 
   const handleStop = useCallback(async () => {
     try {
@@ -356,10 +365,6 @@ export default function RemindersScreen({ navigation, route }: any) {
             />
           )}
 
-          {/* Record reminder FAB */}
-          {!isProcessing && pipelineState !== "confirming" && (
-            <MicFAB onPress={handleStartRecording} />
-          )}
         </>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -37,8 +37,8 @@ import { t } from "../../i18n";
 
 import { useSnackbar } from "../../hooks/useSnackbar";
 import ScreenHeader from "../../components/ScreenHeader";
-import MicFAB from "../../components/MicFAB";
 import FolderPlusFAB from "../../components/FolderPlusFAB";
+import { recordingTrigger } from "../../utils/recordingTrigger";
 import FolderDialog from "./FolderDialog";
 
 export default function DirectoryHomeScreen({ navigation }: any) {
@@ -88,6 +88,13 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       setSnackbar(safeErrorMessage(e));
     }
   }, [isRecording, stopRecording, startRecording, setSnackbar]);
+
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      recordingTrigger.current = handleRecordPress;
+    });
+    return unsub;
+  }, [navigation, handleRecordPress]);
 
   const load = useCallback(async () => {
     try {
@@ -323,7 +330,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
           />
 
           <FolderPlusFAB onPress={() => openDialog("create")} />
-          <MicFAB onPress={handleRecordPress} />
         </>
       )}
 

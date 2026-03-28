@@ -43,7 +43,7 @@ import { t } from "../../i18n";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
-import MicFAB from "../../components/MicFAB";
+import { recordingTrigger } from "../../utils/recordingTrigger";
 import { useClipboardWithTimer } from "../../hooks/useClipboardWithTimer";
 import { useDailyLogData } from "./useDailyLogData";
 import DailyLogEntryCard from "./DailyLogEntryCard";
@@ -385,6 +385,13 @@ export default function DailyLogScreen({ navigation, route }: any) {
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); await startRecording(); } catch (e) { setSnackbar(safeErrorMessage(e)); }
   }, [startRecording, setSnackbar]);
 
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      recordingTrigger.current = handleStartRecording;
+    });
+    return unsub;
+  }, [navigation, handleStartRecording]);
+
   const handlePause = useCallback(async () => {
     try { await pauseRecording(); } catch (e) { setSnackbar(safeErrorMessage(e, t("recording.pauseFailed"))); }
   }, [pauseRecording, setSnackbar]);
@@ -528,7 +535,6 @@ export default function DailyLogScreen({ navigation, route }: any) {
             }
           />
 
-          <MicFAB onPress={handleStartRecording} />
         </>
       )}
 

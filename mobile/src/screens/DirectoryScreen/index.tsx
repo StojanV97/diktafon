@@ -41,7 +41,7 @@ import { t } from "../../i18n";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { useEngineDialog } from "../../hooks/useEngineDialog";
 import { usePreventBackDuringRecording } from "../../hooks/usePreventBackDuringRecording";
-import MicFAB from "../../components/MicFAB";
+import { recordingTrigger } from "../../utils/recordingTrigger";
 
 const SECTION_DAYS = ["NED", "PON", "UTO", "SRI", "\u010cET", "PET", "SUB"];
 
@@ -178,6 +178,13 @@ export default function DirectoryScreen({ route, navigation }: any) {
   const handleStartRecording = useCallback(() => {
     setRecordingTypeDialogVisible(true);
   }, []);
+
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      recordingTrigger.current = handleStartRecording;
+    });
+    return unsub;
+  }, [navigation, handleStartRecording]);
 
   const onRecordingTypeConfirm = useCallback(async (type: string) => {
     pendingRecordingTypeRef.current = type;
@@ -411,7 +418,6 @@ export default function DirectoryScreen({ route, navigation }: any) {
         }
       />
 
-      <MicFAB onPress={handleStartRecording} />
         </>
       )}
 

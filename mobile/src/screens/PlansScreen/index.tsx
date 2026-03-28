@@ -27,7 +27,7 @@ import { useSnackbar } from "../../hooks/useSnackbar";
 import { usePlansData } from "./usePlansData";
 import PlanCard from "./PlanCard";
 import DatePickerDialog from "./DatePickerDialog";
-import MicFAB from "../../components/MicFAB";
+import { recordingTrigger } from "../../utils/recordingTrigger";
 
 type PipelineState = "idle" | "recording" | "transcribing" | "extracting";
 
@@ -78,6 +78,13 @@ export default function PlansScreen({ navigation }: any) {
       setSnackbar(safeErrorMessage(e));
     }
   }, [startRecording, setSnackbar]);
+
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      recordingTrigger.current = isActiveSession ? null : handleRecordPress;
+    });
+    return unsub;
+  }, [navigation, handleRecordPress, isActiveSession]);
 
   const handleDateConfirm = useCallback(async (date: string) => {
     setDatePickerVisible(false);
@@ -155,9 +162,6 @@ export default function PlansScreen({ navigation }: any) {
             }
           />
 
-          {!isActiveSession && (
-            <MicFAB onPress={handleRecordPress} />
-          )}
         </>
       )}
 

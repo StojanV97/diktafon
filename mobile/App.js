@@ -24,7 +24,9 @@ import { useAppInit } from "./src/hooks/useAppInit";
 import { useBiometricLock } from "./src/hooks/useBiometricLock";
 import { linking } from "./src/navigation/linking";
 import { recordingGuard } from "./src/utils/recordingGuard";
+import { recordingTrigger } from "./src/utils/recordingTrigger";
 import { stackScreenOptions } from "./src/navigation/options";
+import RecordTabButton from "./src/components/RecordTabButton";
 import DirectoryHomeScreen from "./screens/DirectoryHomeScreen";
 import DirectoryScreen from "./screens/DirectoryScreen";
 import EntryScreen from "./screens/EntryScreen";
@@ -151,6 +153,8 @@ const createTabListeners = (tabName) => ({ navigation }) => ({
   },
 });
 
+function EmptyScreen() { return null; }
+
 function RootTabs() {
   return (
     <Tab.Navigator
@@ -160,9 +164,10 @@ function RootTabs() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.foreground,
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontWeight: "600" },
-        tabBarIcon: ({ color, size }) => (
-          <MaterialCommunityIcons name={TAB_ICONS[route.name]} size={size} color={color} />
-        ),
+        tabBarIcon: ({ color, size }) => {
+          const icon = TAB_ICONS[route.name];
+          return icon ? <MaterialCommunityIcons name={icon} size={size} color={color} /> : null;
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
@@ -171,12 +176,24 @@ function RootTabs() {
           borderTopWidth: 0.5,
           borderTopColor: colors.divider,
           paddingTop: spacing.sm,
+          paddingHorizontal: spacing.lg,
           height: 88,
+          overflow: "visible",
         },
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: t("tabs.home") }} listeners={createTabListeners("HomeTab")} />
       <Tab.Screen name="DailyLogsTab" component={DailyLogsStack} options={{ title: t("tabs.dailyLogs") }} listeners={createTabListeners("DailyLogsTab")} />
+      <Tab.Screen
+        name="RecordTab"
+        component={EmptyScreen}
+        options={{
+          tabBarButton: () => <RecordTabButton />,
+        }}
+        listeners={{
+          tabPress: (e) => e.preventDefault(),
+        }}
+      />
       <Tab.Screen name="PlansTab" component={PlansStack} options={{ title: t("tabs.plans") }} listeners={createTabListeners("PlansTab")} />
       <Tab.Screen name="RemindersTab" component={RemindersStack} options={{ title: t("tabs.reminders") }} listeners={createTabListeners("RemindersTab")} />
     </Tab.Navigator>
