@@ -24,6 +24,7 @@ import {
   tombstoneFolder,
   deleteFolderWithICloud,
   createDailyLogEntry,
+  getRawEntries,
 } from "../../../services/journalStorage";
 import { isSyncEnabled } from "../../../services/icloudSyncService";
 import { useRecorder } from "../../../hooks/useRecorder";
@@ -45,6 +46,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const { snackbar, setSnackbar, dismissSnackbar } = useSnackbar();
 
   const [folders, setFolders] = useState<any[]>([]);
+  const [stats, setStats] = useState({ recordings: 0, transcripts: 0, durationLabel: "0m" });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -70,6 +72,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
       try {
         await createDailyLogEntry(uri, durationSeconds);
         setSnackbar(t("home.recordingSaved"));
+        load();
       } catch (e) {
         setSnackbar(safeErrorMessage(e, t("errors.saveFailed")));
       }
@@ -98,8 +101,17 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchFolders();
+      const [data, allEntries] = await Promise.all([fetchFolders(), getRawEntries()]);
       setFolders(data);
+
+      const active = allEntries.filter((e: any) => !e.deleted_locally);
+      const recordings = active.length;
+      const transcripts = active.filter((e: any) => e.status === "done").length;
+      const totalSeconds = active.reduce((sum: number, e: any) => sum + (e.duration_seconds || 0), 0);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const durationLabel = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+      setStats({ recordings, transcripts, durationLabel });
     } catch (e) {
       setSnackbar(safeErrorMessage(e));
     } finally {
@@ -219,9 +231,6 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 
   const regularFolders = useMemo(() => folders.filter((f) => !f.is_daily_log), [folders]);
 
-  const listHeader = useMemo(() => (
-    <ScreenHeader title="Home" />
-  ), []);
 
   const renderItem = useCallback(({ item }: any) => {
     const color = item.color || FOLDER_COLORS[0];
@@ -309,11 +318,31 @@ export default function DirectoryHomeScreen({ navigation }: any) {
         />
       ) : (
         <>
+          <View style={styles.fixedHeader}>
+            <ScreenHeader title={t("tabs.home")} />
+          </View>
+
+          <View style={styles.statsStrip}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.danger }]}>{stats.recordings}</Text>
+              <Text style={styles.statLabel}> {t("home.statsRecordings")}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>{stats.transcripts}</Text>
+              <Text style={styles.statLabel}> {t("home.statsTranscripts")}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.success }]}>{stats.durationLabel}</Text>
+              <Text style={styles.statLabel}> {t("home.statsTotal")}</Text>
+            </View>
+          </View>
+
           <FlatList
             data={regularFolders}
             keyExtractor={(item: any) => item.id}
             renderItem={renderItem}
-            ListHeaderComponent={listHeader}
             contentContainerStyle={styles.listGrow}
             refreshControl={
               <RefreshControl
@@ -366,8 +395,41 @@ export default function DirectoryHomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  fixedHeader: { paddingHorizontal: spacing.lg },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
   listGrow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, flexGrow: 1 },
+  statsStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 0.5,
+    borderColor: colors.borderGhost,
+  },
+  statItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+  },
+  statNumber: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "400" as const,
+    color: colors.muted,
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.divider,
+  },
   emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xxxl },
   emptyText: { color: colors.muted, textAlign: "center", lineHeight: 24 },
   card: {

@@ -118,7 +118,7 @@ export const elevation = {
 // ── Typography presets ──────────────────────────────────────────
 // Uses platform system font (SF Pro on iOS, Roboto on Android).
 // Monospace uses Menlo (SF Mono on iOS).
-export const typography = {
+export const typography = /** @type {const} */ ({
   monoLabel: {
     fontFamily: "Menlo",
     fontWeight: "500",
@@ -167,7 +167,7 @@ export const typography = {
     fontSize: 12,
     color: colors.muted,
   },
-};
+});
 
 // ── Folder color palette ────────────────────────────────────────
 export const FOLDER_COLORS = [

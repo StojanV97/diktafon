@@ -157,6 +157,9 @@ export default {
     deleteFolderMessage: "Obrisati \"%{name}\" i sve zapise u njemu?",
     nameTooLong: "Naziv ne moze biti duzi od 100 karaktera.",
     recordingSaved: "Snimak sacuvan u Dnevne Zapise.",
+    statsRecordings: "snimaka",
+    statsTranscripts: "transkripata",
+    statsTotal: "ukupno",
   },
 
   entry: {

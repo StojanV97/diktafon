@@ -157,6 +157,9 @@ export default {
     deleteFolderMessage: "Delete \"%{name}\" and all entries in it?",
     nameTooLong: "Name cannot be longer than 100 characters.",
     recordingSaved: "Recording saved to Daily Logs.",
+    statsRecordings: "recordings",
+    statsTranscripts: "transcripts",
+    statsTotal: "total",
   },
 
   entry: {
