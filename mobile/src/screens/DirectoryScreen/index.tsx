@@ -473,13 +473,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 12,
     color: colors.muted,
     textTransform: "uppercase",
   },
   sectionCount: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 12,
     color: colors.muted,
   },
@@ -492,12 +492,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   filterCount: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 13,
     color: colors.foreground,
   },
   filterLink: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 13,
     color: colors.primary,
   },
@@ -536,13 +536,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statusLabel: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 10,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
   metaSeparator: {
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 11,
     color: colors.muted,
   },

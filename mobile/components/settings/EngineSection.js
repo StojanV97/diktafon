@@ -101,7 +101,7 @@ const radioStyles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   premiumBadgeText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 11,
     color: colors.primary,
   },

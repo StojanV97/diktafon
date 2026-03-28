@@ -1,7 +1,7 @@
 import { Buffer } from "@craftzdog/react-native-buffer"
 global.Buffer = global.Buffer || Buffer
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import { Alert, View, ActivityIndicator, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { StatusBar } from "expo-status-bar";
@@ -11,8 +11,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
-import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
-import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import * as ScreenCapture from "expo-screen-capture";
 import { theme, colors, spacing } from "./theme";
 import * as Haptics from "expo-haptics";
@@ -163,14 +161,14 @@ function RootTabs() {
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontWeight: "600" },
+        headerTitleStyle: { fontWeight: "600",fontWeight: "600" },
         tabBarIcon: ({ color, size }) => {
           const icon = TAB_ICONS[route.name];
           return icon ? <MaterialCommunityIcons name={icon} size={size} color={color} /> : null;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+        tabBarLabelStyle: { fontWeight: "600",fontSize: 11 },
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopWidth: 0.5,
@@ -203,27 +201,6 @@ function RootTabs() {
 function App() {
   const { ready, initialRoute } = useAppInit();
   const { locked, unlock, checkPendingControlAction } = useBiometricLock(navigationRef);
-  const [fontTimeout, setFontTimeout] = useState(false);
-
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    JetBrainsMono_400Regular,
-    JetBrainsMono_500Medium,
-  });
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setFontTimeout(true);
-      Sentry.addBreadcrumb({
-        category: "startup",
-        message: "Font loading timed out after 10s",
-        level: "warning",
-      });
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Enable app-switcher blur protection (iOS)
   useEffect(() => {
@@ -254,9 +231,9 @@ function App() {
     if ((fontsLoaded || fontTimeout) && ready) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontTimeout, ready]);
+  }, [ready]);
 
-  if ((!fontsLoaded && !fontTimeout) || !ready) {
+  if (!ready) {
     return (
       <PaperProvider theme={theme}>
         <View style={styles.loading}>
@@ -301,9 +278,9 @@ function App() {
 const styles = StyleSheet.create({
   loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   flex1: { flex: 1 },
-  lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: colors.foreground, marginBottom: 16 },
+  lockTitle: { fontWeight: "600",fontSize: 18, color: colors.foreground, marginBottom: 16 },
   lockButton: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  lockButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
+  lockButtonText: { fontWeight: "600",fontSize: 15, color: "#FFF" },
 });
 
 export default SENTRY_DSN ? Sentry.wrap(App) : App;

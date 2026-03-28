@@ -55,14 +55,14 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: "center",
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontWeight: "600",
     fontSize: 15,
     color: colors.foreground,
   },
   subtitle: {
     textAlign: "center",
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 11,
     color: colors.muted,
     marginTop: 2,

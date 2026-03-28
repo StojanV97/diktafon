@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   headerTitle: {
-    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
     fontSize: 22,
     color: colors.foreground,
   },
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   timerText: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 36,
     color: colors.foreground,
     fontVariant: ["tabular-nums"],

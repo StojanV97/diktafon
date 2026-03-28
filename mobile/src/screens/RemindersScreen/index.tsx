@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   sectionHeader: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 11,
     color: colors.muted,
     textTransform: "uppercase",

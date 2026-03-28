@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   label: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 11,
     color: colors.muted,
     marginTop: 2,

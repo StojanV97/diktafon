@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   title: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 18,
     color: colors.foreground,
     marginBottom: 16,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 15,
     color: "#FFF",
   },

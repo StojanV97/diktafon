@@ -171,14 +171,14 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   statusLabel: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 10,
     letterSpacing: 1,
     textTransform: "uppercase",
     color: colors.muted,
   },
   metaSeparator: {
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 11,
     color: colors.muted,
   },
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   recurrenceText: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 10,
     color: colors.muted,
   },

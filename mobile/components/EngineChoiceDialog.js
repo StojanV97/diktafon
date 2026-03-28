@@ -161,7 +161,7 @@ function UpgradePrompt({ offerings, loading, purchaseLoading, onPurchase, onSign
 
   return (
     <View style={styles.upgradeBox}>
-      <Text style={[typography.body, { fontFamily: "Inter_600SemiBold", marginBottom: spacing.sm }]}>
+      <Text style={[typography.body, { fontWeight: "600", marginBottom: spacing.sm }]}>
         {t('engine.unlockPremium')}
       </Text>
       <Text style={[typography.caption, { marginBottom: spacing.md }]}>
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   premiumBadgeText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 11,
     color: colors.primary,
   },

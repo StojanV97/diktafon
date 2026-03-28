@@ -70,7 +70,7 @@ export default function AccountSection({ navigation, setSnackbar, onUserChanged 
           <>
             <Text style={typography.body}>
               {t('settings.account.signedInAs')}{" "}
-              <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+              <Text style={{ fontWeight: "600" }}>
                 {user.email || t('settings.account.appleId')}
               </Text>
             </Text>

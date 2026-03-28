@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   bottomBtnText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 11,
     color: colors.primary,
     marginTop: 4,

@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   quickText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 13,
     color: colors.foreground,
   },

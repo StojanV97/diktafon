@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   timeText: {
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 11,
     color: colors.muted,
     fontVariant: ["tabular-nums"],
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyText: {
-    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
     fontSize: 15,
     color: colors.foreground,
     lineHeight: 24,

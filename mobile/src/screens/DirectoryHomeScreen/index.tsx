@@ -220,7 +220,7 @@ export default function DirectoryHomeScreen({ navigation }: any) {
   const regularFolders = useMemo(() => folders.filter((f) => !f.is_daily_log), [folders]);
 
   const listHeader = useMemo(() => (
-    <ScreenHeader title="Diktaphone" />
+    <ScreenHeader title="Home" />
   ), []);
 
   const renderItem = useCallback(({ item }: any) => {

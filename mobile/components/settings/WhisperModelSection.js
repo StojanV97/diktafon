@@ -55,7 +55,7 @@ export default function WhisperModelSection({ setSnackbar }) {
       <View style={styles.sectionBody}>
         <Text style={typography.body}>
           {t('settings.whisper.status')}{" "}
-          <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+          <Text style={{ fontWeight: "600" }}>
             {modelStatus.downloaded
               ? t('settings.whisper.downloaded', { size: formatBytes(modelStatus.sizeBytes) })
               : t('settings.whisper.notDownloaded')}

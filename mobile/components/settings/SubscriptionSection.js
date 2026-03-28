@@ -77,7 +77,7 @@ export default function SubscriptionSection({ setSnackbar, user }) {
           <>
             <View style={premiumStyles.premiumBadge}>
               <MaterialCommunityIcons name="check-decagram" size={20} color={colors.success} />
-              <Text style={[typography.body, { marginLeft: spacing.sm, fontFamily: "Inter_600SemiBold" }]}>
+              <Text style={[typography.body, { marginLeft: spacing.sm, fontWeight: "600" }]}>
                 {t('settings.subscription.premiumBadge')}
               </Text>
             </View>

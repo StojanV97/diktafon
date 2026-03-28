@@ -253,13 +253,13 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   warningText: {
-    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
     fontSize: 13,
     color: colors.warning,
     flex: 1,
   },
   label: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 11,
     color: colors.muted,
     textTransform: "uppercase",
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   input: {
-    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
     fontSize: 15,
     color: colors.foreground,
     backgroundColor: colors.background,
@@ -285,12 +285,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   timeValue: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo", fontWeight: "500",
     fontSize: 15,
     color: colors.foreground,
   },
   changeLink: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 13,
     color: colors.primary,
   },
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   recurrenceChipText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 13,
     color: colors.muted,
   },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   cancelBtnText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 15,
     color: colors.muted,
   },
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   confirmBtnText: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 15,
     color: colors.surface,
   },

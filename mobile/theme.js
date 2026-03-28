@@ -116,51 +116,54 @@ export const elevation = {
 };
 
 // ── Typography presets ──────────────────────────────────────────
+// Uses platform system font (SF Pro on iOS, Roboto on Android).
+// Monospace uses Menlo (SF Mono on iOS).
 export const typography = {
   monoLabel: {
-    fontFamily: "JetBrainsMono_500Medium",
+    fontFamily: "Menlo",
+    fontWeight: "500",
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: "uppercase",
     color: colors.muted,
   },
   title: {
-    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
     fontSize: 28,
     color: colors.foreground,
   },
   heading: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 17,
     color: colors.foreground,
   },
   subheading: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 14,
     color: colors.foreground,
   },
   body: {
-    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
     fontSize: 15,
     color: colors.foreground,
   },
   bodySmall: {
-    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
     fontSize: 13,
     color: colors.foreground,
   },
   caption: {
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 13,
     color: colors.muted,
   },
   label: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 12,
     color: colors.primary,
   },
   mono: {
-    fontFamily: "JetBrainsMono_400Regular",
+    fontFamily: "Menlo",
     fontSize: 12,
     color: colors.muted,
   },

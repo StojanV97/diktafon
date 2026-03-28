@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   monthLabel: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 16,
     color: colors.foreground,
     textTransform: "capitalize",
@@ -202,17 +202,17 @@ const styles = StyleSheet.create({
     marginRight: CHIP_MARGIN,
   },
   chipDayAbbr: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 10,
     textTransform: "uppercase",
     marginBottom: 2,
   },
   chipDayNum: {
-    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
     fontSize: 16,
   },
   chipCount: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 9,
     color: colors.surface,
     marginTop: 2,

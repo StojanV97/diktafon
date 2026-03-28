@@ -16,7 +16,7 @@ export const sectionStyles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     fontSize: 16,
     color: colors.foreground,
   },
